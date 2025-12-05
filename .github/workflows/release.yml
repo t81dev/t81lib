@@ -1,0 +1,30 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create release artifact
+        id: artifact
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          tar czf "t81lib-${VERSION}-headers.tar.gz" include doc README.md LICENSE CHANGELOG.md
+          echo "artifact=t81lib-${VERSION}-headers.tar.gz" >> "$GITHUB_OUTPUT"
+
+      - name: Publish release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ github.ref_name }}
+          name: t81lib ${{ github.ref_name }}
+          body: |
+            Automated release for ${{ github.ref_name }}.
+            See CHANGELOG.md for details.
+          files: ${{ steps.artifact.outputs.artifact }}

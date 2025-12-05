@@ -1,0 +1,16 @@
+PROJECT_NAME           = "t81lib"
+PROJECT_BRIEF          = "Balanced ternary arithmetic primitives"
+PROJECT_NUMBER         = @PROJECT_VERSION@
+
+OUTPUT_DIRECTORY       = docs
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+RECURSIVE              = YES
+INPUT                  = include doc
+QUIET                  = NO
+WARNINGS               = YES
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = NO
+FULL_PATH_NAMES        = YES
+STRIP_FROM_PATH        = .

@@ -13,6 +13,8 @@ t81lib is a small foundation for balanced ternary arithmetic. It primarily expos
 - `CODE_OF_CONDUCT.md` and `CONTRIBUTING.md` explain how to collaborate respectfully.
 - API docs may be generated with Doxygen by adding a Doxyfile and run `cmake --build build --target doc`.
 - `doc/formatting.md` captures the preferred `clang-format`/`clang-tidy` workflow so contributions stay consistent.
+- `doc/api.md` breaks down the public API and gives recipes for conversions, packing, and wide multiplication.
+- `doc/qa.md` lays out the QA checklist covering regressions, fuzz tests, sanitizers, and release readiness.
 ## Automation
 
 - **CI**: GitHub Actions builds the project (`cmake --build`, `ctest`) on pushes/PRs to `main`.
@@ -30,6 +32,10 @@ cmake --build examples/basic/build
 ```
 
 After installing t81lib (`cmake --install build`), a `lib/pkgconfig/t81lib.pc` file is generated so legacy build systems can incorporate the headers via `pkg-config --cflags t81lib`.
+
+## Documentation generation
+
+Run `doxygen Doxyfile` to emit the HTML API reference in `docs/html`. The `Doxyfile` references `include/` and `doc/`, so the resulting pages cover both the headers and the new `doc/api.md` recipes.
 
 ## Building
 

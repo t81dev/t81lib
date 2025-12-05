@@ -1,0 +1,9 @@
+Checks: >
+  -*,
+  clang-analyzer-*,
+  modernize-*,
+  readability-*,
+  performance-*
+WarningsAsErrors: ''
+HeaderFilterRegex: '(.*/)?t81/.*'
+AnalyzeTemporaryDtors: false

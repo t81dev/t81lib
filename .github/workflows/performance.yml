@@ -1,0 +1,22 @@
+name: Performance Benchmarks
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 3'  # Weekly on Wednesdays at 06:00 UTC
+
+jobs:
+  bench:
+    name: Build and run benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure benchmark build
+        run: cmake -S . -B build-bench -DBUILD_BENCHMARKS=ON -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build benchmarks
+        run: cmake --build build-bench
+
+      - name: Run benchmark suite
+        run: ./build-bench/bench/t81lib-bench
