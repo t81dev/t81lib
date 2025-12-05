@@ -18,10 +18,20 @@ t81lib is a small, high-performance foundation for balanced ternary arithmetic i
 ## Documentation
 
 - `doc/overview.md` — numeric philosophy, key types, and design rationale.
+- `doc/design.md` — deeper reasoning about balanced ternary and limb structure.
+- `doc/api.md` — recipes for API usage (mul_wide, packing, CLI helpers).
+- `doc/cookbook.md` — actionable steps for chaining mul_wide, packing, and CLI helpers.
+- `doc/qa.md` — regression/fuzz/sanitizer checklist.
 - `CHANGELOG.md` — tracks all progress.
 - `CODE_OF_CONDUCT.md` and `CONTRIBUTING.md` — how to collaborate respectfully.
 - API documentation can be generated with Doxygen (`cmake --build build --target doc` after adding a `Doxyfile`).
 - `doc/formatting.md` — `clang-format` / `clang-tidy` workflow for consistent style.
+
+## Documentation generation
+
+Run `doxygen Doxyfile` to regenerate the HTML API reference in `docs/html`. The Doxyfile covers both `include/` and `doc/` sources, so the site includes the API references plus the new recipes.
+
+`docs/html/index.html` is committed, so you can browse the pre-generated docs directly in the repository without rerunning Doxygen. Regenerate them locally only when the public headers or docs change.
 
 ## Automation
 
