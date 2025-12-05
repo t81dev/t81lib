@@ -1,0 +1,23 @@
+/**
+ * @file t81lib_config.hpp
+ * @brief Configured macros for t81lib versioning and feature detection.
+ *
+ * This header is generated at configure time and records the current project
+ * version plus optional feature flags such as the benchmark suite toggle.
+ */
+#pragma once
+
+// Version numbers driven by the consuming project's configure step.
+#define T81LIB_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
+#define T81LIB_VERSION_MINOR @PROJECT_VERSION_MINOR@
+#define T81LIB_VERSION_PATCH @PROJECT_VERSION_PATCH@
+
+// Fallback for semantics that prefer a single numeric version.
+#define T81LIB_VERSION_NUMBER ((T81LIB_VERSION_MAJOR * 10000) + \
+    (T81LIB_VERSION_MINOR * 100) + T81LIB_VERSION_PATCH)
+
+// Stringified version for UIs and diagnostics.
+#define T81LIB_VERSION_STRING "@PROJECT_VERSION@"
+
+// Feature flags.
+#define T81LIB_HAS_BENCHMARKS @T81LIB_HAS_BENCHMARKS@
