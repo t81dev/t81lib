@@ -54,6 +54,23 @@ inline constexpr ScoreboardEntry scoreboard[] = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// T81 vs Binary comparison pairs
+// ─────────────────────────────────────────────────────────────────────────────
+struct BinaryPartner {
+    const char* t81_bench;
+    const char* binary_bench;
+    const char* name;
+};
+
+inline constexpr BinaryPartner binary_partners[] = {
+    {"BM_T81_Compare", "BM_GMP_256bit_Mul", "GMP 256-bit"},
+    {"BM_T81_Add", "BM_GMP_128bit", "GMP 128-bit"},
+    {"BM_T81_Negate", "BM_TTMath_128bit", "TTMath 128-bit"},
+    {"BM_T81_Mul_Karatsuba", "BM_GMP_256bit_Mul", "GMP 256-bit"},
+    {"BM_T81_Square", "BM_TTMath_256bit", "TTMath 256-bit"}
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Binary Gods — 256-bit Showdown
 // ─────────────────────────────────────────────────────────────────────────────
 struct BinaryGod {
@@ -131,6 +148,15 @@ inline void ascii_plot(const std::vector<PlotDatum>& entries, const PlotConfig& 
         for (int i = 0; i < bar_len; ++i) std::cout << "█";
         std::cout << " " << format_time(it->second);
         if (it->second == global_min) std::cout << "  ← fastest";
+        for (const auto& partner : binary_partners) {
+            if (partner.t81_bench != e.benchmark_name) continue;
+            auto partner_it = best_times.find(partner.binary_bench);
+            if (partner_it == best_times.end()) continue;
+            double ratio = it->second / partner_it->second;
+            std::cout << " (" << std::fixed << std::setprecision(2) << ratio
+                      << "× " << partner.name << ")";
+            break;
+        }
         std::cout << "\n";
     }
 
