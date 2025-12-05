@@ -1,9 +1,14 @@
 build/
+build-bench/
+examples/basic/build/
+bench/results/
+
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
 CTestTestfile.cmake
 Makefile
+
 *.o
 *.obj
 *.exe
@@ -11,5 +16,16 @@ Makefile
 *.dir
 *.runfiles
 *.swp
+*.gcda
+*.gcno
+
 .vscode/
 .idea/
+.DS_Store
+
+# Doxygen / doc output
+docs/
+docs/html/
+
+# Release assets
+t81lib-*.tar.gz
