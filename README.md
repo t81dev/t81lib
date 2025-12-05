@@ -1,4 +1,3 @@
-```markdown
 # t81lib — Balanced Ternary Arithmetic Foundation
 
 > “Binary was fast.  
