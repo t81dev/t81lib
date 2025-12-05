@@ -59,8 +59,7 @@ int main(int argc, char** argv) {
     AsciiPlotReporter reporter({
         .title = "t81lib v1.0.0 — The Final Form",
         .width = 64,
-        .unit = "ns",
-        .show_predicted = true
+        .unit = "ns"
     });
     benchmark::RunSpecifiedBenchmarks(&reporter);
     benchmark::Shutdown();
