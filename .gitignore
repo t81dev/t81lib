@@ -28,11 +28,5 @@ docs/*
 
 *.js
 
-!docs/html/
-!docs/html/**
-
-docs/html/search/
-docs/html/search/**
-
 # Release assets
 t81lib-*.tar.gz
