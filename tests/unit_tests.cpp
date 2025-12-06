@@ -15,6 +15,8 @@ namespace {
 
 using t81::core::T81Limb;
 using Triplet = std::array<int8_t, T81Limb::TRITS>;
+using t81::core::MontgomeryContext;
+using t81::core::MontgomeryContextTestAccess;
 
 struct AssertionFailure : std::runtime_error {
     using std::runtime_error::runtime_error;
@@ -108,6 +110,20 @@ std::pair<T81Limb, T81Limb> canonical_wide(const T81Limb& a, const T81Limb& b) {
     return { T81Limb::from_trits(low), T81Limb::from_trits(high) };
 }
 
+T81Limb naive_pow_mod(T81Limb base, T81Limb exp, const T81Limb& mod) {
+    T81Limb result = T81Limb::one();
+    auto two = T81Limb::from_int(2);
+    while (!exp.is_zero()) {
+        auto [quot, rem] = exp.div_mod(two);
+        if (!rem.is_zero()) {
+            result = (result * base) % mod;
+        }
+        base = (base * base) % mod;
+        exp = quot;
+    }
+    return result;
+}
+
 int run_tests() {
     std::vector<std::pair<std::string, std::function<void()>>> cases;
     cases.emplace_back("Addition matches naive implementation", []() {
@@ -169,6 +185,77 @@ int run_tests() {
             ensure(fast.second.compare(canonical.second) == 0, "mul_wide high half mismatch");
         }
     });
+
+    cases.emplace_back("pow_mod matches naive Montgomery pow", []() {
+        uint32_t seed = 0xBEEFCAFEu;
+        for (int iteration = 0; iteration < 64; ++iteration) {
+            auto base = random_limb(seed);
+            auto exponent = random_limb(seed);
+            auto modulus = random_limb(seed);
+            if (modulus.is_zero()) continue;
+            auto positive_mod = modulus.is_negative() ? -modulus : modulus;
+            auto positive_exp = exponent.is_negative() ? -exponent : exponent;
+            auto direct = T81Limb::pow_mod(base, positive_exp, positive_mod);
+            auto reference = naive_pow_mod(base % positive_mod, positive_exp, positive_mod);
+            ensure(direct.compare(reference) == 0, "pow_mod mismatch vs naive");
+        }
+    });
+
+    cases.emplace_back("Montgomery multiply equals modular product", []() {
+        uint32_t seed = 0xCAFEF00Du;
+        for (int iteration = 0; iteration < 64; ++iteration) {
+            auto lhs = random_limb(seed);
+            auto rhs = random_limb(seed);
+            auto modulus = random_limb(seed);
+            if (modulus.is_zero()) continue;
+            auto positive_mod = modulus.is_negative() ? -modulus : modulus;
+            auto positive_lhs = lhs % positive_mod;
+            if (positive_lhs.is_negative()) positive_lhs = positive_lhs + positive_mod;
+            auto positive_rhs = rhs % positive_mod;
+            if (positive_rhs.is_negative()) positive_rhs = positive_rhs + positive_mod;
+            MontgomeryContext ctx(positive_mod);
+            auto mont = ctx.multiply(positive_lhs, positive_rhs);
+            auto expected = (positive_lhs * positive_rhs) % positive_mod;
+            ensure(mont.compare(expected) == 0, "Montgomery multiply mismatch");
+        }
+    });
+
+    cases.emplace_back("Montgomery converters round-trip", []() {
+        uint32_t seed = 0xDEAD001Fu;
+        for (int iteration = 0; iteration < 64; ++iteration) {
+            auto value = random_limb(seed);
+            auto modulus = random_limb(seed);
+            if (modulus.is_zero()) continue;
+            auto positive_mod = modulus.is_negative() ? -modulus : modulus;
+            auto residue = value % positive_mod;
+            if (residue.is_negative()) residue = residue + positive_mod;
+            MontgomeryContext ctx(positive_mod);
+            auto mont = ctx.to_montgomery(residue);
+            auto restored = ctx.from_montgomery(mont);
+            ensure(restored.compare(residue) == 0, "Montgomery round-trip mismatch");
+        }
+    });
+
+    cases.emplace_back("Montgomery reduce matches brute-force wide product", []() {
+        uint32_t seed = 0xFEEDBEEFu;
+        for (int iteration = 0; iteration < 64; ++iteration) {
+            auto lhs = random_limb(seed);
+            auto rhs = random_limb(seed);
+            auto modulus = random_limb(seed);
+            if (modulus.is_zero()) continue;
+            auto positive_mod = modulus.is_negative() ? -modulus : modulus;
+            auto positive_lhs = lhs % positive_mod;
+            if (positive_lhs.is_negative()) positive_lhs = positive_lhs + positive_mod;
+            auto positive_rhs = rhs % positive_mod;
+            if (positive_rhs.is_negative()) positive_rhs = positive_rhs + positive_mod;
+            MontgomeryContext ctx(positive_mod);
+            auto wide = T81Limb::mul_wide(positive_lhs, positive_rhs);
+            auto reduced = MontgomeryContextTestAccess::reduce(ctx, wide);
+            auto expected = (positive_lhs * positive_rhs) % positive_mod;
+            ensure(reduced.compare(expected) == 0, "Montgomery reduce mismatch");
+        }
+    });
+
 
     int failed = 0;
     for (auto& [name, body] : cases) {

@@ -180,11 +180,11 @@ inline constexpr int8_t encode_tryte(const int8_t trits[3]) noexcept {
     );
 }
 
-inline void encode_tryte(const int8_t trits[3], int8_t& target) noexcept {
+inline constexpr void encode_tryte(const int8_t trits[3], int8_t& target) noexcept {
     target = encode_tryte(trits);
 }
 
-inline void decode_tryte(int8_t tryte, int8_t out_trits[3]) noexcept {
+inline constexpr void decode_tryte(int8_t tryte, int8_t out_trits[3]) noexcept {
     int value = static_cast<int>(tryte) + 13;
     for (int idx = 0; idx < 3; ++idx) {
         out_trits[idx] = static_cast<int8_t>((value % 3) - 1);
@@ -192,7 +192,7 @@ inline void decode_tryte(int8_t tryte, int8_t out_trits[3]) noexcept {
     }
 }
 
-inline std::array<int8_t, 3> decode_tryte(int8_t tryte) noexcept {
+inline constexpr std::array<int8_t, 3> decode_tryte(int8_t tryte) noexcept {
     std::array<int8_t, 3> digits{};
     decode_tryte(tryte, digits.data());
     return digits;

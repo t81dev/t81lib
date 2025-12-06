@@ -20,6 +20,7 @@ FetchContent_MakeAvailable(benchmark)
 add_executable(t81lib-bench
     main.cpp
     addition.cpp
+    number_theory.cpp
     multiplication.cpp
     negation.cpp
     subtraction.cpp
@@ -30,6 +31,7 @@ add_executable(t81lib-bench
     gmp_comparison.cpp
     conversion.cpp
     shift.cpp
+    pow_mod.cpp
     compare.cpp
     binary_gods.cpp
     competitors/gmp.cpp

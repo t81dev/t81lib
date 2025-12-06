@@ -71,6 +71,18 @@ cmake --build build-bench
 
 Benchmarks are excluded from normal builds; enable only when needed.
 
+## The Final 11 API
+
+t81lib now exposes the full “Final 11” limb helpers that make the library feel like a standard integer type:
+
+- `T81Limb::operator/`, `T81Limb::operator%`, and `T81Limb::div_mod` — canonical division/remainder with the same performance profile as the benchmarks.
+- `T81Limb::pow_mod(base, exp, mod)` — binary modular exponentiation for RSA/DH-like workloads (benchmarked with the new `bench/number_theory.cpp` suite).
+- `T81Limb::gcd`, `T81Limb::inv_mod`, and `T81Limb::abs` / `signum` / `is_zero` / `is_negative` — utility routines for crypto and control flow.
+- Shift helpers (`<<`, `>>`, `shift_left_trytes`, `shift_right_trytes`) mirror the bit-shift semantics you expect from a binary limb.
+- `T81Limb::to_string(base)` renders any limb in balanced ternary or decimal, e.g. `std::cout << T81Limb::from_int(42).to_string(10);`.
+
+These additions are covered by the ASCII benchmark dashboard and documented in `doc/api.md`.
+
 ## Layout
 
 - `include/` — public headers (`t81/core`, `t81/packing`).
