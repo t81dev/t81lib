@@ -121,14 +121,28 @@ namespace detail {
 
     static constexpr int WIDE_TRITS = 96;
 
-    inline void normalize_wide(std::array<int, WIDE_TRITS>& acc) noexcept {
-        for (int i = 0; i + 1 < WIDE_TRITS; ++i) {
-            int carry = (acc[i] + (acc[i] >= 0 ? 1 : -1)) / 3;
-            acc[i] -= carry * 3;
-            acc[i + 1] += carry;
+    inline void normalize_wide_once(std::array<int, WIDE_TRITS>& acc) noexcept {
+        auto handle = [&](int idx) {
+            int carry = (acc[idx] + (acc[idx] >= 0 ? 1 : -1)) / 3;
+            acc[idx] -= carry * 3;
+            if (idx + 1 < WIDE_TRITS) acc[idx + 1] += carry;
+        };
+
+        const int unroll_step = 4;
+        int i = 0;
+        for (; i + unroll_step <= WIDE_TRITS; i += unroll_step) {
+            handle(i);
+            handle(i + 1);
+            handle(i + 2);
+            handle(i + 3);
         }
-        int carry = (acc[WIDE_TRITS - 1] + (acc[WIDE_TRITS - 1] >= 0 ? 1 : -1)) / 3;
-        acc[WIDE_TRITS - 1] -= carry * 3;
+        for (; i < WIDE_TRITS; ++i) {
+            handle(i);
+        }
+    }
+
+    inline void normalize_wide(std::array<int, WIDE_TRITS>& acc) noexcept {
+        normalize_wide_once(acc);
     }
 
     inline void finalize_wide(std::array<int8_t, WIDE_TRITS>& trits,
@@ -162,6 +176,7 @@ private:
 public:
     T81Limb() noexcept = default;
     void set_tryte(int i, int8_t val) { trytes_[i] = val; }
+    int8_t get_tryte(int i) const noexcept { return trytes_[i]; }
 
     [[nodiscard]] constexpr T81Limb operator+(const T81Limb& other) const noexcept;
     [[nodiscard]] constexpr T81Limb operator-() const noexcept;
@@ -198,7 +213,27 @@ inline T81Limb T81Limb::operator*(const T81Limb& rhs) const noexcept {
 }
 
 inline constexpr T81Limb T81Limb::operator+(const T81Limb& other) const noexcept {
-    return addc(other).first;
+    T81Limb res;
+    int8_t carry = 0;
+
+    for (int i = 0; i < TRYTES; ++i) {
+        int32_t sum = static_cast<int32_t>(trytes_[i]) + static_cast<int32_t>(other.trytes_[i]) + carry;
+        int32_t q = (sum >= 14) ? 1 : (sum <= -14) ? -1 : 0;
+        int32_t t = sum - q * 27;
+        res.trytes_[i] = static_cast<int8_t>(t);
+        carry = static_cast<int8_t>(q);
+    }
+
+    carry = 0;
+    for (int i = 0; i < TRYTES; ++i) {
+        int32_t sum = static_cast<int32_t>(res.trytes_[i]) + carry;
+        int32_t over = (sum >= 14);
+        int32_t under = (sum <= -14);
+        res.trytes_[i] = static_cast<int8_t>(sum - (over * 27) + (under * 27));
+        carry = static_cast<int8_t>(over - under);
+    }
+
+    return res;
 }
 
 inline constexpr T81Limb T81Limb::operator-() const noexcept {
@@ -759,6 +794,7 @@ public:
 
     static T81Limb27 from_low_block(const T81Limb& src) noexcept;
     static T81Limb27 from_high_block(const T81Limb& src) noexcept;
+    static T81Limb27 from_tryte_block(const T81Limb& src, int start_tryte) noexcept;
 
     static T81Limb27 from_low_27(const T81Limb54& src) noexcept {
         T81Limb27 lo;
@@ -898,11 +934,20 @@ inline T81Limb27 T81Limb27::from_trits_window(
 }
 
 inline T81Limb27 T81Limb27::from_low_block(const T81Limb& src) noexcept {
-    return from_trits_window(src.to_trits(), 0);
+    return from_tryte_block(src, 0);
 }
 
 inline T81Limb27 T81Limb27::from_high_block(const T81Limb& src) noexcept {
-    return from_trits_window(src.to_trits(), PART_TRITS);
+    return from_tryte_block(src, PART_TRYTES);
+}
+
+inline T81Limb27 T81Limb27::from_tryte_block(const T81Limb& src, int start_tryte) noexcept {
+    T81Limb27 block;
+    for (int i = 0; i < TRYTES; ++i) {
+        int tryte_index = start_tryte + i;
+        block.trytes_[i] = (tryte_index < T81Limb::TRYTES) ? src.trytes_[tryte_index] : 0;
+    }
+    return block;
 }
 
 inline std::pair<T81Limb, T81Limb> T81Limb::mul_wide(
@@ -927,10 +972,10 @@ inline std::pair<T81Limb, T81Limb> T81Limb::mul_wide_fast(
 {
     auto a_trits = a.to_trits();
     auto b_trits = b.to_trits();
-    auto a_lo = T81Limb27::from_trits_window(a_trits, 0);
-    auto a_hi = T81Limb27::from_trits_window(a_trits, T81Limb27::PART_TRITS);
-    auto b_lo = T81Limb27::from_trits_window(b_trits, 0);
-    auto b_hi = T81Limb27::from_trits_window(b_trits, T81Limb27::PART_TRITS);
+    auto a_lo = T81Limb27::from_tryte_block(a, 0);
+    auto a_hi = T81Limb27::from_tryte_block(a, T81Limb27::PART_TRYTES);
+    auto b_lo = T81Limb27::from_tryte_block(b, 0);
+    auto b_hi = T81Limb27::from_tryte_block(b, T81Limb27::PART_TRYTES);
 
     auto z0 = a_lo * b_lo;
     auto z2 = a_hi * b_hi;
@@ -938,31 +983,20 @@ inline std::pair<T81Limb, T81Limb> T81Limb::mul_wide_fast(
     auto temp_z0_z2 = z0 + z2;
     auto z1 = mid - temp_z0_z2;
 
-    auto to_int_section = [](const T81Limb54& limb) {
-        std::array<int, T81Limb54::TRITS> section{};
-        auto trits = limb.to_trits();
-        for (int i = 0; i < T81Limb54::TRITS; ++i) {
-            section[i] = static_cast<int>(trits[i]);
-        }
-        return section;
-    };
-
-    auto z0_arr = to_int_section(z0);
-    auto z1_arr = to_int_section(z1);
-    auto z2_arr = to_int_section(z2);
     std::array<int, detail::WIDE_TRITS> accum{};
 
-    auto add_shifted = [&](const std::array<int, T81Limb54::TRITS>& section, int shift) {
+    auto add_shifted = [&](const T81Limb54& limb, int shift) {
+        auto trits = limb.to_trits();
         for (int i = 0; i < T81Limb54::TRITS; ++i) {
             int target = i + shift;
             if (target >= detail::WIDE_TRITS) break;
-            accum[target] += section[i];
+            accum[target] += static_cast<int>(trits[i]);
         }
     };
 
-    add_shifted(z0_arr, 0);
-    add_shifted(z1_arr, T81Limb27::PART_TRITS);
-    add_shifted(z2_arr, T81Limb27::PART_TRITS * 2);
+    add_shifted(z0, 0);
+    add_shifted(z1, T81Limb27::PART_TRITS);
+    add_shifted(z2, T81Limb27::PART_TRITS * 2);
 
     detail::normalize_wide(accum);
     detail::normalize_wide(accum);

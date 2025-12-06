@@ -2,6 +2,7 @@ build/
 build-bench/
 examples/basic/build/
 bench/results/
+bench/deps/
 
 CMakeCache.txt
 CMakeFiles/
