@@ -36,6 +36,7 @@ add_executable(t81lib-bench
     competitors/boost_multiprecision.cpp
     competitors/ttmath.cpp
     competitors/naive_ternary.cpp
+    division.cpp
 )
 
 target_link_libraries(t81lib-bench PRIVATE

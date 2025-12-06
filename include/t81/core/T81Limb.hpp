@@ -205,6 +205,9 @@ private:
         const T81Limb& b) noexcept;
     [[nodiscard]] static T81Limb mul_booth_karatsuba(const T81Limb& a, const T81Limb& b) noexcept;
     [[nodiscard]] T81Limb shift_left_trytes(int count) const noexcept;
+    [[nodiscard]] T81Limb square() const noexcept;
+private:
+    [[nodiscard]] static std::pair<T81Limb, T81Limb> square_wide(const T81Limb& a) noexcept;
 };
 
 
@@ -767,6 +770,7 @@ inline T81Limb T81Limb::mul_booth_karatsuba(const T81Limb& a, const T81Limb& b) 
     return mul_wide(a, b).first;
 }
 
+
 inline std::pair<T81Limb, T81Limb> T81Limb::mul_wide_canonical(
     const T81Limb& a,
     const T81Limb& b) noexcept
@@ -918,6 +922,10 @@ public:
         return T81Limb54::from_trits(result);
     }
 
+    [[nodiscard]] T81Limb54 square_booth() const noexcept {
+        return (*this) * (*this);
+    }
+
     static T81Limb27 from_trits_window(const std::array<int8_t, T81Limb::TRITS>& digits, int start_trit) noexcept;
 
 private:
@@ -966,6 +974,48 @@ inline T81Limb27 T81Limb27::from_tryte_block(const T81Limb& src, int start_tryte
         block.trytes_[i] = (tryte_index < T81Limb::TRYTES) ? src.trytes_[tryte_index] : 0;
     }
     return block;
+}
+
+inline T81Limb T81Limb::square() const noexcept {
+    return square_wide(*this).first;
+}
+
+inline std::pair<T81Limb, T81Limb> T81Limb::square_wide(const T81Limb& a) noexcept {
+    auto a_lo = T81Limb27::from_tryte_block(a, 0);
+    auto a_hi = T81Limb27::from_tryte_block(a, T81Limb27::PART_TRYTES);
+
+    auto z0 = a_lo.square_booth();
+    auto z2 = a_hi.square_booth();
+
+    auto sum = a_lo + a_hi;
+    auto mid = sum.square_booth();
+    auto z1 = mid - (z0 + z2);
+
+    std::array<int, detail::WIDE_TRITS> accum{};
+    auto add_shifted = [&](const T81Limb54& limb, int shift) {
+        auto trits = limb.to_trits();
+        for (int i = 0; i < T81Limb54::TRITS; ++i) {
+            int target = i + shift;
+            if (target >= detail::WIDE_TRITS) break;
+            accum[target] += static_cast<int>(trits[i]);
+        }
+    };
+
+    add_shifted(z0, 0);
+    add_shifted(z1, T81Limb27::PART_TRITS);
+    add_shifted(z2, T81Limb27::PART_TRITS * 2);
+
+    detail::normalize_wide(accum);
+    detail::normalize_wide(accum);
+    detail::normalize_wide(accum);
+
+    std::array<int8_t, detail::WIDE_TRITS> trits{};
+    detail::finalize_wide(trits, accum);
+
+    std::array<int8_t, TRITS> low{}, high{};
+    std::copy_n(trits.begin(), TRITS, low.begin());
+    std::copy_n(trits.begin() + TRITS, TRITS, high.begin());
+    return {T81Limb::from_trits(low), T81Limb::from_trits(high)};
 }
 
 inline std::pair<T81Limb, T81Limb> T81Limb::mul_wide(
