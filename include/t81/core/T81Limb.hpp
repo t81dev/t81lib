@@ -150,6 +150,7 @@ namespace detail {
 
 class T81Limb54;
 class T81Limb27;
+class T81Limb81;
 
 class T81Limb {
 public:
@@ -199,6 +200,8 @@ public:
         const T81Limb& b) noexcept;
     [[nodiscard]] std::string to_string(int base = 3) const;
     [[nodiscard]] static constexpr T81Limb from_int(int value) noexcept;
+    [[nodiscard]] static constexpr T81Limb from_int128(signed __int128 value) noexcept;
+    [[nodiscard]] static constexpr signed __int128 to_int128(const T81Limb& value) noexcept;
     [[nodiscard]] T81Limb square() const noexcept;
 private:
     [[nodiscard]] static constexpr std::pair<T81Limb, T81Limb> mul_wide_canonical(
@@ -417,22 +420,7 @@ inline constexpr T81Limb T81Limb::operator-(const T81Limb& rhs) const noexcept {
 }
 
 inline T81Limb T81Limb::operator/(const T81Limb& divisor) const {
-    if (divisor.compare(T81Limb()) == 0) throw std::domain_error("division by zero");
-
-    bool negative = compare(T81Limb()) < 0;
-    if (divisor.compare(T81Limb()) < 0) negative = !negative;
-
-    T81Limb numerator = negative ? -*this : *this;
-    T81Limb denominator = divisor;
-    if (denominator.compare(T81Limb()) < 0) denominator = -denominator;
-
-    T81Limb quotient;
-    while (numerator.compare(denominator) >= 0) {
-        numerator = numerator - denominator;
-        quotient = quotient + T81Limb::one();
-    }
-
-    return negative ? -quotient : quotient;
+    return div_mod(divisor).first;
 }
 
 inline T81Limb T81Limb::operator%(const T81Limb& divisor) const {
@@ -445,32 +433,11 @@ inline constexpr std::pair<T81Limb, T81Limb> T81Limb::div_mod(const T81Limb& div
 }
 
 inline constexpr std::pair<T81Limb, T81Limb> T81Limb::div_mod_pair(const T81Limb& numerator, const T81Limb& denominator) {
-    bool negative = numerator.compare(T81Limb()) < 0;
-    bool denom_negative = denominator.compare(T81Limb()) < 0;
-    bool quotient_negative = negative ^ denom_negative;
-
-    T81Limb num = negative ? -numerator : numerator;
-    T81Limb den = denom_negative ? -denominator : denominator;
-
-    T81Limb quotient;
-    while (num.compare(den) >= 0) {
-        T81Limb multiple = den;
-        T81Limb factor = T81Limb::one();
-        // accelerate using doubling (shift-and-subtract).
-        while (true) {
-            auto doubled = multiple + multiple;
-            if (num.compare(doubled) < 0) break;
-            multiple = std::move(doubled);
-            factor = factor + factor;
-        }
-        num = num - multiple;
-        quotient = quotient + factor;
-    }
-
-    if (quotient_negative) quotient = -quotient;
-    if (negative && num.compare(T81Limb()) != 0) num = -num;
-
-    return {quotient, num};
+    signed __int128 num = to_int128(numerator);
+    signed __int128 den = to_int128(denominator);
+    signed __int128 quot = num / den;
+    signed __int128 rem = num - quot * den;
+    return {from_int128(quot), from_int128(rem)};
 }
 
 inline constexpr T81Limb T81Limb::gcd(const T81Limb& other) const {
@@ -1148,6 +1115,8 @@ public:
     static constexpr T81Limb27 from_low_block(const T81Limb& src) noexcept;
     static constexpr T81Limb27 from_high_block(const T81Limb& src) noexcept;
     static constexpr T81Limb27 from_tryte_block(const T81Limb& src, int start_tryte) noexcept;
+    static constexpr T81Limb27 from_tryte_block(const T81Limb81& src, int start_tryte) noexcept;
+    [[nodiscard]] constexpr int8_t get_tryte(int index) const noexcept { return trytes_[index]; }
 
     static constexpr T81Limb27 from_low_27(const T81Limb54& src) noexcept {
         T81Limb27 lo;
@@ -1257,9 +1226,14 @@ public:
         return (*this) * (*this);
     }
 
+    [[nodiscard]] constexpr std::array<int8_t, TRITS> to_trits() const noexcept;
+
     static constexpr T81Limb27 from_trits_window(const std::array<int8_t, T81Limb::TRITS>& digits, int start_trit) noexcept;
 
 private:
+    template <typename Limb>
+    static constexpr T81Limb27 from_tryte_block_impl(const Limb& src, int start_tryte) noexcept;
+
     [[nodiscard]] constexpr std::array<std::array<int8_t, TRYTES>, 3> to_trit_columns() const noexcept {
         std::array<std::array<int8_t, TRYTES>, 3> cols{};
         for (int idx = 0; idx < TRYTES; ++idx) {
@@ -1272,6 +1246,175 @@ private:
         return cols;
     }
 };
+
+class T81Limb81 {
+public:
+    static constexpr int TRITS = 81;
+    static constexpr int TRYTES = 27;
+
+    T81Limb81() noexcept = default;
+
+    void set_tryte(int index, int8_t value) noexcept { trytes_[index] = value; }
+    [[nodiscard]] constexpr int8_t get_tryte(int index) const noexcept { return trytes_[index]; }
+
+    [[nodiscard]] constexpr T81Limb27 lo() const noexcept { return T81Limb27::from_tryte_block(*this, 0); }
+    [[nodiscard]] constexpr T81Limb27 mid() const noexcept { return T81Limb27::from_tryte_block(*this, 9); }
+    [[nodiscard]] constexpr T81Limb27 hi() const noexcept { return T81Limb27::from_tryte_block(*this, 18); }
+
+    [[nodiscard]] constexpr std::array<int8_t, TRITS> to_trits() const noexcept;
+    [[nodiscard]] static constexpr T81Limb81 from_trits(const std::array<int8_t, TRITS>& digits) noexcept;
+    [[nodiscard]] static constexpr T81Limb81 from_parts(
+        const T81Limb27& lo,
+        const T81Limb27& mid,
+        const T81Limb27& hi) noexcept;
+    [[nodiscard]] static constexpr std::pair<T81Limb81, T81Limb81> mul_wide(
+        const T81Limb81& a,
+        const T81Limb81& b) noexcept;
+
+private:
+    alignas(32) int8_t trytes_[TRYTES]{};
+};
+
+inline constexpr std::array<int8_t, T81Limb81::TRITS> T81Limb81::to_trits() const noexcept {
+    std::array<int8_t, TRITS> trits{};
+    for (int idx = 0; idx < TRYTES; ++idx) {
+        int8_t decoded[3]{};
+        t81::decode_tryte(trytes_[idx], decoded);
+        trits[idx * 3 + 0] = decoded[0];
+        trits[idx * 3 + 1] = decoded[1];
+        trits[idx * 3 + 2] = decoded[2];
+    }
+    return trits;
+}
+
+inline constexpr T81Limb81 T81Limb81::from_trits(const std::array<int8_t, TRITS>& digits) noexcept {
+    std::array<int8_t, TRITS> normalized = digits;
+    int carry = 0;
+    for (int i = 0; i < TRITS; ++i) {
+        int sum = static_cast<int>(normalized[i]) + carry;
+        if (sum == 2) { normalized[i] = -1; carry = 1; }
+        else if (sum == -2) { normalized[i] = 1; carry = -1; }
+        else { normalized[i] = static_cast<int8_t>(sum); carry = 0; }
+    }
+
+    T81Limb81 limb;
+    for (int idx = 0; idx < TRYTES; ++idx) {
+        int8_t chunk[3] = {
+            normalized[idx * 3 + 0],
+            normalized[idx * 3 + 1],
+            normalized[idx * 3 + 2]
+        };
+        t81::encode_tryte(chunk, limb.trytes_[idx]);
+    }
+    return limb;
+}
+
+inline constexpr T81Limb81 T81Limb81::from_parts(
+    const T81Limb27& lo,
+    const T81Limb27& mid,
+    const T81Limb27& hi) noexcept
+{
+    T81Limb81 limb;
+    constexpr int PART = T81Limb27::TRYTES;
+    for (int idx = 0; idx < PART; ++idx) {
+        limb.trytes_[idx] = lo.get_tryte(idx);
+        limb.trytes_[idx + PART] = mid.get_tryte(idx);
+        limb.trytes_[idx + PART * 2] = hi.get_tryte(idx);
+    }
+    return limb;
+}
+
+namespace detail {
+inline constexpr int WIDE_TRITS_162 = T81Limb81::TRITS * 2;
+
+inline constexpr void normalize_wide_162(std::array<int, WIDE_TRITS_162>& acc) noexcept {
+    for (int idx = 0; idx + 1 < WIDE_TRITS_162; ++idx) {
+        int carry = (acc[idx] + (acc[idx] >= 0 ? 1 : -1)) / 3;
+        acc[idx] -= carry * 3;
+        acc[idx + 1] += carry;
+    }
+    int carry = (acc[WIDE_TRITS_162 - 1] + (acc[WIDE_TRITS_162 - 1] >= 0 ? 1 : -1)) / 3;
+    acc[WIDE_TRITS_162 - 1] -= carry * 3;
+}
+
+inline constexpr void finalize_wide_162(
+    std::array<int8_t, WIDE_TRITS_162>& trits,
+    const std::array<int, WIDE_TRITS_162>& acc) noexcept
+{
+    for (int i = 0; i < WIDE_TRITS_162; ++i) {
+        int value = acc[i];
+        if (value > 1) value = 1;
+        else if (value < -1) value = -1;
+        trits[i] = static_cast<int8_t>(value);
+    }
+}
+} // namespace detail
+
+inline constexpr std::pair<T81Limb81, T81Limb81> T81Limb81::mul_wide(
+    const T81Limb81& a,
+    const T81Limb81& b) noexcept
+{
+    auto a_lo = a.lo();
+    auto a_mid = a.mid();
+    auto a_hi = a.hi();
+    auto b_lo = b.lo();
+    auto b_mid = b.mid();
+    auto b_hi = b.hi();
+
+    auto z0 = a_lo * b_lo;
+    auto z1a = a_lo * b_mid;
+    auto z1b = a_mid * b_lo;
+    auto z2a = a_lo * b_hi;
+    auto z2b = a_mid * b_mid;
+    auto z2c = a_hi * b_lo;
+    auto z3a = a_mid * b_hi;
+    auto z3b = a_hi * b_mid;
+    auto z4 = a_hi * b_hi;
+
+    std::array<int, detail::WIDE_TRITS_162> accum{};
+    auto add_shifted = [&](const T81Limb54& value, int shift_trytes) {
+        auto trits = value.to_trits();
+        int shift = shift_trytes * 3;
+        for (int idx = 0; idx < T81Limb54::TRITS; ++idx) {
+            accum[idx + shift] += static_cast<int>(trits[idx]);
+        }
+    };
+
+    add_shifted(z0, 0);
+    add_shifted(z1a, 1);
+    add_shifted(z1b, 1);
+    add_shifted(z2a, 2);
+    add_shifted(z2b, 2);
+    add_shifted(z2c, 2);
+    add_shifted(z3a, 3);
+    add_shifted(z3b, 3);
+    add_shifted(z4, 4);
+
+    detail::normalize_wide_162(accum);
+    detail::normalize_wide_162(accum);
+    detail::normalize_wide_162(accum);
+
+    std::array<int8_t, detail::WIDE_TRITS_162> normalized{};
+    detail::finalize_wide_162(normalized, accum);
+
+    std::array<int8_t, TRITS> low{};
+    std::array<int8_t, TRITS> high{};
+    std::copy_n(normalized.begin(), TRITS, low.begin());
+    std::copy_n(normalized.begin() + TRITS, TRITS, high.begin());
+    return {from_trits(low), from_trits(high)};
+}
+
+inline constexpr std::array<int8_t, T81Limb27::TRITS> T81Limb27::to_trits() const noexcept {
+    std::array<int8_t, TRITS> trits{};
+    for (int idx = 0; idx < TRYTES; ++idx) {
+        int8_t decoded[3]{};
+        t81::decode_tryte(trytes_[idx], decoded);
+        trits[idx * 3 + 0] = decoded[0];
+        trits[idx * 3 + 1] = decoded[1];
+        trits[idx * 3 + 2] = decoded[2];
+    }
+    return trits;
+}
 
 inline constexpr T81Limb27 T81Limb27::from_trits_window(
     const std::array<int8_t, T81Limb::TRITS>& digits,
@@ -1299,10 +1442,23 @@ inline constexpr T81Limb27 T81Limb27::from_high_block(const T81Limb& src) noexce
 }
 
 inline constexpr T81Limb27 T81Limb27::from_tryte_block(const T81Limb& src, int start_tryte) noexcept {
-    T81Limb27 block;
+    return from_tryte_block_impl(src, start_tryte);
+}
+
+inline constexpr T81Limb27 T81Limb27::from_tryte_block(const T81Limb81& src, int start_tryte) noexcept {
+    return from_tryte_block_impl(src, start_tryte);
+}
+
+template <typename Limb>
+inline constexpr T81Limb27 T81Limb27::from_tryte_block_impl(const Limb& src, int start_tryte) noexcept {
+    T81Limb27 block{};
     for (int i = 0; i < TRYTES; ++i) {
         int tryte_index = start_tryte + i;
-        block.trytes_[i] = (tryte_index < T81Limb::TRYTES) ? src.trytes_[tryte_index] : 0;
+        int8_t value = 0;
+        if (tryte_index < Limb::TRYTES) {
+            value = src.get_tryte(tryte_index);
+        }
+        block.trytes_[i] = value;
     }
     return block;
 }
@@ -1369,6 +1525,36 @@ inline constexpr T81Limb T81Limb::from_int(int value) noexcept {
         res.trytes_[idx++] = static_cast<int8_t>(rem);
     }
     return negative ? -res : res;
+}
+
+inline constexpr T81Limb T81Limb::from_int128(signed __int128 value) noexcept {
+    if (value == 0) {
+        return T81Limb();
+    }
+    T81Limb res;
+    bool negative = value < 0;
+    unsigned __int128 magnitude = negative ? static_cast<unsigned __int128>(-value)
+                                            : static_cast<unsigned __int128>(value);
+    for (int idx = 0; idx < TRYTES && magnitude != 0; ++idx) {
+        unsigned __int128 rem = magnitude % 3;
+        magnitude /= 3;
+        int digit = static_cast<int>(rem);
+        if (digit == 2) {
+            digit = -1;
+            ++magnitude;
+        }
+        res.trytes_[idx] = static_cast<int8_t>(digit);
+    }
+    return negative ? -res : res;
+}
+
+inline constexpr signed __int128 T81Limb::to_int128(const T81Limb& value) noexcept {
+    signed __int128 result = 0;
+    auto trits = value.to_trits();
+    for (int idx = TRITS - 1; idx >= 0; --idx) {
+        result = result * 3 + trits[idx];
+    }
+    return result;
 }
 
 inline int T81Limb::small_int() const noexcept {
