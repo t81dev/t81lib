@@ -279,6 +279,7 @@ struct MontgomeryContextTestAccess;
 
 struct MontgomeryContext {
     T81Limb modulus;
+    const bool use_montgomery;
     T81Limb r2_mod;
     T81Limb m_prime;  // -m^{-1} mod R where R = 3^48
 
@@ -291,13 +292,15 @@ private:
     [[nodiscard]] static constexpr T81Limb pow3_mod(const T81Limb& modulus, int exponent) noexcept;
     [[nodiscard]] static constexpr T81Limb compute_m_prime(const T81Limb& modulus) noexcept;
     [[nodiscard]] static constexpr T81Limb compute_r2_mod(const T81Limb& modulus) noexcept;
+    [[nodiscard]] static constexpr bool modulus_invertible_mod3(const T81Limb& modulus) noexcept;
     friend struct MontgomeryContextTestAccess;
 };
 
 inline constexpr MontgomeryContext::MontgomeryContext(const T81Limb& mod)
     : modulus(mod),
-      r2_mod(compute_r2_mod(mod)),
-      m_prime(compute_m_prime(mod))
+      use_montgomery(modulus_invertible_mod3(mod)),
+      r2_mod(use_montgomery ? compute_r2_mod(mod) : T81Limb()),
+      m_prime(use_montgomery ? compute_m_prime(mod) : T81Limb())
 {}
 
 inline constexpr T81Limb MontgomeryContext::pow3_mod(const T81Limb& modulus, int exponent) noexcept {
@@ -311,38 +314,60 @@ inline constexpr T81Limb MontgomeryContext::pow3_mod(const T81Limb& modulus, int
     return result;
 }
 
+inline constexpr bool MontgomeryContext::modulus_invertible_mod3(const T81Limb& modulus) noexcept {
+    auto trits = modulus.to_trits();
+    int m_mod3 = (static_cast<int>(trits[0]) + 3) % 3;
+    return m_mod3 != 0;
+}
+
 inline constexpr T81Limb MontgomeryContext::compute_m_prime(const T81Limb& modulus) noexcept {
-    Base3Digits candidate{};
-    const int m_mod3 = (static_cast<int>(modulus.to_trits()[0]) + 3) % 3;
-    for (int k = 0; k < T81Limb::TRITS; ++k) {
-        T81Limb partial = candidate.to_limb();
-        auto product = T81Limb::mul_wide(modulus, partial);
-        auto accum = detail::wide_from_pair(product);
-        accum[0] += 1;
-        int k_digit = ((accum[k] % 3) + 3) % 3;
-        int inv_mod3 = (m_mod3 == 1) ? 1 : 2;
-        int needed = (3 - k_digit) % 3;
-        needed = (needed * inv_mod3) % 3;
-        candidate.add_digit(k, needed);
+    auto trits = modulus.to_trits();
+    int m_mod3 = (static_cast<int>(trits[0]) + 3) % 3;
+    if (m_mod3 == 0) return T81Limb();
+    int inv_mod3 = (m_mod3 == 1) ? 1 : 2;
+
+    T81Limb inv = T81Limb::from_int(inv_mod3);
+    const T81Limb two = T81Limb::from_int(2);
+
+    for (int iter = 0; iter < 6; ++iter) {
+        inv = inv * (two - modulus * inv);
     }
-    return candidate.to_limb();
+
+    return -inv;
 }
 
 inline constexpr T81Limb MontgomeryContext::compute_r2_mod(const T81Limb& modulus) noexcept {
+    if (!modulus_invertible_mod3(modulus)) return T81Limb();
     auto r_mod = pow3_mod(modulus, T81Limb::TRITS);
     auto product = r_mod * r_mod;
     return product.div_mod(modulus).second;
 }
 
 inline constexpr T81Limb MontgomeryContext::multiply(const T81Limb& a, const T81Limb& b) const noexcept {
+    if (!use_montgomery) {
+        auto product = a * b;
+        auto remainder = product.div_mod(modulus).second;
+        if (remainder.is_negative()) remainder = remainder + modulus;
+        return remainder;
+    }
     return montgomery_reduce(T81Limb::mul_wide(a, b));
 }
 
 inline constexpr T81Limb MontgomeryContext::to_montgomery(const T81Limb& x) const noexcept {
+    if (!use_montgomery) {
+        auto remainder = x.div_mod(modulus).second;
+        if (remainder.is_negative()) remainder = remainder + modulus;
+        return remainder;
+    }
     return multiply(x, r2_mod);
 }
 
 inline constexpr T81Limb MontgomeryContext::from_montgomery(const T81Limb& x) const noexcept {
+    if (!use_montgomery) {
+        auto remainder = x.div_mod(modulus).second;
+        if (remainder.is_negative()) remainder = remainder + modulus;
+        return remainder;
+    }
     return multiply(x, T81Limb::one());
 }
 
@@ -354,6 +379,7 @@ inline constexpr T81Limb MontgomeryContext::montgomery_reduce(const std::pair<T8
     for (int idx = 0; idx < detail::WIDE_TRITS; ++idx) {
         accum[idx] += um_acc[idx];
     }
+    // Normalize the wide result repeatedly so carries settle before slicing.
     detail::normalize_wide(accum);
     detail::normalize_wide(accum);
     detail::normalize_wide(accum);
@@ -432,12 +458,113 @@ inline constexpr std::pair<T81Limb, T81Limb> T81Limb::div_mod(const T81Limb& div
     return div_mod_pair(*this, divisor);
 }
 
+namespace detail {
+inline constexpr std::array<int, WIDE_TRITS> wide_from_limb_abs(const T81Limb& value) noexcept {
+    std::array<int, WIDE_TRITS> data{};
+    auto trits = value.to_trits();
+    for (int idx = 0; idx < T81Limb::TRITS; ++idx) {
+        data[idx] = trits[idx];
+    }
+    return data;
+}
+
+inline constexpr std::array<int, WIDE_TRITS> to_nonnegative_digits(
+    const std::array<int, WIDE_TRITS>& value) noexcept
+{
+    std::array<int, WIDE_TRITS> digits{};
+    int carry = 0;
+    for (int idx = 0; idx < WIDE_TRITS; ++idx) {
+        int sum = value[idx] + carry;
+        int digit = sum;
+        carry = 0;
+        if (digit < 0) {
+            digit += 3;
+            carry = -1;
+        } else if (digit > 2) {
+            digit -= 3;
+            carry = 1;
+        }
+        digits[idx] = digit;
+    }
+    return digits;
+}
+
+inline constexpr int highest_trit(const std::array<int, WIDE_TRITS>& value) noexcept {
+    auto digits = to_nonnegative_digits(value);
+    for (int idx = WIDE_TRITS - 1; idx >= 0; --idx) {
+        if (digits[idx] != 0) return idx;
+    }
+    return -1;
+}
+
+inline constexpr int compare_shifted(
+    const std::array<int, WIDE_TRITS>& lhs,
+    const std::array<int, WIDE_TRITS>& rhs,
+    int shift) noexcept
+{
+    auto lhs_digits = to_nonnegative_digits(lhs);
+    auto rhs_digits = to_nonnegative_digits(rhs);
+    for (int idx = WIDE_TRITS - 1; idx >= 0; --idx) {
+        int rhs_value = (idx - shift >= 0) ? rhs_digits[idx - shift] : 0;
+        if (lhs_digits[idx] != rhs_value) return lhs_digits[idx] > rhs_value ? 1 : -1;
+    }
+    return 0;
+}
+
+inline constexpr void subtract_shifted(
+    std::array<int, WIDE_TRITS>& target,
+    const std::array<int, WIDE_TRITS>& source,
+    int shift) noexcept
+{
+    if (shift < 0) return;
+    for (int idx = 0; idx + shift < WIDE_TRITS; ++idx) {
+        target[idx + shift] -= source[idx];
+    }
+    normalize_wide(target);
+}
+} // namespace detail
+
 inline constexpr std::pair<T81Limb, T81Limb> T81Limb::div_mod_pair(const T81Limb& numerator, const T81Limb& denominator) {
-    signed __int128 num = to_int128(numerator);
-    signed __int128 den = to_int128(denominator);
-    signed __int128 quot = num / den;
-    signed __int128 rem = num - quot * den;
-    return {from_int128(quot), from_int128(rem)};
+    if (denominator.compare(T81Limb()) == 0) throw std::domain_error("division by zero");
+
+    const bool numerator_negative = numerator.is_negative();
+    const bool denominator_negative = denominator.is_negative();
+
+    auto rem = detail::wide_from_limb_abs(numerator.abs());
+    auto den = detail::wide_from_limb_abs(denominator.abs());
+
+    int rem_msd = detail::highest_trit(rem);
+    int den_msd = detail::highest_trit(den);
+
+    std::array<int8_t, TRITS> quotient_digits{};
+    if (den_msd >= 0 && rem_msd >= den_msd) {
+        for (int shift = rem_msd - den_msd; shift >= 0; --shift) {
+            while (quotient_digits[shift] < 2 && detail::compare_shifted(rem, den, shift) >= 0) {
+                detail::subtract_shifted(rem, den, shift);
+                ++quotient_digits[shift];
+            }
+        }
+    }
+
+    Base3Digits quotient_base3;
+    for (int idx = 0; idx < TRITS; ++idx) {
+        quotient_base3.digits[idx] = quotient_digits[idx];
+    }
+    T81Limb quotient = quotient_base3.to_limb();
+    if (numerator_negative != denominator_negative && !quotient.is_zero()) {
+        quotient = -quotient;
+    }
+
+    detail::normalize_wide(rem);
+    auto rem_trits = detail::trits_from_accum(rem);
+    std::array<int8_t, TRITS> remainder_trits{};
+    std::copy_n(rem_trits.begin(), TRITS, remainder_trits.begin());
+    T81Limb remainder = T81Limb::from_trits(remainder_trits);
+    if (numerator_negative && !remainder.is_zero()) {
+        remainder = -remainder;
+    }
+
+    return {quotient, remainder};
 }
 
 inline constexpr T81Limb T81Limb::gcd(const T81Limb& other) const {
@@ -600,6 +727,8 @@ inline constexpr std::pair<T81Limb, int8_t> T81Limb::addc(const T81Limb& other) 
     for (int i = 8; i < TRYTES; ++i) {
         map_ids[i] = detail::COMPOSITION_TABLE[map_ids[i]][map_ids[i - 8]];
     }
+    // The carries below are computed from the fully composed carry map so
+    // each tryte can pick the correct sum slot with no further propagation.
 
     const int8_t c0  = 0;
     const int8_t c1  = static_cast<int8_t>(detail::CARRY_FROM_ZERO[map_ids[0]]);
@@ -657,9 +786,9 @@ inline constexpr T81Limb T81Limb::from_trits(const std::array<int8_t, TRITS>& di
     int carry = 0;
     for (int i = 0; i < TRITS; ++i) {
         int sum = static_cast<int>(normalized[i]) + carry;
-        if (sum == 2) { normalized[i] = -1; carry = 1; }
-        else if (sum == -2) { normalized[i] = 1; carry = -1; }
-        else { normalized[i] = static_cast<int8_t>(sum); carry = 0; }
+        int new_carry = (sum + (sum >= 0 ? 1 : -1)) / 3;
+        normalized[i] = static_cast<int8_t>(sum - new_carry * 3);
+        carry = new_carry;
     }
     T81Limb limb;
     for (int idx = 0; idx < TRYTES; ++idx) {
@@ -723,31 +852,17 @@ inline std::array<int8_t, T81Limb::TRITS> T81Limb::booth_mul_trits(
     int carry = 0;
     for (int i = 0; i < TRITS * 2; ++i) {
         int sum = accum[i] + carry;
-        if (sum >= 2) {
-            accum[i] = sum - 3;
-            carry = 1;
-        } else if (sum <= -2) {
-            accum[i] = sum + 3;
-            carry = -1;
-        } else {
-            accum[i] = sum;
-            carry = 0;
-        }
+        int new_carry = (sum + (sum >= 0 ? 1 : -1)) / 3;
+        accum[i] = sum - new_carry * 3;
+        carry = new_carry;
     }
 
     std::array<int8_t, TRITS> result{};
     for (int i = 0; i < TRITS; ++i) {
         int sum = accum[i] + carry;
-        if (sum == 2) {
-            result[i] = -1;
-            carry = 1;
-        } else if (sum == -2) {
-            result[i] = 1;
-            carry = -1;
-        } else {
-            result[i] = static_cast<int8_t>(sum);
-            carry = 0;
-        }
+        int new_carry = (sum + (sum >= 0 ? 1 : -1)) / 3;
+        result[i] = static_cast<int8_t>(sum - new_carry * 3);
+        carry = new_carry;
     }
     return result;
 }
@@ -909,9 +1024,9 @@ inline constexpr T81Limb54 T81Limb54::from_trits(const std::array<int8_t, TRITS>
     int carry = 0;
     for (int i = 0; i < TRITS; ++i) {
         int sum = static_cast<int>(normalized[i]) + carry;
-        if (sum == 2) { normalized[i] = -1; carry = 1; }
-        else if (sum == -2) { normalized[i] = 1; carry = -1; }
-        else { normalized[i] = static_cast<int8_t>(sum); carry = 0; }
+        int new_carry = (sum + (sum >= 0 ? 1 : -1)) / 3;
+        normalized[i] = static_cast<int8_t>(sum - new_carry * 3);
+        carry = new_carry;
     }
     T81Limb54 limb;
     for (int idx = 0; idx < TRYTES; ++idx) {
@@ -999,31 +1114,17 @@ inline constexpr std::array<int8_t, T81Limb54::TRITS> T81Limb54::booth_mul_trits
     int carry = 0;
     for (int i = 0; i < TRITS * 2; ++i) {
         int sum = accum[i] + carry;
-        if (sum >= 2) {
-            accum[i] = sum - 3;
-            carry = 1;
-        } else if (sum <= -2) {
-            accum[i] = sum + 3;
-            carry = -1;
-        } else {
-            accum[i] = sum;
-            carry = 0;
-        }
+        int new_carry = (sum + (sum >= 0 ? 1 : -1)) / 3;
+        accum[i] = sum - new_carry * 3;
+        carry = new_carry;
     }
 
     std::array<int8_t, TRITS> result{};
     for (int i = 0; i < TRITS; ++i) {
         int sum = accum[i] + carry;
-        if (sum == 2) {
-            result[i] = -1;
-            carry = 1;
-        } else if (sum == -2) {
-            result[i] = 1;
-            carry = -1;
-        } else {
-            result[i] = static_cast<int8_t>(sum);
-            carry = 0;
-        }
+        int new_carry = (sum + (sum >= 0 ? 1 : -1)) / 3;
+        result[i] = static_cast<int8_t>(sum - new_carry * 3);
+        carry = new_carry;
     }
     return result;
 }
@@ -1292,9 +1393,9 @@ inline constexpr T81Limb81 T81Limb81::from_trits(const std::array<int8_t, TRITS>
     int carry = 0;
     for (int i = 0; i < TRITS; ++i) {
         int sum = static_cast<int>(normalized[i]) + carry;
-        if (sum == 2) { normalized[i] = -1; carry = 1; }
-        else if (sum == -2) { normalized[i] = 1; carry = -1; }
-        else { normalized[i] = static_cast<int8_t>(sum); carry = 0; }
+        int new_carry = (sum + (sum >= 0 ? 1 : -1)) / 3;
+        normalized[i] = static_cast<int8_t>(sum - new_carry * 3);
+        carry = new_carry;
     }
 
     T81Limb81 limb;
@@ -1623,6 +1724,7 @@ inline constexpr std::pair<T81Limb, T81Limb> T81Limb::mul_wide_fast(
     auto b_lo = T81Limb27::from_tryte_block(b, 0);
     auto b_hi = T81Limb27::from_tryte_block(b, T81Limb27::SPLIT_TRYTES);
 
+    // Karatsuba: compute three partial products and reconstruct with Booth helpers.
     auto z0 = a_lo * b_lo;
     auto z2 = a_hi * b_hi;
     auto mid = (a_lo + a_hi) * (b_lo + b_hi);

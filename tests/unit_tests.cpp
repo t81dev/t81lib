@@ -32,6 +32,23 @@ inline void ensure_eq(int lhs, int rhs, const char* message) {
     if (lhs != rhs) throw AssertionFailure(message);
 }
 
+inline std::string to_string_int128(signed __int128 value) {
+    if (value == 0) return "0";
+    bool negative = value < 0;
+    unsigned __int128 mag = negative ? static_cast<unsigned __int128>(-value)
+                                     : static_cast<unsigned __int128>(value);
+    std::string digits;
+    while (mag != 0) {
+        int digit = static_cast<int>(mag % 10);
+        digits.push_back(static_cast<char>('0' + digit));
+        mag /= 10;
+    }
+    if (digits.empty()) digits = "0";
+    if (negative) digits.push_back('-');
+    std::reverse(digits.begin(), digits.end());
+    return digits;
+}
+
 constexpr int WIDE_TRITS = 96;
 
 uint32_t advance_seed(uint32_t seed) {
@@ -198,6 +215,32 @@ int run_tests() {
             for (auto value : normalized) {
                 ensure(value >= -1 && value <= 1, "T81Limb81 trit out of range");
             }
+        }
+    });
+
+    cases.emplace_back("Div_mod honors __int128 fallback", []() {
+        uint32_t seed = 0xBADC0FFEu;
+        for (int iteration = 0; iteration < 128; ++iteration) {
+            auto numerator = random_limb(seed);
+            auto denominator = random_limb(seed);
+            if (denominator.is_zero()) continue;
+            auto [quot, rem] = numerator.div_mod(denominator);
+            signed __int128 num = T81Limb::to_int128(numerator);
+            signed __int128 den = T81Limb::to_int128(denominator);
+            signed __int128 expected_quot = num / den;
+            signed __int128 expected_rem = num - expected_quot * den;
+            if (T81Limb::to_int128(quot) != expected_quot ||
+                T81Limb::to_int128(rem) != expected_rem) {
+                std::cerr << "Div mismatch iteration " << iteration
+                          << " numerator=" << numerator.to_string(10)
+                          << " denominator=" << denominator.to_string(10)
+                          << " quotient=" << quot.to_string(10) << " expected=" << to_string_int128(expected_quot)
+                          << " remainder=" << rem.to_string(10) << " expected=" << to_string_int128(expected_rem)
+                          << '\n';
+            }
+
+            ensure(quot.compare(T81Limb::from_int128(expected_quot)) == 0, "quotient mismatch");
+            ensure(rem.compare(T81Limb::from_int128(expected_rem)) == 0, "remainder mismatch");
         }
     });
 
