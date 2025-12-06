@@ -204,6 +204,7 @@ private:
         const T81Limb& a,
         const T81Limb& b) noexcept;
     [[nodiscard]] static T81Limb mul_booth_karatsuba(const T81Limb& a, const T81Limb& b) noexcept;
+    [[nodiscard]] T81Limb shift_left_trytes(int count) const noexcept;
 };
 
 
@@ -237,15 +238,32 @@ inline constexpr T81Limb T81Limb::operator+(const T81Limb& other) const noexcept
 }
 
 inline constexpr T81Limb T81Limb::operator-() const noexcept {
-    T81Limb flipped;
+    T81Limb neg;
     for (int i = 0; i < TRYTES; ++i) {
-        flipped.trytes_[i] = -trytes_[i];
+        neg.trytes_[i] = static_cast<int8_t>(-trytes_[i]);
     }
-    return flipped + T81Limb::one();
+    return neg;
 }
 
 inline constexpr T81Limb T81Limb::operator-(const T81Limb& rhs) const noexcept {
-    return addc(-rhs).first;
+    return *this + (-rhs);
+}
+
+inline T81Limb T81Limb::shift_left_trytes(int count) const noexcept {
+    T81Limb result;
+    if (count <= 0) {
+        return *this;
+    }
+    if (count >= TRYTES) {
+        return result;
+    }
+    for (int i = TRYTES - 1; i >= count; --i) {
+        result.trytes_[i] = trytes_[i - count];
+    }
+    for (int i = 0; i < count; ++i) {
+        result.trytes_[i] = 0;
+    }
+    return result;
 }
 inline constexpr int T81Limb::compare(const T81Limb& other) const noexcept {
     for (int idx = TRYTES - 1; idx >= 0; --idx) {
