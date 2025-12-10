@@ -16,6 +16,7 @@
 #include <optional>
 
 #include <t81/core/detail/lut.hpp>
+#include <t81/core/detail/base_digits.hpp>
 
 namespace t81::core {
 
@@ -243,8 +244,8 @@ public:
     explicit constexpr operator long double() const noexcept { return to_long_double(); }
 
     constexpr std::string to_string(int base = 10) const {
-        if (base < 2 || base > 36) {
-            throw std::invalid_argument("supported bases are 2..36");
+        if (!detail::base81_supports_base(base)) {
+            throw std::invalid_argument("supported bases are 2..81");
         }
         const auto value = to_value();
         if (value == 0) {
@@ -256,16 +257,9 @@ public:
         if (negative) {
             cursor = -cursor;
         }
-        const auto append_digit = [&](int digit) {
-            if (digit < 10) {
-                digits.push_back(static_cast<char>('0' + digit));
-            } else {
-                digits.push_back(static_cast<char>('a' + digit - 10));
-            }
-        };
         while (cursor != 0) {
             const int remainder = static_cast<int>(cursor % base);
-            append_digit(remainder);
+            digits.push_back(detail::base81_digit_char(remainder));
             cursor /= base;
         }
         if (negative) {
@@ -276,8 +270,8 @@ public:
     }
 
     static limb from_string(std::string_view text, int base = 10) {
-        if (base < 2 || base > 36) {
-            throw std::invalid_argument("supported bases are 2..36");
+        if (!detail::base81_supports_base(base)) {
+            throw std::invalid_argument("supported bases are 2..81");
         }
         if (text.empty()) {
             throw std::invalid_argument("empty string");
@@ -294,18 +288,7 @@ public:
         detail::limb_int128 accumulator = 0;
         for (; index < text.size(); ++index) {
             const char ch = text[index];
-            const int digit = [](char ch) -> int {
-                if (ch >= '0' && ch <= '9') {
-                    return ch - '0';
-                }
-                if (ch >= 'a' && ch <= 'z') {
-                    return 10 + ch - 'a';
-                }
-                if (ch >= 'A' && ch <= 'Z') {
-                    return 10 + ch - 'A';
-                }
-                return -1;
-            }(ch);
+            const int digit = detail::base81_digit_value(ch, base);
             if (digit < 0 || digit >= base) {
                 throw std::invalid_argument("invalid digit in string");
             }

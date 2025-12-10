@@ -6,6 +6,7 @@
 #include <string>
 
 #include <t81/core/bigint.hpp>
+#include <t81/core/detail/base_digits.hpp>
 
 namespace t81::io {
 
@@ -14,8 +15,8 @@ inline std::string to_string(const t81::core::limb& value, int base = 10) {
 }
 
 inline std::string to_string(const t81::core::bigint& value, int base = 10) {
-    if (base < 2 || base > 36) {
-        throw std::invalid_argument("supported bases are 2..36");
+    if (!t81::core::detail::base81_supports_base(base)) {
+        throw std::invalid_argument("supported bases are 2..81");
     }
     if (value.is_zero()) {
         return "0";
@@ -30,10 +31,7 @@ inline std::string to_string(const t81::core::bigint& value, int base = 10) {
         const t81::core::bigint absolute_remainder = remainder.abs();
         const auto digit_limb = absolute_remainder.to_limb();
         const int digit_value = digit_limb.to_integer<int>();
-        const char digit_char = digit_value < 10
-            ? static_cast<char>('0' + digit_value)
-            : static_cast<char>('a' + (digit_value - 10));
-        digits.push_back(digit_char);
+        digits.push_back(t81::core::detail::base81_digit_char(digit_value));
     }
     if (negative) {
         digits.push_back('-');

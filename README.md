@@ -16,6 +16,7 @@ modular helpers, and deterministic utilities.\n
 - **Arbitrary-precision math**: `t81::core::bigint` layers on top of limbs with sign-plus-magnitude,
   Karatsuba-aware multiplication, canonical normalization, and full conversion helpers.
 - **SIMD accelerations**: The SIMD helpers under `include/t81/core/detail/simd_impl.hpp` contain AVX-512, AVX2, and NEON implementations for tryte addition/multiplication so the core limb arithmetic can leverage vector hardware when available.
+- **Base81 I/O**: Formatting/parsing now supports bases 2..81 with the playful base-3⁴ alphabet (0-9, a-z, A-Z, and punctuation) so you can round-trip balanced-ternary-friendly strings without extra glue.
 - **Concrete helpers**: Montgomery contexts, I/O formatters, random tooling, and utility guards
   keep reusable patterns consistent and testable.
 - **Specs & architecture**: Normative coverage under [doc/](doc/), plus a human-friendly

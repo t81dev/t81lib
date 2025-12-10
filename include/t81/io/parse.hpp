@@ -5,25 +5,9 @@
 #include <type_traits>
 
 #include <t81/core/bigint.hpp>
+#include <t81/core/detail/base_digits.hpp>
 
 namespace t81::io {
-
-namespace {
-
-inline int decode_digit(char ch) noexcept {
-    if (ch >= '0' && ch <= '9') {
-        return ch - '0';
-    }
-    if (ch >= 'a' && ch <= 'z') {
-        return 10 + (ch - 'a');
-    }
-    if (ch >= 'A' && ch <= 'Z') {
-        return 10 + (ch - 'A');
-    }
-    return -1;
-}
-
-} // namespace
 
 template <typename Int>
 inline Int from_string(std::string_view text, int base = 10) {
@@ -33,8 +17,8 @@ inline Int from_string(std::string_view text, int base = 10) {
     if constexpr (std::is_same_v<Int, t81::core::limb>) {
         return t81::core::limb::from_string(text, base);
     } else {
-        if (base < 2 || base > 36) {
-            throw std::invalid_argument("supported bases are 2..36");
+        if (!t81::core::detail::base81_supports_base(base)) {
+            throw std::invalid_argument("supported bases are 2..81");
         }
         if (text.empty()) {
             throw std::invalid_argument("empty string");
@@ -52,7 +36,7 @@ inline Int from_string(std::string_view text, int base = 10) {
         const t81::core::bigint base_value(base);
         for (; index < text.size(); ++index) {
             const char ch = text[index];
-            const int digit = decode_digit(ch);
+            const int digit = t81::core::detail::base81_digit_value(ch, base);
             if (digit < 0 || digit >= base) {
                 throw std::invalid_argument("invalid digit in string");
             }

@@ -7,6 +7,7 @@
 #include <iostream>
 #include <random>
 #include <array>
+#include <utility>
 #include <cstdint>
 #include <stdexcept>
 #include <string>
@@ -48,7 +49,7 @@ bool check_equal(const t81::core::bigint& lhs,
 }
 
 bool test_string_roundtrip(std::mt19937_64& rng) {
-    const std::vector<int> bases = {3, 7, 10, 16, 27};
+    const std::vector<int> bases = {3, 7, 10, 16, 27, 81};
     for (int base : bases) {
         for (int iteration = 0; iteration < 16; ++iteration) {
             const auto original = random_small_bigint(rng);
@@ -65,6 +66,27 @@ bool test_string_roundtrip(std::mt19937_64& rng) {
     if (limb_value != expected) {
         std::cerr << "limb parser mismatch\n";
         return false;
+    }
+    return true;
+}
+
+bool test_base81_digits() {
+    const std::vector<std::pair<t81::core::bigint, std::string>> cases = {
+        {t81::core::bigint(10), "a"},
+        {t81::core::bigint(36), "A"},
+        {t81::core::bigint(62), "!"},
+        {t81::core::bigint(80), "?"}
+    };
+    for (const auto& [value, repr] : cases) {
+        const std::string encoded = t81::io::to_string(value, 81);
+        if (encoded != repr) {
+            std::cerr << "base81 encoding mismatch for " << t81::io::to_string(value) << "\n";
+            return false;
+        }
+        const auto decoded = t81::io::from_string<t81::core::bigint>(repr, 81);
+        if (!check_equal(value, decoded, "base81 digit " + repr)) {
+            return false;
+        }
     }
     return true;
 }
@@ -373,6 +395,9 @@ bool test_integral_conversions() {
 int main() {
     std::mt19937_64 rng(0xc0ffee123);
     if (!test_string_roundtrip(rng)) {
+        return 1;
+    }
+    if (!test_base81_digits()) {
         return 1;
     }
     if (!test_add_sub_properties(rng)) {
