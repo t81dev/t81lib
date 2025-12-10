@@ -11,10 +11,13 @@
 #include <string_view>
 #include <type_traits>
 #include <utility>
+#include <optional>
 
 #include <t81/core/detail/lut.hpp>
 
 namespace t81::core {
+
+class limb;
 
 namespace detail {
 #if !defined(__SIZEOF_INT128__)
@@ -62,6 +65,12 @@ inline constexpr std::pair<int, Int> balanced_digit_and_carry(Int value) noexcep
 }
 
 } // namespace detail
+
+namespace detail {
+    bool add_trytes_simd(const limb&, const limb&, limb&);
+    std::optional<std::pair<limb, limb>> mul_wide_simd(const limb&, const limb&);
+    std::pair<limb, limb> mul_wide_scalar(const limb&, const limb&);
+}
 
 class limb {
 public:
@@ -300,7 +309,13 @@ public:
 
     limb operator-() const { return from_value(-to_value()); }
 
-    limb operator+(const limb& other) const { return from_value(to_value() + other.to_value()); }
+    limb operator+(const limb& other) const {
+        limb result;
+        if (detail::add_trytes_simd(*this, other, result)) {
+            return result;
+        }
+        return from_value(to_value() + other.to_value());
+    }
     limb operator-(const limb& other) const { return from_value(to_value() - other.to_value()); }
 
     limb operator*(const limb& other) const {
@@ -312,34 +327,10 @@ public:
     }
 
     static std::pair<limb, limb> mul_wide(const limb& lhs, const limb& rhs) {
-        std::array<int, TRITS * 2> accum{};
-        const auto left = lhs.to_trits();
-        const auto right = rhs.to_trits();
-        for (int i = 0; i < TRITS; ++i) {
-            for (int j = 0; j < TRITS; ++j) {
-                accum[i + j] += left[i] * right[j];
-            }
+        if (const auto simd_result = detail::mul_wide_simd(lhs, rhs)) {
+            return *simd_result;
         }
-        for (int pass = 0; pass < 6; ++pass) {
-            for (std::size_t k = 0; k < accum.size() - 1; ++k) {
-                const auto [digit, carry] = detail::balanced_digit_and_carry(accum[k]);
-                accum[k] = digit;
-                accum[k + 1] += carry;
-            }
-        }
-        for (std::size_t k = accum.size() - 1; k > 0; --k) {
-            const auto [digit, carry] = detail::balanced_digit_and_carry(accum[k]);
-            accum[k] = digit;
-            accum[k - 1] += carry;
-        }
-        accum[0] = detail::balanced_digit_and_carry(accum[0]).first;
-        std::array<std::int8_t, TRITS> low_trits{};
-        std::array<std::int8_t, TRITS> high_trits{};
-        for (int index = 0; index < TRITS; ++index) {
-            low_trits[index] = static_cast<std::int8_t>(accum[index]);
-            high_trits[index] = static_cast<std::int8_t>(accum[index + TRITS]);
-        }
-        return {from_trits(low_trits), from_trits(high_trits)};
+        return detail::mul_wide_scalar(lhs, rhs);
     }
 
     static std::pair<limb, limb> div_mod(const limb& dividend, const limb& divisor) {
@@ -526,3 +517,5 @@ private:
 };
 
 } // namespace t81::core
+
+#include <t81/core/detail/simd.hpp>
