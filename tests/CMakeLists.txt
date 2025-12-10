@@ -21,3 +21,15 @@ add_executable(test_montgomery
 )
 target_link_libraries(test_montgomery PRIVATE t81::t81lib)
 add_test(NAME montgomery COMMAND test_montgomery)
+
+add_executable(test_limb_float_hash
+    unit/test_limb_float_hash.cpp
+)
+target_link_libraries(test_limb_float_hash PRIVATE t81::t81lib)
+add_test(NAME limb_float_hash COMMAND test_limb_float_hash)
+
+add_executable(test_limb_properties
+    unit/test_limb_properties.cpp
+)
+target_link_libraries(test_limb_properties PRIVATE t81::t81lib)
+add_test(NAME limb_properties COMMAND test_limb_properties)

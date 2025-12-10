@@ -19,6 +19,11 @@ target_include_directories(t81lib
 
 target_compile_features(t81lib INTERFACE cxx_std_20)
 
+# ARM targets default to enabling the NEON path.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|armv8|armv7|armhf|armeabi)") 
+    target_compile_definitions(t81lib INTERFACE T81_ENABLE_NEON=1)
+endif()
+
 # Exported namespace: t81::t81lib
 add_library(t81::t81lib ALIAS t81lib)
 

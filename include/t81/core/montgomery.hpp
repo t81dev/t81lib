@@ -4,6 +4,8 @@
 #include <stdexcept>
 #include <type_traits>
 
+#include <iostream>
+
 #include <t81/core/bigint.hpp>
 #include <t81/core/limb.hpp>
 
@@ -122,6 +124,7 @@ public:
 
     limb pow(const limb& base_bar, const limb& exponent) const {
         auto exp_value = exponent.to_value();
+        std::cerr << "MontgomeryContext<limb>::pow start exp=" << static_cast<long long>(exp_value) << "\n";
         if (exp_value < 0) {
             throw std::domain_error("negative exponent");
         }
@@ -131,9 +134,11 @@ public:
             if ((exp_value & 1) != 0) {
                 result = mul(result, base);
             }
+            std::cerr << "pow loop exp=" << static_cast<long long>(exp_value) << "\n";
             base = square(base);
             exp_value >>= 1;
         }
+        std::cerr << "MontgomeryContext<limb>::pow end\n";
         return result;
     }
 
@@ -161,6 +166,8 @@ private:
     }
 
     limb redc(const limb& low, const limb& high) const {
+        std::cerr << "redc start low=" << static_cast<long long>(low.to_value())
+                  << " high=" << static_cast<long long>(high.to_value()) << "\n";
         const auto [u_low, u_high] = limb::mul_wide(low, m_prime_);
         const auto [um_low, um_high] = limb::mul_wide(u_low, modulus_);
         const detail::limb_int128 low_sum = low.to_value() + um_low.to_value();
@@ -168,16 +175,30 @@ private:
         detail::limb_int128 high_sum =
             high.to_value() + um_high.to_value() + carry;
         auto [result, high_carry] = detail::radix_digit(high_sum);
+        std::cerr << "redc after radix digit result="
+                  << static_cast<long long>(result.to_value())
+                  << " high_carry=" << static_cast<long long>(high_carry) << "\n";
         while (high_carry != 0) {
+            std::cerr << "redc high carry loop entry high_carry="
+                      << static_cast<long long>(high_carry) << "\n";
             detail::limb_int128 adjusted = result.to_value() + high_carry * detail::RADIX;
             auto next = detail::radix_digit(adjusted);
             result = next.first;
             high_carry = next.second;
         }
         while (result.is_negative()) {
+            std::cerr << "redc adjusting negative result="
+                      << static_cast<long long>(result.to_value()) << "\n";
+            result += modulus_;
+        }
+        while (result.is_negative()) {
+            std::cerr << "redc adjusting negative result (second pass)="
+                      << static_cast<long long>(result.to_value()) << "\n";
             result += modulus_;
         }
         while (!(result < modulus_)) {
+            std::cerr << "redc subtracting modulus result="
+                      << static_cast<long long>(result.to_value()) << "\n";
             result -= modulus_;
         }
         return result;
@@ -279,10 +300,13 @@ private:
     }
 
     bigint redc(const bigint& T) const {
-        const auto [quotient, remainder] = bigint::div_mod(T, R_);
+        const auto remainder = bigint::div_mod(T, R_).second;
         const auto u = bigint::div_mod(remainder * m_prime_, R_).second;
         const auto T_prime = T + u * modulus_;
         auto result = bigint::div_mod(T_prime, R_).first;
+        while (result.is_negative()) {
+            result += modulus_;
+        }
         while (!(result < modulus_)) {
             result -= modulus_;
         }

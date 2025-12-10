@@ -387,6 +387,19 @@ Binary I/O:
 * `from_bytes` / `to_bytes` must operate on the canonical 16-byte layout directly on `trytes_`.
 * This is the authoritative binary format for `limb` in t81lib.
 
+### 9.3 Floating-point conversions and canonical hashing
+
+Converting between balanced-ternary limbs and floating-point numbers reuses the same canonical integer semantics:
+
+* `from_float`, `from_double`, and `from_long_double` explicitly truncate toward zero (`std::trunc`) and reject non-finite inputs, throwing `std::invalid_argument` for infinities or NaNs.
+* Once truncated, the usual `[min(), max()]` bounds check applies and `std::overflow_error` is raised if the resulting integer is out-of-range.
+* The `to_float`/`to_double`/`to_long_double` helpers simply reinterpret the canonical integer value, so casting `limb` → floating point is deterministic and loses no more precision than any native integer conversion would.
+
+Hashing is directly tied to the canonical byte layout:
+
+* `t81::core::canonical_hash` (used by `std::hash<t81::core::limb>`) runs FNV-1a over `to_bytes()` and is therefore purely a function of the limb's canonical encoding.
+* Because equality is defined via canonical bytes, the hash is guaranteed to be stable across builds and to reflect canonical identity without touching any hidden padding or internal cache.
+
 ---
 
 ## 10. Invariants and Testing Strategy

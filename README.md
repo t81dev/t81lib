@@ -24,6 +24,8 @@ This README focuses on:
   - Canonical packing into 16 trytes → 16 bytes
   - No UB; overflow behavior is explicit and specified
   - `constexpr`-friendly where practical
+  - Floating-point helpers (`from_float`, `from_double`, `from_long_double`) and explicit casts that truncate toward zero and reject infinities/NaNs
+  - `std::hash<t81::core::limb>` is provided and built from the canonical 16-byte encoding for deterministic hashing
 
 **Multi-precision**
 
@@ -134,6 +136,7 @@ using t81::core::bigint;
 
 ```cpp
 #include <t81/t81lib.hpp>
+#include <functional>
 #include <iostream>
 
 int main() {
@@ -154,6 +157,10 @@ int main() {
 
     limb e = limb::from_bytes(buf);
     std::cout << "e == d? " << std::boolalpha << (e == d) << "\n";
+
+    limb f = limb::from_double(3.9);
+    std::cout << "trace double view: " << static_cast<double>(f) << "\n";
+    std::cout << "std::hash<limb>(f) = " << std::hash<limb>{}(f) << "\n";
 }
 ```
 
@@ -162,6 +169,8 @@ Key properties:
 * `limb::TRITS == 48`, `TRYTES == 16`, `BYTES == 16`
 * Stable tryte/trit mapping (see `doc/t81lib-spec-v1.0.0.md`)
 * All arithmetic is deterministic; overflows are signaled, not UB
+* Conversion helpers (`to_float`, `to_double`, `to_long_double`) expose the value
+* `std::hash<t81::core::limb>` is derived from `to_bytes()`/`t81::core::canonical_hash`
 
 ### 4.2 Working with `t81::core::bigint`
 

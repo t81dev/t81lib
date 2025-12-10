@@ -27,7 +27,11 @@ inline bool cpu_supports_avx2() noexcept {
 
 inline bool cpu_supports_neon() noexcept {
 #if defined(__ARM_NEON) || defined(__ARM_NEON__)
-    return true;
+    #if defined(T81_ENABLE_NEON)
+        return true;
+    #else
+        return false;
+    #endif
 #else
     return false;
 #endif

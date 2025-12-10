@@ -17,10 +17,15 @@ t81::core::bigint small_positive_bigint(std::mt19937_64& rng) {
 bool check_limb_modular(const t81::core::MontgomeryContext<t81::core::limb>& ctx,
                         const t81::core::limb& a,
                         const t81::core::limb& b) {
+    std::cerr << "limb modular check\n";
     const auto a_bar = ctx.to_montgomery(a);
+    std::cerr << "limb to_montgomery a\n";
     const auto b_bar = ctx.to_montgomery(b);
+    std::cerr << "limb to_montgomery b\n";
     const auto product = ctx.mul(a_bar, b_bar);
+    std::cerr << "limb product computed\n";
     const auto recovered = ctx.from_montgomery(product);
+    std::cerr << "limb from_montgomery\n";
     const auto mod_value = ctx.modulus().to_value();
     const auto expected = t81::core::limb::from_value(
         (a.to_value() * b.to_value()) % mod_value);
@@ -31,9 +36,11 @@ bool check_limb_modular(const t81::core::MontgomeryContext<t81::core::limb>& ctx
         return false;
     }
     const auto pow_bar = ctx.pow(a_bar, t81::core::limb::from_value(3));
+    std::cerr << "limb pow computed\n";
     const auto pow_plain = t81::core::limb::from_value(
         (a.to_value() * a.to_value() * a.to_value()) % mod_value);
     const auto pow_result = ctx.from_montgomery(pow_bar);
+    std::cerr << "limb pow result\n";
     if (pow_result != pow_plain) {
         std::cerr << "limb montgomery pow mismatch\n";
         return false;
@@ -44,6 +51,7 @@ bool check_limb_modular(const t81::core::MontgomeryContext<t81::core::limb>& ctx
 bool check_bigint_modular(const t81::core::MontgomeryContext<t81::core::bigint>& ctx) {
     auto rng = std::mt19937_64(0x1337c0de);
     for (int i = 1; i <= 4; ++i) {
+        std::cerr << "bigint modular iteration " << i << "\n";
         const auto a = small_positive_bigint(rng);
         const auto b = small_positive_bigint(rng);
         const auto a_bar = ctx.to_montgomery(a);

@@ -5,6 +5,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <compare>
+#include <cmath>
+#include <functional>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -224,6 +226,22 @@ public:
         return static_cast<Int>(value);
     }
 
+    constexpr float to_float() const noexcept {
+        return static_cast<float>(to_value());
+    }
+
+    constexpr double to_double() const noexcept {
+        return static_cast<double>(to_value());
+    }
+
+    constexpr long double to_long_double() const noexcept {
+        return static_cast<long double>(to_value());
+    }
+
+    explicit constexpr operator float() const noexcept { return to_float(); }
+    explicit constexpr operator double() const noexcept { return to_double(); }
+    explicit constexpr operator long double() const noexcept { return to_long_double(); }
+
     constexpr std::string to_string(int base = 10) const {
         if (base < 2 || base > 36) {
             throw std::invalid_argument("supported bases are 2..36");
@@ -298,6 +316,24 @@ public:
         }
         return from_value(accumulator);
     }
+
+    template <typename Float,
+              typename = std::enable_if_t<std::is_floating_point_v<Float>>>
+    static limb from_floating(Float value) {
+        if (!std::isfinite(value)) {
+            throw std::invalid_argument("limb floating-point value must be finite");
+        }
+        const long double truncated = std::trunc(static_cast<long double>(value));
+        if (truncated < static_cast<long double>(detail::MIN_VALUE) ||
+            truncated > static_cast<long double>(detail::MAX_VALUE)) {
+            throw std::overflow_error("limb floating-point value out of range");
+        }
+        return from_value(static_cast<detail::limb_int128>(truncated));
+    }
+
+    static limb from_float(float value) { return from_floating(value); }
+    static limb from_double(double value) { return from_floating(value); }
+    static limb from_long_double(long double value) { return from_floating(value); }
 
     constexpr auto operator<=>(const limb& other) const noexcept {
         return to_value() <=> other.to_value();
@@ -516,6 +552,31 @@ private:
     std::array<tryte_t, TRYTES> trytes_{};
 };
 
+inline std::size_t canonical_hash(const limb& value) noexcept {
+    constexpr std::uint64_t FNV_OFFSET = 1469598103934665603ULL;
+    constexpr std::uint64_t FNV_PRIME = 1099511628211ULL;
+    std::uint64_t hash = FNV_OFFSET;
+    for (auto byte : value.to_bytes()) {
+        hash ^= byte;
+        hash *= FNV_PRIME;
+    }
+    if constexpr (sizeof(std::size_t) >= 8) {
+        return static_cast<std::size_t>(hash);
+    }
+    return static_cast<std::size_t>((hash >> 32) ^ (hash & 0xFFFFFFFFULL));
+}
+
 } // namespace t81::core
+
+namespace std {
+
+template <>
+struct hash<t81::core::limb> {
+    std::size_t operator()(const t81::core::limb& value) const noexcept {
+        return t81::core::canonical_hash(value);
+    }
+};
+
+} // namespace std
 
 #include <t81/core/detail/simd.hpp>
