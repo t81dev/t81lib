@@ -62,6 +62,54 @@ public:
     static bigint zero() noexcept { return {}; }
     static bigint one() { return bigint(limb::one()); }
 
+    static bigint from_limbs(std::vector<limb> limbs, bool negative) {
+        bigint result;
+        result.limbs_ = std::move(limbs);
+        result.normalize();
+        result.negative_ = negative && !result.is_zero();
+        return result;
+    }
+
+    std::vector<int> base81_digits() const {
+        if (is_zero()) {
+            return {0};
+        }
+        std::vector<int> digits;
+        digits.reserve(limbs_.size() * limb::BASE81_DIGITS_PER_LIMB + 4);
+        int carry = 0;
+        for (const auto& limb_value : limbs_) {
+            const auto trits = limb_value.to_trits();
+            int block_carry = carry;
+            for (int chunk = 0; chunk < limb::BASE81_DIGITS_PER_LIMB; ++chunk) {
+                int sum = block_carry;
+                int weight = 1;
+                for (int offset = 0; offset < 4; ++offset) {
+                    sum += static_cast<int>(trits[chunk * 4 + offset]) * weight;
+                    weight *= 3;
+                }
+                int digit = sum % 81;
+                if (digit < 0) {
+                    digit += 81;
+                }
+                block_carry = (sum - digit) / 81;
+                digits.push_back(digit);
+            }
+            carry = block_carry;
+        }
+        while (carry != 0) {
+            int digit = carry % 81;
+            if (digit < 0) {
+                digit += 81;
+            }
+            carry = (carry - digit) / 81;
+            digits.push_back(digit);
+        }
+        while (digits.size() > 1 && digits.back() == 0) {
+            digits.pop_back();
+        }
+        return digits;
+    }
+
     bool is_zero() const noexcept { return limbs_.empty(); }
     bool is_negative() const noexcept { return negative_; }
     int signum() const noexcept {

@@ -15,8 +15,24 @@ inline std::string to_string(const t81::core::limb& value, int base = 10) {
 }
 
 inline std::string to_string(const t81::core::bigint& value, int base = 10) {
-    if (!t81::core::detail::base81_supports_base(base)) {
-        throw std::invalid_argument("supported bases are 2..81");
+    if (base == 81) {
+        if (value.is_zero()) {
+            return "0";
+        }
+        const bool negative = value.is_negative();
+        const auto digits = value.base81_digits();
+        std::string result;
+        result.reserve(digits.size() + (negative ? 1 : 0));
+        if (negative) {
+            result.push_back('-');
+        }
+        for (auto it = digits.rbegin(); it != digits.rend(); ++it) {
+            result.push_back(t81::core::detail::base81_digit_char(*it));
+        }
+        return result;
+    }
+    if (base < 2 || base > 36) {
+        throw std::invalid_argument("supported bases are 2..36");
     }
     if (value.is_zero()) {
         return "0";
@@ -28,10 +44,12 @@ inline std::string to_string(const t81::core::bigint& value, int base = 10) {
     while (!cursor.is_zero()) {
         const auto [quotient, remainder] = t81::core::bigint::div_mod(cursor, base_value);
         cursor = quotient;
-        const t81::core::bigint absolute_remainder = remainder.abs();
-        const auto digit_limb = absolute_remainder.to_limb();
-        const int digit_value = digit_limb.to_integer<int>();
-        digits.push_back(t81::core::detail::base81_digit_char(digit_value));
+        const int digit_value = static_cast<int>(remainder.abs().to_limb().to_integer<int>());
+        if (digit_value < 10) {
+            digits.push_back(static_cast<char>('0' + digit_value));
+        } else {
+            digits.push_back(static_cast<char>('a' + digit_value - 10));
+        }
     }
     if (negative) {
         digits.push_back('-');

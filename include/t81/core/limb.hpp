@@ -14,6 +14,7 @@
 #include <type_traits>
 #include <utility>
 #include <optional>
+#include <vector>
 
 #include <t81/core/detail/lut.hpp>
 #include <t81/core/detail/base_digits.hpp>
@@ -81,6 +82,7 @@ public:
     static constexpr int TRYTES = detail::TRYTES;
     static constexpr int BYTES = detail::BYTES;
     using tryte_t = std::uint8_t;
+    static constexpr int BASE81_DIGITS_PER_LIMB = TRITS / 4;
 
     constexpr limb() noexcept { trytes_.fill(detail::ZERO_TRYTE); }
 
@@ -244,8 +246,53 @@ public:
     explicit constexpr operator long double() const noexcept { return to_long_double(); }
 
     constexpr std::string to_string(int base = 10) const {
-        if (!detail::base81_supports_base(base)) {
-            throw std::invalid_argument("supported bases are 2..81");
+        const bool negative = is_negative();
+        if (base == 81) {
+        const limb magnitude = negative ? -(*this) : *this;
+        if (magnitude.is_zero()) {
+            return "0";
+        }
+        const auto trits = magnitude.to_trits();
+        std::vector<int> digits;
+        digits.reserve(BASE81_DIGITS_PER_LIMB + 4);
+        int carry = 0;
+        for (int chunk = 0; chunk < BASE81_DIGITS_PER_LIMB; ++chunk) {
+            int sum = carry;
+            int weight = 1;
+            for (int offset = 0; offset < 4; ++offset) {
+                sum += static_cast<int>(trits[chunk * 4 + offset]) * weight;
+                weight *= 3;
+            }
+            int digit = sum % 81;
+            if (digit < 0) {
+                digit += 81;
+            }
+            carry = (sum - digit) / 81;
+            digits.push_back(digit);
+        }
+        while (carry != 0) {
+            int digit = carry % 81;
+            if (digit < 0) {
+                digit += 81;
+            }
+            carry = (carry - digit) / 81;
+            digits.push_back(digit);
+        }
+        while (digits.size() > 1 && digits.back() == 0) {
+            digits.pop_back();
+        }
+        std::string result;
+        result.reserve(digits.size() + (negative ? 1 : 0));
+        if (negative) {
+            result.push_back('-');
+        }
+        for (auto it = digits.rbegin(); it != digits.rend(); ++it) {
+            result.push_back(detail::base81_digit_char(*it));
+        }
+        return result;
+        }
+        if (base < 2 || base > 36) {
+            throw std::invalid_argument("supported bases are 2..36");
         }
         const auto value = to_value();
         if (value == 0) {
@@ -253,25 +300,42 @@ public:
         }
         detail::limb_int128 cursor = value;
         std::string digits;
-        const bool negative = cursor < 0;
-        if (negative) {
+        const bool legacy_negative = cursor < 0;
+        if (legacy_negative) {
             cursor = -cursor;
         }
         while (cursor != 0) {
             const int remainder = static_cast<int>(cursor % base);
-            digits.push_back(detail::base81_digit_char(remainder));
+            if (remainder < 10) {
+                digits.push_back(static_cast<char>('0' + remainder));
+            } else {
+                digits.push_back(static_cast<char>('a' + remainder - 10));
+            }
             cursor /= base;
         }
-        if (negative) {
+        if (legacy_negative) {
             digits.push_back('-');
         }
         std::reverse(digits.begin(), digits.end());
         return digits;
     }
 
+    static limb from_base81_digits(std::string_view digits) {
+        if (digits.empty()) {
+            return zero();
+        }
+        if (digits[0] == '+' || digits[0] == '-') {
+            throw std::invalid_argument("base81 digit chunk must not contain a sign");
+        }
+        return from_string_base81(digits);
+    }
+
     static limb from_string(std::string_view text, int base = 10) {
-        if (!detail::base81_supports_base(base)) {
-            throw std::invalid_argument("supported bases are 2..81");
+        if (base == 81) {
+            return from_string_base81(text);
+        }
+        if (base < 2 || base > 36) {
+            throw std::invalid_argument("supported bases are 2..36");
         }
         if (text.empty()) {
             throw std::invalid_argument("empty string");
@@ -280,15 +344,24 @@ public:
         std::size_t index = 0;
         if (text[0] == '+' || text[0] == '-') {
             negative = (text[0] == '-');
-            index = 1;
-            if (text.size() == 1) {
+            ++index;
+            if (index == text.size()) {
                 throw std::invalid_argument("string has only a sign");
             }
         }
         detail::limb_int128 accumulator = 0;
         for (; index < text.size(); ++index) {
             const char ch = text[index];
-            const int digit = detail::base81_digit_value(ch, base);
+            int digit;
+            if (ch >= '0' && ch <= '9') {
+                digit = ch - '0';
+            } else if (ch >= 'a' && ch <= 'z') {
+                digit = 10 + ch - 'a';
+            } else if (ch >= 'A' && ch <= 'Z') {
+                digit = 10 + ch - 'A';
+            } else {
+                digit = -1;
+            }
             if (digit < 0 || digit >= base) {
                 throw std::invalid_argument("invalid digit in string");
             }
@@ -299,7 +372,6 @@ public:
         }
         return from_value(accumulator);
     }
-
     template <typename Float,
               typename = std::enable_if_t<std::is_floating_point_v<Float>>>
     static limb from_floating(Float value) {
@@ -518,6 +590,35 @@ public:
             result.trytes_[index] = detail::ZERO_TRYTE;
         }
         return result;
+    }
+
+    static limb from_string_base81(std::string_view text) {
+        if (text.empty()) {
+            throw std::invalid_argument("empty string");
+        }
+        bool negative = false;
+        std::size_t index = 0;
+        if (text[0] == '+' || text[0] == '-') {
+            negative = (text[0] == '-');
+            ++index;
+            if (index == text.size()) {
+                throw std::invalid_argument("string has only a sign");
+            }
+        }
+        detail::limb_int128 value = 0;
+        constexpr detail::limb_int128 BASE81_BASE = 81;
+        for (; index < text.size(); ++index) {
+            const char ch = text[index];
+            const int digit = detail::base81_digit_value(ch, 81);
+            if (digit < 0) {
+                throw std::invalid_argument("invalid digit in string");
+            }
+            value = value * BASE81_BASE + digit;
+        }
+        if (negative) {
+            value = -value;
+        }
+        return from_value(value);
     }
 
 private:

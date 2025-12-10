@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 
 namespace t81::core::detail {
 
@@ -75,6 +76,46 @@ inline int base81_digit_value(char ch, int base) noexcept {
         }
     }
     return -1;
+}
+
+inline constexpr int normalize_base81_sum(int sum) noexcept {
+    const int digit = sum % 81;
+    return digit < 0 ? digit + 81 : digit;
+}
+
+constexpr std::array<std::array<std::int8_t, 4>, 81> make_base81_trits() {
+    std::array<std::array<std::int8_t, 4>, 81> result{};
+    for (int t0 = -1; t0 <= 1; ++t0) {
+        for (int t1 = -1; t1 <= 1; ++t1) {
+            for (int t2 = -1; t2 <= 1; ++t2) {
+                for (int t3 = -1; t3 <= 1; ++t3) {
+                    const int sum = t0 + 3 * t1 + 9 * t2 + 27 * t3;
+                    const int digit = normalize_base81_sum(sum);
+                    result[digit] = {static_cast<std::int8_t>(t0),
+                                     static_cast<std::int8_t>(t1),
+                                     static_cast<std::int8_t>(t2),
+                                     static_cast<std::int8_t>(t3)};
+                }
+            }
+        }
+    }
+    return result;
+}
+
+constexpr auto BASE81_TRITS = make_base81_trits();
+
+inline int base81_digit_from_trits(const std::array<std::int8_t, 4>& trits) noexcept {
+    int sum = 0;
+    int weight = 1;
+    for (int index = 0; index < 4; ++index) {
+        sum += trits[index] * weight;
+        weight *= 3;
+    }
+    return normalize_base81_sum(sum);
+}
+
+inline const std::array<std::int8_t, 4>& base81_trits_for_digit(int digit) noexcept {
+    return BASE81_TRITS[digit];
 }
 
 } // namespace t81::core::detail
