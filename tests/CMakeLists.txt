@@ -16,6 +16,12 @@ add_executable(test_bigint_ops
 target_link_libraries(test_bigint_ops PRIVATE t81::t81lib)
 add_test(NAME bigint_ops COMMAND test_bigint_ops)
 
+add_executable(test_bigint_bitops_fuzz
+    unit/test_bigint_bitops_fuzz.cpp
+)
+target_link_libraries(test_bigint_bitops_fuzz PRIVATE t81::t81lib)
+add_test(NAME bigint_bitops_fuzz COMMAND test_bigint_bitops_fuzz)
+
 add_executable(test_montgomery
     unit/test_montgomery.cpp
 )

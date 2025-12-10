@@ -6,6 +6,7 @@
 #include <t81/core/limb.hpp>
 #include <t81/core/bigint.hpp>
 #include <t81/core/montgomery.hpp>
+#include <t81/core/montgomery_helpers.hpp>
 #include <t81/io/format.hpp>
 #include <t81/io/parse.hpp>
 #include <t81/util/random.hpp>

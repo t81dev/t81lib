@@ -391,6 +391,36 @@ Division by zero must throw `std::domain_error`.
 
 ---
 
+### 5.6 Bitwise and shift operations
+
+The bitwise helpers mirror the `limb` tritwise semantics while letting operands span
+multiple limbs:
+
+* `consensus`, `&`, `|`, `^`, and `~` operate on the **signed limb slices** (treating absent
+  limbs as zero) and simply apply the corresponding `limb` operator on each limb. This means
+  every operation is implicitly per-trit and preserves the canonical balanced ternary
+  representation that `limb` already guarantees.
+* `~` negates every signed limb, so it still produces a canonical `bigint` via the same
+  limb-level normalization path that regular arithmetic uses.
+
+Shift helpers reuse the zero-fill conventions from the limb spec:
+
+* Tryte shifts (`<<`, `>>`) move whole trytes (three trits) at a time. `<<` shifts toward
+  more significant positions and zero-fills the least-significant trytes, while `>>`
+  shifts toward less significant positions and zero-fills the most significant trytes. If the
+  shift count exceeds the number of trytes that actually hold data, the result simply clears
+  to zero.
+* Trit shifts (`trit_shift_left`, `trit_shift_right`, `rotate_left_tbits`, `rotate_right_tbits`)
+  operate on individual trits and replicate the limb-level zero-fill behavior: vacated
+  trits are filled with zero, so the rotates behave like zero-filled shifts even though they
+  keep their historical names for compatibility.
+* Both families treat negative shift counts as no-ops and otherwise behave consistently for
+  multi-limb values because they work on the signed limb/trit sequences instead of per-limb
+  state.
+
+These helpers are the natural extension of the `limb` bitwise/shift guarantees, so any
+`bigint` user can expect the same per-trit invariants regardless of the integer width.
+
 ## 6. Conversions
 
 ### 6.1 To/from limb

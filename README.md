@@ -38,6 +38,7 @@ This README focuses on:
 
 - `t81::io` — string / stream I/O helpers for `limb` and `bigint`
 - `t81::util` — random value generators, debug dumps, invariants
+- `t81::core::montgomery_helpers` — factories, modular multiply/pow convenience helpers, and const-time guards on Montgomery contexts
 
 **Design & spec**
 
@@ -198,6 +199,32 @@ int main() {
     }
 }
 ```
+
+### 4.3 Montgomery helpers
+
+Convenience helpers sit on top of `t81::core::MontgomeryContext`. Include the helper header directly or through the umbrella and users get:
+
+- `make_limb_context` / `make_bigint_context` — preconfigure a context once per modulus.
+- `modular_multiply` / `modular_pow` — one-shot modular arithmetic that handles the Montgomery conversions for you.
+- `MontgomeryConstTimeGuard` — declare a bit-width cap on exponents, query `allows`, and use `guard.pow` once the guard approves the exponent.
+
+```cpp
+#include <t81/core/montgomery_helpers.hpp>
+
+using namespace t81::core;
+using namespace t81::core::montgomery;
+
+const limb modulus = limb::from_value(17);
+const auto ctx = make_limb_context(modulus);
+const auto product = modular_multiply(ctx, limb::from_value(3), limb::from_value(5));
+
+MontgomeryConstTimeGuard<limb> guard(ctx, 6);
+if (guard.allows(limb::from_value(3))) {
+    const auto powered = guard.pow(limb::from_value(3), limb::from_value(4));
+}
+```
+
+The `examples/example_montgomery.cpp` file shows these helpers alongside the `bigint` guard for reference.
 
 `bigint`:
 

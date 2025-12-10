@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <compare>
 #include <cstddef>
 #include <cstdint>
@@ -8,6 +9,7 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include <limits>
 
 #include <t81/core/limb.hpp>
 
@@ -89,6 +91,39 @@ public:
             value = -value;
         }
         return value;
+    }
+
+    template <typename Int,
+              typename = std::enable_if_t<std::is_integral_v<Int>>>
+    explicit operator Int() const {
+        if (is_zero()) {
+            return static_cast<Int>(0);
+        }
+        if constexpr (std::is_unsigned_v<Int>) {
+            if (negative_) {
+                throw std::overflow_error("bigint does not fit in target type");
+            }
+        }
+        using wide = detail::limb_int128;
+        const wide max_value =
+            static_cast<wide>(std::numeric_limits<Int>::max());
+        const wide min_value =
+            static_cast<wide>(std::numeric_limits<Int>::min());
+        const int limit_limbs = max_limbs_for(max_value);
+        if (limb_count() > static_cast<std::size_t>(limit_limbs)) {
+            throw std::overflow_error("bigint does not fit in target type");
+        }
+        wide value = 0;
+        for (std::size_t index = limb_count(); index-- > 0;) {
+            value = value * detail::RADIX + limbs_[index].to_value();
+        }
+        if (negative_) {
+            value = -value;
+        }
+        if (value < min_value || value > max_value) {
+            throw std::overflow_error("bigint does not fit in target type");
+        }
+        return static_cast<Int>(value);
     }
 
     bigint abs() const noexcept {
@@ -262,7 +297,171 @@ public:
         return {quotient, remainder};
     }
 
+    bigint consensus(const bigint& other) const {
+        return apply_limbwise(*this, other, [](const limb& lhs, const limb& rhs) {
+            return lhs.consensus(rhs);
+        });
+    }
+
+    bigint operator&(const bigint& other) const {
+        return apply_limbwise(*this, other, [](const limb& lhs, const limb& rhs) {
+            return lhs & rhs;
+        });
+    }
+
+    bigint operator|(const bigint& other) const {
+        return apply_limbwise(*this, other, [](const limb& lhs, const limb& rhs) {
+            return lhs | rhs;
+        });
+    }
+
+    bigint operator^(const bigint& other) const {
+        return apply_limbwise(*this, other, [](const limb& lhs, const limb& rhs) {
+            return lhs ^ rhs;
+        });
+    }
+
+    bigint operator~() const {
+        auto digits = signed_limbs();
+        for (auto& digit : digits) {
+            digit = -digit;
+        }
+        return from_signed_limbs(digits);
+    }
+
+    bigint operator<<(int shift) const {
+        return tryte_shift_left(shift);
+    }
+
+    bigint operator>>(int shift) const {
+        return tryte_shift_right(shift);
+    }
+
+    bigint rotate_left_tbits(int count) const {
+        return trit_shift_left(count);
+    }
+
+    bigint rotate_right_tbits(int count) const {
+        return trit_shift_right(count);
+    }
+
+    bigint trit_shift_left(int count) const {
+        if (count <= 0) {
+            return *this;
+        }
+        auto trits = signed_trits();
+        trits.insert(trits.begin(), static_cast<std::size_t>(count), 0);
+        return from_signed_trits(std::move(trits));
+    }
+
+    bigint trit_shift_right(int count) const {
+        if (count <= 0) {
+            return *this;
+        }
+        auto trits = signed_trits();
+        if (static_cast<std::size_t>(count) >= trits.size()) {
+            return bigint::zero();
+        }
+        trits.erase(trits.begin(), trits.begin() + count);
+        return from_signed_trits(std::move(trits));
+    }
+
+    bigint tryte_shift_left(int count) const {
+        if (count <= 0) {
+            return *this;
+        }
+        constexpr int TRITS_PER_TRYTE = 3;
+        const long long trit_count = static_cast<long long>(count) * TRITS_PER_TRYTE;
+        if (trit_count > std::numeric_limits<int>::max()) {
+            throw std::overflow_error("tryte shift count too large");
+        }
+        return trit_shift_left(static_cast<int>(trit_count));
+    }
+
+    bigint tryte_shift_right(int count) const {
+        if (count <= 0) {
+            return *this;
+        }
+        constexpr int TRITS_PER_TRYTE = 3;
+        const long long trit_count = static_cast<long long>(count) * TRITS_PER_TRYTE;
+        if (trit_count > std::numeric_limits<int>::max()) {
+            return bigint::zero();
+        }
+        return trit_shift_right(static_cast<int>(trit_count));
+    }
+
 private:
+    template <typename Fn>
+    static bigint apply_limbwise(const bigint& lhs, const bigint& rhs, Fn fn) {
+        const std::size_t size = std::max(lhs.limb_count(), rhs.limb_count());
+        const auto lhs_digits = lhs.signed_limbs(size);
+        const auto rhs_digits = rhs.signed_limbs(size);
+        std::vector<limb> result;
+        result.reserve(size);
+        for (std::size_t index = 0; index < size; ++index) {
+            result.push_back(fn(lhs_digits[index], rhs_digits[index]));
+        }
+        return from_signed_limbs(result);
+    }
+
+    std::vector<limb> signed_limbs(std::size_t min_size = 0) const {
+        const std::size_t target = std::max(min_size, limbs_.size());
+        std::vector<limb> result;
+        result.reserve(target);
+        for (std::size_t index = 0; index < target; ++index) {
+            limb value = limb::zero();
+            if (index < limbs_.size()) {
+                value = limbs_[index];
+            }
+            if (negative_) {
+                value = -value;
+            }
+            result.push_back(value);
+        }
+        return result;
+    }
+
+    std::vector<std::int8_t> signed_trits() const {
+        const auto digits = signed_limbs();
+        std::vector<std::int8_t> trits;
+        trits.reserve(digits.size() * limb::TRITS);
+        for (const auto& digit : digits) {
+            const auto chunk = digit.to_trits();
+            trits.insert(trits.end(), chunk.begin(), chunk.end());
+        }
+        return trits;
+    }
+
+    static bigint from_signed_trits(std::vector<std::int8_t> trits) {
+        if (trits.empty()) {
+            return bigint::zero();
+        }
+        constexpr int trits_per_limb = limb::TRITS;
+        const std::size_t padded =
+            ((trits.size() + trits_per_limb - 1) / trits_per_limb) * trits_per_limb;
+        trits.resize(padded, 0);
+        std::vector<limb> digits;
+        digits.reserve(trits.size() / trits_per_limb);
+        for (std::size_t index = 0; index < trits.size(); index += trits_per_limb) {
+            std::array<std::int8_t, limb::TRITS> chunk{};
+            for (std::size_t offset = 0; offset < trits_per_limb; ++offset) {
+                chunk[offset] = trits[index + offset];
+            }
+            digits.push_back(limb::from_trits(chunk));
+        }
+        return from_signed_limbs(digits);
+    }
+
+    static bigint from_signed_limbs(const std::vector<limb>& digits) {
+        bigint result;
+        for (std::size_t index = digits.size(); index-- > 0;) {
+            result = result.shift_limbs(1);
+            if (!digits[index].is_zero()) {
+                result += bigint(digits[index]);
+            }
+        }
+        return result;
+    }
     static std::vector<limb> add_magnitude(const std::vector<limb>& lhs,
                                             const std::vector<limb>& rhs) {
         const std::size_t max_len = std::max(lhs.size(), rhs.size());
@@ -352,6 +551,18 @@ private:
             --carry;
         }
         return {limb::from_value(remainder), carry};
+    }
+
+    static int max_limbs_for(detail::limb_int128 limit) {
+        if (limit <= 0) {
+            return 1;
+        }
+        int count = 1;
+        while (limit >= detail::RADIX) {
+            limit /= detail::RADIX;
+            ++count;
+        }
+        return count;
     }
 
     std::strong_ordering compare(const bigint& other) const noexcept {
