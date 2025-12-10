@@ -1,20 +1,528 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <compare>
+#include <limits>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+
+#include <t81/core/detail/lut.hpp>
 
 namespace t81::core {
 
-/// Placeholder fixed-size packed balanced-ternary limb type.
-/// Replace with your real implementation.
+namespace detail {
+#if !defined(__SIZEOF_INT128__)
+#error "t81::core::limb requires __int128 support"
+#endif
+
+using limb_int128 = __int128_t;
+using limb_uint128 = unsigned __int128;
+
+inline constexpr int TRITS = 48;
+inline constexpr int TRYTES = 16;
+inline constexpr int BYTES = TRYTES;
+inline constexpr std::uint8_t ZERO_TRYTE = 13;
+
+inline constexpr std::array<limb_int128, TRITS> build_pow3() {
+    std::array<limb_int128, TRITS> powers{};
+    limb_int128 value{1};
+    for (int index = 0; index < TRITS; ++index) {
+        powers[index] = value;
+        value *= 3;
+    }
+    return powers;
+}
+
+inline constexpr auto POW3 = build_pow3();
+inline constexpr limb_int128 RADIX = POW3[TRITS - 1] * 3;
+inline constexpr limb_int128 MAX_VALUE = (RADIX - 1) / 2;
+inline constexpr limb_int128 MIN_VALUE = -MAX_VALUE;
+
+inline constexpr bool valid_trit(std::int8_t trit) noexcept {
+    return trit >= -1 && trit <= 1;
+}
+
+inline constexpr std::size_t pack_trit_index(std::int8_t t0,
+                                              std::int8_t t1,
+                                              std::int8_t t2) noexcept {
+    return static_cast<std::size_t>((t0 + 1) + 3 * (t1 + 1) + 9 * (t2 + 1));
+}
+
+template <class Int>
+inline constexpr std::pair<int, Int> balanced_digit_and_carry(Int value) noexcept {
+    const Int carry = value >= 0 ? (value + 1) / 3 : (value - 1) / 3;
+    const int digit = static_cast<int>(value - carry * 3);
+    return {digit, carry};
+}
+
+} // namespace detail
+
 class limb {
 public:
-    static constexpr int TRITS = 48; // example size
+    static constexpr int TRITS = detail::TRITS;
+    static constexpr int TRYTES = detail::TRYTES;
+    static constexpr int BYTES = detail::BYTES;
+    using tryte_t = std::uint8_t;
 
-    constexpr limb() noexcept = default;
+    constexpr limb() noexcept { trytes_.fill(detail::ZERO_TRYTE); }
 
-    friend constexpr auto operator<=>(const limb&, const limb&) = default;
+    constexpr limb(const limb&) noexcept = default;
+    constexpr limb& operator=(const limb&) noexcept = default;
+
+    template <typename Int,
+              typename = std::enable_if_t<std::is_integral_v<Int>>>
+    constexpr explicit limb(Int value) : limb(from_value(static_cast<detail::limb_int128>(value))) {}
+
+    static constexpr limb zero() noexcept { return limb(); }
+    static constexpr limb one() { return from_value(1); }
+    static constexpr limb min() { return from_value(detail::MIN_VALUE); }
+    static constexpr limb max() { return from_value(detail::MAX_VALUE); }
+
+    static constexpr limb from_value(detail::limb_int128 value) {
+        if (value < detail::MIN_VALUE || value > detail::MAX_VALUE) {
+            throw std::overflow_error("limb value out of representable range");
+        }
+        std::array<std::int8_t, TRITS> trits{};
+        detail::limb_int128 cursor = value;
+        for (int index = 0; index < TRITS; ++index) {
+            const auto [digit, carry] = detail::balanced_digit_and_carry(cursor);
+            trits[index] = static_cast<std::int8_t>(digit);
+            cursor = carry;
+        }
+        if (cursor != 0) {
+            throw std::overflow_error("limb value normalization overflow");
+        }
+        return from_trits(trits);
+    }
+
+    static constexpr limb from_trits(const std::array<std::int8_t, TRITS>& trits) {
+        limb result;
+        for (std::size_t index = 0; index < TRYTES; ++index) {
+            const std::int8_t t0 = trits[3 * index];
+            const std::int8_t t1 = trits[3 * index + 1];
+            const std::int8_t t2 = trits[3 * index + 2];
+            if (!detail::valid_trit(t0) || !detail::valid_trit(t1) || !detail::valid_trit(t2)) {
+                throw std::invalid_argument("limb trits must be -1..1");
+            }
+            const std::size_t packed = detail::pack_trit_index(t0, t1, t2);
+            result.trytes_[index] = detail::TRITS_TO_TRYTE[packed];
+        }
+        return result;
+    }
+
+    static constexpr limb from_bytes(std::array<std::uint8_t, BYTES> bytes) {
+        limb result;
+        for (std::size_t index = 0; index < BYTES; ++index) {
+            if (bytes[index] > 26) {
+                throw std::invalid_argument("limb bytes must encode canonical trytes");
+            }
+            result.trytes_[index] = static_cast<tryte_t>(bytes[index]);
+        }
+        return result;
+    }
+
+    constexpr std::array<std::uint8_t, BYTES> to_bytes() const noexcept {
+        std::array<std::uint8_t, BYTES> bytes{};
+        for (std::size_t index = 0; index < BYTES; ++index) {
+            bytes[index] = trytes_[index];
+        }
+        return bytes;
+    }
+
+    constexpr std::array<tryte_t, TRYTES> to_trytes() const noexcept { return trytes_; }
+
+    constexpr tryte_t get_tryte(std::size_t index) const {
+        if (index >= TRYTES) {
+            throw std::out_of_range("limb tryte index out of range");
+        }
+        return trytes_[index];
+    }
+
+    constexpr limb& set_tryte(std::size_t index, tryte_t value) {
+        if (index >= TRYTES) {
+            throw std::out_of_range("limb tryte index out of range");
+        }
+        if (value > 26) {
+            throw std::invalid_argument("limb tryte value must be 0..26");
+        }
+        trytes_[index] = value;
+        return *this;
+    }
+
+    constexpr std::int8_t get_trit(std::size_t index) const {
+        if (index >= TRITS) {
+            throw std::out_of_range("limb trit index out of range");
+        }
+        const std::size_t tryte_index = index / 3;
+        const std::size_t offset = index % 3;
+        const auto& triple = detail::TRYTE_TO_TRITS[trytes_[tryte_index]];
+        return triple[offset];
+    }
+
+    constexpr limb& set_trit(std::size_t index, std::int8_t value) {
+        if (index >= TRITS) {
+            throw std::out_of_range("limb trit index out of range");
+        }
+        if (!detail::valid_trit(value)) {
+            throw std::invalid_argument("limb trit value must be -1..1");
+        }
+        const std::size_t tryte_index = index / 3;
+        auto triple = detail::TRYTE_TO_TRITS[trytes_[tryte_index]];
+        triple[index % 3] = value;
+        const std::size_t packed = detail::pack_trit_index(triple[0], triple[1], triple[2]);
+        trytes_[tryte_index] = detail::TRITS_TO_TRYTE[packed];
+        return *this;
+    }
+
+    constexpr std::array<std::int8_t, TRITS> to_trits() const noexcept {
+        std::array<std::int8_t, TRITS> trits{};
+        for (std::size_t index = 0; index < TRYTES; ++index) {
+            const auto& triple = detail::TRYTE_TO_TRITS[trytes_[index]];
+            trits[3 * index] = triple[0];
+            trits[3 * index + 1] = triple[1];
+            trits[3 * index + 2] = triple[2];
+        }
+        return trits;
+    }
+
+    constexpr detail::limb_int128 to_value() const noexcept {
+        const auto trits = to_trits();
+        detail::limb_int128 total = 0;
+        for (int index = 0; index < TRITS; ++index) {
+            total += static_cast<detail::limb_int128>(trits[index]) * detail::POW3[index];
+        }
+        return total;
+    }
+
+    constexpr bool is_zero() const noexcept { return to_value() == 0; }
+    constexpr bool is_negative() const noexcept { return to_value() < 0; }
+    constexpr int signum() const noexcept { return (to_value() > 0) - (to_value() < 0); }
+
+    template <typename Int,
+              typename = std::enable_if_t<std::is_integral_v<Int>>>
+    constexpr Int to_integer() const {
+        const auto value = to_value();
+        if (value < static_cast<detail::limb_int128>(std::numeric_limits<Int>::min()) ||
+            value > static_cast<detail::limb_int128>(std::numeric_limits<Int>::max())) {
+            throw std::overflow_error("limb value does not fit in target integer");
+        }
+        return static_cast<Int>(value);
+    }
+
+    constexpr std::string to_string(int base = 10) const {
+        if (base < 2 || base > 36) {
+            throw std::invalid_argument("supported bases are 2..36");
+        }
+        const auto value = to_value();
+        if (value == 0) {
+            return "0";
+        }
+        detail::limb_int128 cursor = value;
+        std::string digits;
+        const bool negative = cursor < 0;
+        if (negative) {
+            cursor = -cursor;
+        }
+        const auto append_digit = [&](int digit) {
+            if (digit < 10) {
+                digits.push_back(static_cast<char>('0' + digit));
+            } else {
+                digits.push_back(static_cast<char>('a' + digit - 10));
+            }
+        };
+        while (cursor != 0) {
+            const int remainder = static_cast<int>(cursor % base);
+            append_digit(remainder);
+            cursor /= base;
+        }
+        if (negative) {
+            digits.push_back('-');
+        }
+        std::reverse(digits.begin(), digits.end());
+        return digits;
+    }
+
+    static limb from_string(std::string_view text, int base = 10) {
+        if (base < 2 || base > 36) {
+            throw std::invalid_argument("supported bases are 2..36");
+        }
+        if (text.empty()) {
+            throw std::invalid_argument("empty string");
+        }
+        bool negative = false;
+        std::size_t index = 0;
+        if (text[0] == '+' || text[0] == '-') {
+            negative = (text[0] == '-');
+            index = 1;
+            if (text.size() == 1) {
+                throw std::invalid_argument("string has only a sign");
+            }
+        }
+        detail::limb_int128 accumulator = 0;
+        for (; index < text.size(); ++index) {
+            const char ch = text[index];
+            const int digit = [](char ch) -> int {
+                if (ch >= '0' && ch <= '9') {
+                    return ch - '0';
+                }
+                if (ch >= 'a' && ch <= 'z') {
+                    return 10 + ch - 'a';
+                }
+                if (ch >= 'A' && ch <= 'Z') {
+                    return 10 + ch - 'A';
+                }
+                return -1;
+            }(ch);
+            if (digit < 0 || digit >= base) {
+                throw std::invalid_argument("invalid digit in string");
+            }
+            accumulator = accumulator * base + digit;
+        }
+        if (negative) {
+            accumulator = -accumulator;
+        }
+        return from_value(accumulator);
+    }
+
+    constexpr auto operator<=>(const limb& other) const noexcept {
+        return to_value() <=> other.to_value();
+    }
+
+    constexpr bool operator==(const limb& other) const noexcept {
+        return to_value() == other.to_value();
+    }
+
+    limb operator-() const { return from_value(-to_value()); }
+
+    limb operator+(const limb& other) const { return from_value(to_value() + other.to_value()); }
+    limb operator-(const limb& other) const { return from_value(to_value() - other.to_value()); }
+
+    limb operator*(const limb& other) const {
+        const auto [low, high] = mul_wide(*this, other);
+        if (!high.is_zero()) {
+            throw std::overflow_error("limb multiplication overflow");
+        }
+        return low;
+    }
+
+    static std::pair<limb, limb> mul_wide(const limb& lhs, const limb& rhs) {
+        std::array<int, TRITS * 2> accum{};
+        const auto left = lhs.to_trits();
+        const auto right = rhs.to_trits();
+        for (int i = 0; i < TRITS; ++i) {
+            for (int j = 0; j < TRITS; ++j) {
+                accum[i + j] += left[i] * right[j];
+            }
+        }
+        for (int pass = 0; pass < 6; ++pass) {
+            for (std::size_t k = 0; k < accum.size() - 1; ++k) {
+                const auto [digit, carry] = detail::balanced_digit_and_carry(accum[k]);
+                accum[k] = digit;
+                accum[k + 1] += carry;
+            }
+        }
+        for (std::size_t k = accum.size() - 1; k > 0; --k) {
+            const auto [digit, carry] = detail::balanced_digit_and_carry(accum[k]);
+            accum[k] = digit;
+            accum[k - 1] += carry;
+        }
+        accum[0] = detail::balanced_digit_and_carry(accum[0]).first;
+        std::array<std::int8_t, TRITS> low_trits{};
+        std::array<std::int8_t, TRITS> high_trits{};
+        for (int index = 0; index < TRITS; ++index) {
+            low_trits[index] = static_cast<std::int8_t>(accum[index]);
+            high_trits[index] = static_cast<std::int8_t>(accum[index + TRITS]);
+        }
+        return {from_trits(low_trits), from_trits(high_trits)};
+    }
+
+    static std::pair<limb, limb> div_mod(const limb& dividend, const limb& divisor) {
+        if (divisor.is_zero()) {
+            throw std::domain_error("division by zero");
+        }
+        const auto num = dividend.to_value();
+        const auto den = divisor.to_value();
+        const auto quotient = num / den;
+        const auto remainder = num % den;
+        return {from_value(quotient), from_value(remainder)};
+    }
+
+    limb operator/(const limb& other) const {
+        return div_mod(*this, other).first;
+    }
+
+    limb operator%(const limb& other) const {
+        return div_mod(*this, other).second;
+    }
+
+    limb& operator+=(const limb& other) { return *this = *this + other; }
+    limb& operator-=(const limb& other) { return *this = *this - other; }
+    limb& operator*=(const limb& other) { return *this = *this * other; }
+    limb& operator/=(const limb& other) { return *this = *this / other; }
+    limb& operator%=(const limb& other) { return *this = *this % other; }
+
+    static limb pow_mod(const limb& base, const limb& exponent, const limb& modulus) {
+        if (modulus.is_zero()) {
+            throw std::domain_error("modulus must be non-zero");
+        }
+        const auto mod_value = modulus.to_value();
+        if (mod_value <= 0) {
+            throw std::domain_error("modulus must be positive");
+        }
+        auto exp_value = exponent.to_value();
+        if (exp_value < 0) {
+            throw std::domain_error("negative exponent");
+        }
+        auto result = detail::limb_int128(1);
+        auto base_value = base.to_value() % mod_value;
+        if (base_value < 0) {
+            base_value += mod_value;
+        }
+        while (exp_value > 0) {
+            if ((exp_value & 1) != 0) {
+                result = (result * base_value) % mod_value;
+            }
+            base_value = (base_value * base_value) % mod_value;
+            exp_value >>= 1;
+        }
+        return from_value(result % mod_value);
+    }
+
+    limb consensus(const limb& other) const {
+        return apply_tritwise(other, [](std::int8_t lhs, std::int8_t rhs) {
+            return lhs == rhs ? lhs : 0;
+        });
+    }
+
+    limb operator&(const limb& other) const {
+        return apply_tritwise(other, [](std::int8_t lhs, std::int8_t rhs) {
+            return static_cast<std::int8_t>(std::min(lhs, rhs));
+        });
+    }
+
+    limb operator|(const limb& other) const {
+        return apply_tritwise(other, [](std::int8_t lhs, std::int8_t rhs) {
+            return static_cast<std::int8_t>(std::max(lhs, rhs));
+        });
+    }
+
+    limb operator^(const limb& other) const {
+        return apply_tritwise(other, [](std::int8_t lhs, std::int8_t rhs) {
+            int sum = lhs + rhs;
+            if (sum > 1) {
+                sum -= 3;
+            } else if (sum < -1) {
+                sum += 3;
+            }
+            return static_cast<std::int8_t>(sum);
+        });
+    }
+
+    limb operator~() const {
+        return apply_tritwise(*this, [](std::int8_t lhs, std::int8_t) {
+            return static_cast<std::int8_t>(-lhs);
+        });
+    }
+
+    limb operator<<(int shift) const {
+        return tryte_shift_left(shift);
+    }
+
+    limb operator>>(int shift) const {
+        return tryte_shift_right(shift);
+    }
+
+    limb rotate_left_tbits(int count) const {
+        return trit_shift_left(count);
+    }
+
+    limb rotate_right_tbits(int count) const {
+        return trit_shift_right(count);
+    }
+
+    limb trit_shift_left(int count) const {
+        if (count <= 0) {
+            return *this;
+        }
+        if (count >= TRITS) {
+            return zero();
+        }
+        const auto trits = to_trits();
+        std::array<std::int8_t, TRITS> shifted{};
+        for (int index = 0; index < TRITS - count; ++index) {
+            shifted[index + count] = trits[index];
+        }
+        return from_trits(shifted);
+    }
+
+    limb trit_shift_right(int count) const {
+        if (count <= 0) {
+            return *this;
+        }
+        if (count >= TRITS) {
+            return zero();
+        }
+        const auto trits = to_trits();
+        std::array<std::int8_t, TRITS> shifted{};
+        for (int index = count; index < TRITS; ++index) {
+            shifted[index - count] = trits[index];
+        }
+        return from_trits(shifted);
+    }
+
+    limb tryte_shift_left(int count) const {
+        if (count <= 0) {
+            return *this;
+        }
+        if (count >= TRYTES) {
+            return zero();
+        }
+        limb result;
+        for (int index = TRYTES - 1; index >= count; --index) {
+            result.trytes_[index] = trytes_[index - count];
+        }
+        for (int index = 0; index < count; ++index) {
+            result.trytes_[index] = detail::ZERO_TRYTE;
+        }
+        return result;
+    }
+
+    limb tryte_shift_right(int count) const {
+        if (count <= 0) {
+            return *this;
+        }
+        if (count >= TRYTES) {
+            return zero();
+        }
+        limb result;
+        for (int index = 0; index < TRYTES - count; ++index) {
+            result.trytes_[index] = trytes_[index + count];
+        }
+        for (int index = TRYTES - count; index < TRYTES; ++index) {
+            result.trytes_[index] = detail::ZERO_TRYTE;
+        }
+        return result;
+    }
+
+private:
+    template <typename Fn>
+    limb apply_tritwise(const limb& other, Fn&& fn) const {
+        const auto lhs_trits = to_trits();
+        const auto rhs_trits = other.to_trits();
+        std::array<std::int8_t, TRITS> result_trits{};
+        for (int index = 0; index < TRITS; ++index) {
+            result_trits[index] = fn(lhs_trits[index], rhs_trits[index]);
+        }
+        return from_trits(result_trits);
+    }
+
+    std::array<tryte_t, TRYTES> trytes_{};
 };
 
 } // namespace t81::core
