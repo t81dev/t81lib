@@ -101,27 +101,41 @@ inline bigint expected_trit_shift_right(const bigint& value, int count) {
     if (count <= 0) {
         return value;
     }
-    auto trits = signed_trits(value);
-    if (trits.empty()) {
-        return bigint::zero();
-    }
-    const std::size_t shift = static_cast<std::size_t>(count);
-    const std::size_t limited_shift = std::min(shift, trits.size());
-    const bool negative = value.is_negative();
-    const bool truncated_nonzero =
-        limited_shift > 0 &&
-        std::any_of(trits.begin(), trits.begin() + limited_shift,
-                    [](std::int8_t trit) { return trit != 0; });
-    if (shift >= trits.size()) {
-        if (negative && truncated_nonzero) {
-            return -bigint::one();
+    bigint result = value;
+    const std::size_t limb_shift = static_cast<std::size_t>(count / limb::TRITS);
+    const int remainder_shift = count % limb::TRITS;
+    if (limb_shift > 0) {
+        std::vector<limb> limbs;
+        limbs.reserve(result.limb_count());
+        for (std::size_t index = 0; index < result.limb_count(); ++index) {
+            limbs.push_back(result.limb_at(index));
         }
-        return bigint::zero();
+        bool truncated = false;
+        if (limb_shift >= limbs.size()) {
+            truncated = !limbs.empty();
+            limbs.clear();
+        } else {
+            for (std::size_t index = 0; index < limb_shift; ++index) {
+                if (!limbs[index].is_zero()) {
+                    truncated = true;
+                    break;
+                }
+            }
+            limbs.erase(limbs.begin(), limbs.begin() + limb_shift);
+        }
+        result = bigint::from_limbs(std::move(limbs), value.is_negative());
+        if (value.is_negative() && truncated) {
+            result -= bigint::one();
+        }
     }
-    trits.erase(trits.begin(), trits.begin() + limited_shift);
-    bigint result = from_signed_trits(std::move(trits));
-    if (negative && truncated_nonzero) {
-        result -= bigint::one();
+    if (remainder_shift > 0) {
+        const bool numerator_negative = result.is_negative();
+        const bigint divisor = bigint::multiply_by_power_of_three(bigint::one(), remainder_shift);
+        const auto [quotient, remainder_value] = bigint::div_mod(result, divisor);
+        result = quotient;
+        if (numerator_negative && !remainder_value.is_zero()) {
+            result -= bigint::one();
+        }
     }
     return result;
 }
