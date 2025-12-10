@@ -144,6 +144,28 @@ public:
         return result;
     }
 
+    static bigint multiply_by_power_of_three(const bigint& value, int exponent) {
+        if (exponent <= 0 || value.is_zero()) {
+            return value;
+        }
+        if (exponent >= limb::TRITS) {
+            const int limb_shift = exponent / limb::TRITS;
+            const int remainder = exponent % limb::TRITS;
+            bigint shifted = value.shift_limbs(static_cast<std::size_t>(limb_shift));
+            if (remainder > 0) {
+                return multiply_by_power_of_three(shifted, remainder);
+            }
+            return shifted;
+        }
+        const detail::limb_int128 multiplier_value = detail::POW3[exponent];
+        std::vector<limb> digits = multiply_magnitude_by_small(value.limbs_, multiplier_value);
+        bigint result;
+        result.negative_ = value.negative_;
+        result.limbs_ = std::move(digits);
+        result.normalize();
+        return result;
+    }
+
     friend std::strong_ordering operator<=>(const bigint& lhs, const bigint& rhs) noexcept {
         return lhs.compare(rhs);
     }
@@ -275,20 +297,11 @@ public:
         const bigint abs_divisor = divisor.abs();
         bigint remainder = dividend.abs();
         bigint quotient;
-        while (remainder >= abs_divisor) {
-            bigint temp = abs_divisor;
-            bigint multiple = bigint::one();
-            while (true) {
-                bigint doubled = temp;
-                doubled += temp;
-                if (remainder < doubled) {
-                    break;
-                }
-                temp = std::move(doubled);
-                multiple += multiple;
-            }
-            remainder -= temp;
-            quotient += multiple;
+        if (remainder >= abs_divisor) {
+            const auto [quotient_digits, remainder_digits] =
+                divide_magnitude(remainder.limbs_, abs_divisor.limbs_);
+            quotient.limbs_ = std::move(quotient_digits);
+            remainder.limbs_ = std::move(remainder_digits);
         }
         const bool quotient_negative = (dividend.is_negative() != divisor.is_negative());
         const bool remainder_negative = dividend.is_negative();
@@ -321,6 +334,24 @@ public:
         });
     }
 
+    bigint bitwise_andnot(const bigint& other) const {
+        return apply_limbwise(*this, other, [](const limb& lhs, const limb& rhs) {
+            return lhs & ~rhs;
+        });
+    }
+
+    bigint bitwise_nand(const bigint& other) const {
+        return ~(operator&(other));
+    }
+
+    bigint bitwise_nor(const bigint& other) const {
+        return ~(operator|(other));
+    }
+
+    bigint bitwise_xnor(const bigint& other) const {
+        return ~(operator^(other));
+    }
+
     bigint operator~() const {
         auto digits = signed_limbs();
         for (auto& digit : digits) {
@@ -349,9 +380,13 @@ public:
         if (count <= 0) {
             return *this;
         }
-        auto trits = signed_trits();
-        trits.insert(trits.begin(), static_cast<std::size_t>(count), 0);
-        return from_signed_trits(std::move(trits));
+        const int limb_shift = count / limb::TRITS;
+        const int remainder = count % limb::TRITS;
+        bigint result = shift_limbs(static_cast<std::size_t>(limb_shift));
+        if (remainder > 0) {
+            result = multiply_by_power_of_three(result, remainder);
+        }
+        return result;
     }
 
     bigint trit_shift_right(int count) const {
@@ -388,6 +423,48 @@ public:
             return bigint::zero();
         }
         return trit_shift_right(static_cast<int>(trit_count));
+    }
+
+    static bigint gcd(bigint lhs, bigint rhs) {
+        if (lhs.is_zero()) {
+            return rhs.abs();
+        }
+        if (rhs.is_zero()) {
+            return lhs.abs();
+        }
+        while (!rhs.is_zero()) {
+            const bigint remainder = lhs % rhs;
+            lhs = rhs;
+            rhs = remainder;
+        }
+        return lhs.abs();
+    }
+
+    static bigint mod_pow(bigint base, bigint exponent, const bigint& modulus) {
+        if (modulus.is_zero()) {
+            throw std::domain_error("modulus must be non-zero");
+        }
+        if (modulus.is_negative()) {
+            throw std::domain_error("modulus must be positive");
+        }
+        if (exponent.is_negative()) {
+            throw std::domain_error("negative exponent");
+        }
+        bigint result = bigint::one();
+        base %= modulus;
+        if (base.is_negative()) {
+            base += modulus;
+        }
+        const bigint two = bigint(2);
+        while (!exponent.is_zero()) {
+            const auto [quotient, remainder] = div_mod(exponent, two);
+            if (!remainder.is_zero()) {
+                result = (result * base) % modulus;
+            }
+            base = (base * base) % modulus;
+            exponent = quotient;
+        }
+        return result;
     }
 
 private:
@@ -462,6 +539,69 @@ private:
         }
         return result;
     }
+
+    static void normalize_magnitude(std::vector<limb>& digits) {
+        while (!digits.empty() && digits.back().is_zero()) {
+            digits.pop_back();
+        }
+    }
+
+    static std::strong_ordering compare_magnitude_vectors(const std::vector<limb>& lhs,
+                                                          const std::vector<limb>& rhs) noexcept {
+        if (lhs.size() != rhs.size()) {
+            return lhs.size() < rhs.size() ? std::strong_ordering::less
+                                           : std::strong_ordering::greater;
+        }
+        for (std::size_t index = lhs.size(); index-- > 0;) {
+            const auto cmp = lhs[index] <=> rhs[index];
+            if (cmp != std::strong_ordering::equal) {
+                return cmp;
+            }
+        }
+        return std::strong_ordering::equal;
+    }
+
+    static std::pair<std::vector<limb>, std::vector<limb>>
+    divide_magnitude(std::vector<limb> dividend, const std::vector<limb>& divisor) {
+        normalize_magnitude(dividend);
+        std::vector<limb> divisor_digits = divisor;
+        normalize_magnitude(divisor_digits);
+        if (divisor_digits.empty()) {
+            throw std::domain_error("division by zero");
+        }
+        if (dividend.empty()) {
+            return {{}, {}};
+        }
+        std::vector<std::vector<limb>> scaled;
+        std::vector<std::vector<limb>> multiples;
+        scaled.push_back(divisor_digits);
+        multiples.push_back(std::vector<limb>{limb::one()});
+        while (true) {
+            auto next_scaled = add_magnitude(scaled.back(), scaled.back());
+            normalize_magnitude(next_scaled);
+            if (compare_magnitude_vectors(next_scaled, dividend) == std::strong_ordering::greater) {
+                break;
+            }
+            scaled.push_back(std::move(next_scaled));
+            auto next_multiple = add_magnitude(multiples.back(), multiples.back());
+            normalize_magnitude(next_multiple);
+            multiples.push_back(std::move(next_multiple));
+        }
+        std::vector<limb> quotient;
+        std::vector<limb> remainder = std::move(dividend);
+        for (int index = static_cast<int>(scaled.size()) - 1; index >= 0; --index) {
+            while (!remainder.empty() &&
+                   compare_magnitude_vectors(remainder, scaled[index]) != std::strong_ordering::less) {
+                remainder = subtract_magnitude(remainder, scaled[index]);
+                normalize_magnitude(remainder);
+                quotient = add_magnitude(quotient, multiples[index]);
+                normalize_magnitude(quotient);
+            }
+        }
+        normalize_magnitude(quotient);
+        normalize_magnitude(remainder);
+        return {quotient, remainder};
+    }
     static std::vector<limb> add_magnitude(const std::vector<limb>& lhs,
                                             const std::vector<limb>& rhs) {
         const std::size_t max_len = std::max(lhs.size(), rhs.size());
@@ -507,36 +647,127 @@ private:
         return result;
     }
 
-    static std::vector<limb> multiply_magnitude(const std::vector<limb>& lhs,
-                                                const std::vector<limb>& rhs) {
+    static std::vector<limb> multiply_magnitude_by_small(const std::vector<limb>& digits,
+                                                         detail::limb_int128 multiplier) {
+        if (digits.empty() || multiplier == 0) {
+            return {};
+        }
+        std::vector<limb> result;
+        result.reserve(digits.size() + 2);
+        detail::limb_int128 carry = 0;
+        for (const auto& digit : digits) {
+            const auto product = digit.to_value() * multiplier + carry;
+            const auto [value, next_carry] = digit_and_carry(product);
+            result.push_back(value);
+            carry = next_carry;
+        }
+        while (carry != 0) {
+            const auto [value, next_carry] = digit_and_carry(carry);
+            result.push_back(value);
+            carry = next_carry;
+        }
+        return result;
+    }
+
+    static std::vector<limb> multiply_schoolbook(const std::vector<limb>& lhs,
+                                                 const std::vector<limb>& rhs) {
         if (lhs.empty() || rhs.empty()) {
             return {};
         }
         const std::size_t result_size = lhs.size() + rhs.size() + 2;
-        std::vector<detail::limb_int128> accumulation(result_size, 0);
+        thread_local std::vector<detail::limb_int128> accumulation;
+        thread_local std::vector<limb> normalized;
+        accumulation.assign(result_size, 0);
         for (std::size_t i = 0; i < lhs.size(); ++i) {
-            for (std::size_t j = 0; j < rhs.size(); ++j) {
-                const auto [low, high] = limb::mul_wide(lhs[i], rhs[j]);
-                accumulation[i + j] += low.to_value();
-                accumulation[i + j + 1] += high.to_value();
+            const auto lhs_digit = lhs[i];
+            auto* row = accumulation.data() + i;
+            std::size_t j = 0;
+            for (; j + 1 < rhs.size(); j += 2) {
+                const auto rhs0 = rhs[j];
+                const auto rhs1 = rhs[j + 1];
+                const auto [low0, high0] = limb::mul_wide(lhs_digit, rhs0);
+                row[j] += low0.to_value();
+                row[j + 1] += high0.to_value();
+                const auto [low1, high1] = limb::mul_wide(lhs_digit, rhs1);
+                row[j + 1] += low1.to_value();
+                row[j + 2] += high1.to_value();
+            }
+            for (; j < rhs.size(); ++j) {
+                const auto rhs_digit = rhs[j];
+                const auto [low, high] = limb::mul_wide(lhs_digit, rhs_digit);
+                row[j] += low.to_value();
+                row[j + 1] += high.to_value();
             }
         }
-        std::vector<limb> result;
-        result.reserve(result_size);
+        normalized.clear();
+        normalized.reserve(result_size);
         detail::limb_int128 carry = 0;
-        for (std::size_t index = 0; index < accumulation.size(); ++index) {
-            const auto [digit, next_carry] = digit_and_carry(accumulation[index] + carry);
-            result.push_back(digit);
+        for (std::size_t index = 0; index < result_size; ++index) {
+            const auto value = accumulation[index] + carry;
+            const auto [digit, next_carry] = digit_and_carry(value);
+            normalized.push_back(digit);
             carry = next_carry;
         }
         while (carry != 0) {
             const auto [digit, next_carry] = digit_and_carry(carry);
-            result.push_back(digit);
+            normalized.push_back(digit);
             carry = next_carry;
         }
-        while (!result.empty() && result.back().is_zero()) {
-            result.pop_back();
+        while (!normalized.empty() && normalized.back().is_zero()) {
+            normalized.pop_back();
         }
+        std::vector<limb> result = std::move(normalized);
+        normalized.clear();
+        normalized.reserve(result_size);
+        return result;
+    }
+
+    static std::vector<limb> multiply_magnitude(const std::vector<limb>& lhs,
+                                                 const std::vector<limb>& rhs) {
+        if (lhs.empty() || rhs.empty()) {
+            return {};
+        }
+        if (lhs.size() + rhs.size() <= 64) {
+            return multiply_schoolbook(lhs, rhs);
+        }
+        const std::size_t n = std::max(lhs.size(), rhs.size());
+        const std::size_t half = n / 2;
+        auto split_low = [&](const std::vector<limb>& value) {
+            return std::vector<limb>(value.begin(),
+                                     value.begin() + std::min(half, value.size()));
+        };
+        auto split_high = [&](const std::vector<limb>& value) {
+            if (value.size() <= half) {
+                return std::vector<limb>{};
+            }
+            return std::vector<limb>(value.begin() + half, value.end());
+        };
+        const auto lhs_low = split_low(lhs);
+        const auto lhs_high = split_high(lhs);
+        const auto rhs_low = split_low(rhs);
+        const auto rhs_high = split_high(rhs);
+        const auto z0 = multiply_magnitude(lhs_low, rhs_low);
+        const auto z2 = multiply_magnitude(lhs_high, rhs_high);
+        const auto lhs_sum = add_magnitude(lhs_low, lhs_high);
+        const auto rhs_sum = add_magnitude(rhs_low, rhs_high);
+        auto z1 = multiply_magnitude(lhs_sum, rhs_sum);
+        auto z1_minus_z0 = subtract_magnitude(z1, z0);
+        auto z1_final = subtract_magnitude(z1_minus_z0, z2);
+        auto shift_and_add = [&](std::vector<limb>& target,
+                                 const std::vector<limb>& value,
+                                 std::size_t shift) {
+            if (value.empty()) {
+                return;
+            }
+            std::vector<limb> shifted;
+            shifted.reserve(value.size() + shift);
+            shifted.insert(shifted.end(), shift, limb::zero());
+            shifted.insert(shifted.end(), value.begin(), value.end());
+            target = add_magnitude(target, shifted);
+        };
+        std::vector<limb> result = z0;
+        shift_and_add(result, z1_final, half);
+        shift_and_add(result, z2, half * 2);
         return result;
     }
 
@@ -581,17 +812,7 @@ private:
     }
 
     std::strong_ordering compare_magnitude(const bigint& other) const noexcept {
-        if (limbs_.size() != other.limbs_.size()) {
-            return limbs_.size() < other.limbs_.size() ? std::strong_ordering::less
-                                                       : std::strong_ordering::greater;
-        }
-        for (std::size_t index = limbs_.size(); index-- > 0;) {
-            const auto cmp = limbs_[index] <=> other.limbs_[index];
-            if (cmp != std::strong_ordering::equal) {
-                return cmp;
-            }
-        }
-        return std::strong_ordering::equal;
+        return compare_magnitude_vectors(limbs_, other.limbs_);
     }
 
     void normalize() {

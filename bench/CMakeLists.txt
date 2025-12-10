@@ -6,3 +6,6 @@ target_link_libraries(bench_bigint_montgomery PRIVATE benchmark::benchmark t81::
 
 add_executable(bench_limb_ops bench_limb_ops.cpp)
 target_link_libraries(bench_limb_ops PRIVATE benchmark::benchmark t81::t81lib)
+
+add_executable(t81-bench bench_t81.cpp)
+target_link_libraries(t81-bench PRIVATE benchmark::benchmark t81::t81lib)

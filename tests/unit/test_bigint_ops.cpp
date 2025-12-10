@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <numeric>
 
 namespace {
 
@@ -120,6 +121,110 @@ bool test_div_mod(std::mt19937_64& rng) {
         if (!check_equal(quotient2 * two + remainder2, dividend, "div_mod small divisor")) {
             return false;
         }
+    }
+    return true;
+}
+
+bool test_divide_magnitude_large() {
+    using bigint = t81::core::bigint;
+    const auto divisor = t81::io::from_string<bigint>("121932631112635269");
+    auto dividend = divisor;
+    for (int iteration = 0; iteration < 3; ++iteration) {
+        dividend = dividend.shift_limbs(1);
+        dividend += divisor;
+    }
+    const auto [quotient, remainder] = bigint::div_mod(dividend, divisor);
+    if (!check_equal(quotient * divisor + remainder, dividend, "divide_magnitude large recomposition")) {
+        return false;
+    }
+    if (remainder.is_negative()) {
+        std::cerr << "divide_magnitude remainder should never be negative\n";
+        return false;
+    }
+    if (!(remainder.abs() < divisor.abs())) {
+        std::cerr << "divide_magnitude remainder magnitude not less than divisor\n";
+        return false;
+    }
+    if (quotient.limb_count() <= divisor.limb_count()) {
+        std::cerr << "divide_magnitude quotient unexpectedly small\n";
+        return false;
+    }
+    return true;
+}
+
+bool test_gcd_cases() {
+    using bigint = t81::core::bigint;
+    const auto zero = bigint::zero();
+    if (!check_equal(bigint::gcd(zero, zero), zero, "gcd(0,0)")) {
+        return false;
+    }
+    const auto positive = t81::io::from_string<bigint>("385");
+    if (!check_equal(bigint::gcd(zero, positive), positive, "gcd(0,b)")) {
+        return false;
+    }
+    if (!check_equal(bigint::gcd(positive, zero), positive, "gcd(a,0)")) {
+        return false;
+    }
+    const std::int64_t a_value = 2 * 3 * 5 * 7 * 11 * 13;
+    const std::int64_t b_value = 3 * 7 * 17 * 19;
+    const auto expect_value = std::gcd(a_value, b_value);
+    const bigint a = bigint(a_value);
+    const bigint b = bigint(b_value);
+    if (!check_equal(bigint::gcd(a, b), bigint(expect_value), "gcd(kusama)")) {
+        return false;
+    }
+    const bigint negative = bigint(-b_value);
+    if (!check_equal(bigint::gcd(a, negative), bigint(expect_value), "gcd with negative operand")) {
+        return false;
+    }
+    const auto base_common = t81::io::from_string<bigint>("231");
+    const auto multiplier_a =
+        t81::io::from_string<bigint>("12345678901234567890");
+    const auto multiplier_b =
+        t81::io::from_string<bigint>("9876543210987654321");
+    const bigint large_a = base_common * multiplier_a;
+    const bigint large_b = base_common * multiplier_b;
+    if (!check_equal(bigint::gcd(large_a, large_b), base_common, "gcd large multiples")) {
+        return false;
+    }
+    return true;
+}
+
+bool test_mod_pow_cases() {
+    using bigint = t81::core::bigint;
+    const bigint modulus = bigint(1000);
+    if (!check_equal(bigint::mod_pow(bigint(2), bigint(10), modulus), bigint(24), "mod_pow small")) {
+        return false;
+    }
+    if (!check_equal(bigint::mod_pow(bigint(5), bigint(0), modulus), bigint(1), "mod_pow exponent zero")) {
+        return false;
+    }
+    if (!check_equal(bigint::mod_pow(bigint(-3), bigint(3), bigint(50)), bigint(23), "mod_pow negative base")) {
+        return false;
+    }
+    const bigint large_mod = t81::io::from_string<bigint>("1000003");
+    if (!check_equal(bigint::mod_pow(bigint(2), bigint(20), large_mod), bigint(48573), "mod_pow large modulus")) {
+        return false;
+    }
+    bool caught_negative_exponent = false;
+    try {
+        (void)bigint::mod_pow(bigint(2), bigint(-1), bigint(17));
+    } catch (const std::domain_error&) {
+        caught_negative_exponent = true;
+    }
+    if (!caught_negative_exponent) {
+        std::cerr << "mod_pow must reject negative exponent\n";
+        return false;
+    }
+    bool caught_negative_mod = false;
+    try {
+        (void)bigint::mod_pow(bigint(2), bigint(3), bigint(-5));
+    } catch (const std::domain_error&) {
+        caught_negative_mod = true;
+    }
+    if (!caught_negative_mod) {
+        std::cerr << "mod_pow must reject negative modulus\n";
+        return false;
     }
     return true;
 }
@@ -276,6 +381,9 @@ int main() {
     if (!test_div_mod(rng)) {
         return 1;
     }
+    if (!test_divide_magnitude_large()) {
+        return 1;
+    }
     if (!test_bitwise_ops(rng)) {
         return 1;
     }
@@ -283,6 +391,12 @@ int main() {
         return 1;
     }
     if (!test_integral_conversions()) {
+        return 1;
+    }
+    if (!test_gcd_cases()) {
+        return 1;
+    }
+    if (!test_mod_pow_cases()) {
         return 1;
     }
     std::cout << "bigint_ops passed\n";
