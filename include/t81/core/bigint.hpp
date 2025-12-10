@@ -401,11 +401,7 @@ public:
     }
 
     bigint operator~() const {
-        auto digits = signed_limbs();
-        for (auto& digit : digits) {
-            digit = -digit;
-        }
-        return from_signed_limbs(digits);
+        return -(*this + bigint::one());
     }
 
     bigint operator<<(int shift) const {
@@ -441,12 +437,46 @@ public:
         if (count <= 0) {
             return *this;
         }
-        auto trits = signed_trits();
-        if (static_cast<std::size_t>(count) >= trits.size()) {
-            return bigint::zero();
+        if (is_zero()) {
+            return *this;
         }
-        trits.erase(trits.begin(), trits.begin() + count);
-        return from_signed_trits(std::move(trits));
+        bigint result = *this;
+        const bool was_negative = negative_;
+        const int limb_shift = count / limb::TRITS;
+        const int remainder = count % limb::TRITS;
+        if (limb_shift > 0) {
+            const std::size_t shift_limbs = static_cast<std::size_t>(limb_shift);
+            bool truncated = false;
+            if (shift_limbs >= result.limbs_.size()) {
+                truncated = !result.limbs_.empty();
+                result.limbs_.clear();
+                result.negative_ = false;
+            } else {
+                for (std::size_t index = 0; index < shift_limbs; ++index) {
+                    if (!result.limbs_[index].is_zero()) {
+                        truncated = true;
+                        break;
+                    }
+                }
+                result.limbs_.erase(result.limbs_.begin(),
+                                     result.limbs_.begin() + shift_limbs);
+                result.normalize();
+            }
+            if (was_negative && truncated) {
+                result -= bigint::one();
+            }
+        }
+        if (remainder > 0) {
+            const detail::limb_int128 pow3 = detail::POW3[remainder];
+            const bigint divisor(limb::from_value(pow3));
+            const bool numerator_negative = result.is_negative();
+            const auto [quotient, remainder_value] = div_mod(result, divisor);
+            result = quotient;
+            if (numerator_negative && !remainder_value.is_zero()) {
+                result -= bigint::one();
+            }
+        }
+        return result;
     }
 
     bigint tryte_shift_left(int count) const {
@@ -468,7 +498,7 @@ public:
         constexpr int TRITS_PER_TRYTE = 3;
         const long long trit_count = static_cast<long long>(count) * TRITS_PER_TRYTE;
         if (trit_count > std::numeric_limits<int>::max()) {
-            return bigint::zero();
+            throw std::overflow_error("tryte shift count too large");
         }
         return trit_shift_right(static_cast<int>(trit_count));
     }
@@ -577,14 +607,42 @@ private:
         return from_signed_limbs(digits);
     }
 
-    static bigint from_signed_limbs(const std::vector<limb>& digits) {
-        bigint result;
+    static bigint from_signed_limbs(std::vector<limb> digits) {
+        if (digits.empty()) {
+            return bigint::zero();
+        }
+        detail::limb_int128 carry = 0;
+        for (std::size_t index = 0; index < digits.size(); ++index) {
+            detail::limb_int128 value = digits[index].to_value() + carry;
+            const auto [digit, next_carry] = digit_and_carry(value);
+            digits[index] = digit;
+            carry = next_carry;
+        }
+        while (carry != 0) {
+            const auto [digit, next_carry] = digit_and_carry(carry);
+            digits.push_back(digit);
+            carry = next_carry;
+        }
+        normalize_magnitude(digits);
+        if (digits.empty()) {
+            return bigint::zero();
+        }
+        bool negative = false;
         for (std::size_t index = digits.size(); index-- > 0;) {
-            result = result.shift_limbs(1);
             if (!digits[index].is_zero()) {
-                result += bigint(digits[index]);
+                negative = digits[index].is_negative();
+                break;
             }
         }
+        if (negative) {
+            for (auto& digit : digits) {
+                digit = -digit;
+            }
+            normalize_magnitude(digits);
+        }
+        bigint result;
+        result.limbs_ = std::move(digits);
+        result.negative_ = negative && !result.limbs_.empty();
         return result;
     }
 
@@ -638,8 +696,8 @@ private:
         std::vector<limb> quotient;
         std::vector<limb> remainder = std::move(dividend);
         for (int index = static_cast<int>(scaled.size()) - 1; index >= 0; --index) {
-            while (!remainder.empty() &&
-                   compare_magnitude_vectors(remainder, scaled[index]) != std::strong_ordering::less) {
+            if (!remainder.empty() &&
+                compare_magnitude_vectors(remainder, scaled[index]) != std::strong_ordering::less) {
                 remainder = subtract_magnitude(remainder, scaled[index]);
                 normalize_magnitude(remainder);
                 quotient = add_magnitude(quotient, multiples[index]);
@@ -717,6 +775,17 @@ private:
         return result;
     }
 
+    static std::vector<limb> divide_magnitude_by_small(const std::vector<limb>& digits,
+                                                       detail::limb_int128 divisor) {
+        if (digits.empty() || divisor == 0) {
+            return {};
+        }
+        const std::vector<limb> divisor_digits{limb::from_value(divisor)};
+        const auto [quotient, remainder] = divide_magnitude(digits, divisor_digits);
+        (void)remainder;
+        return quotient;
+    }
+
     static std::vector<limb> multiply_schoolbook(const std::vector<limb>& lhs,
                                                  const std::vector<limb>& rhs) {
         if (lhs.empty() || rhs.empty()) {
@@ -775,7 +844,8 @@ private:
         if (lhs.empty() || rhs.empty()) {
             return {};
         }
-        if (lhs.size() + rhs.size() <= 64) {
+        constexpr std::size_t KARATSUBA_THRESHOLD = 128;
+        if (lhs.size() + rhs.size() <= KARATSUBA_THRESHOLD) {
             return multiply_schoolbook(lhs, rhs);
         }
         const std::size_t n = std::max(lhs.size(), rhs.size());

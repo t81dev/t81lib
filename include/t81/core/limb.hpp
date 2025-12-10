@@ -248,48 +248,48 @@ public:
     constexpr std::string to_string(int base = 10) const {
         const bool negative = is_negative();
         if (base == 81) {
-        const limb magnitude = negative ? -(*this) : *this;
-        if (magnitude.is_zero()) {
-            return "0";
-        }
-        const auto trits = magnitude.to_trits();
-        std::vector<int> digits;
-        digits.reserve(BASE81_DIGITS_PER_LIMB + 4);
-        int carry = 0;
-        for (int chunk = 0; chunk < BASE81_DIGITS_PER_LIMB; ++chunk) {
-            int sum = carry;
-            int weight = 1;
-            for (int offset = 0; offset < 4; ++offset) {
-                sum += static_cast<int>(trits[chunk * 4 + offset]) * weight;
-                weight *= 3;
+            const limb magnitude = negative ? -(*this) : *this;
+            if (magnitude.is_zero()) {
+                return "0";
             }
-            int digit = sum % 81;
-            if (digit < 0) {
-                digit += 81;
+            const auto trits = magnitude.to_trits();
+            std::vector<int> digits;
+            digits.reserve(BASE81_DIGITS_PER_LIMB + 4);
+            int carry = 0;
+            for (int chunk = 0; chunk < BASE81_DIGITS_PER_LIMB; ++chunk) {
+                int sum = carry;
+                int weight = 1;
+                for (int offset = 0; offset < 4; ++offset) {
+                    sum += static_cast<int>(trits[chunk * 4 + offset]) * weight;
+                    weight *= 3;
+                }
+                int digit = sum % 81;
+                if (digit < 0) {
+                    digit += 81;
+                }
+                carry = (sum - digit) / 81;
+                digits.push_back(digit);
             }
-            carry = (sum - digit) / 81;
-            digits.push_back(digit);
-        }
-        while (carry != 0) {
-            int digit = carry % 81;
-            if (digit < 0) {
-                digit += 81;
+            while (carry != 0) {
+                int digit = carry % 81;
+                if (digit < 0) {
+                    digit += 81;
+                }
+                carry = (carry - digit) / 81;
+                digits.push_back(digit);
             }
-            carry = (carry - digit) / 81;
-            digits.push_back(digit);
-        }
-        while (digits.size() > 1 && digits.back() == 0) {
-            digits.pop_back();
-        }
-        std::string result;
-        result.reserve(digits.size() + (negative ? 1 : 0));
-        if (negative) {
-            result.push_back('-');
-        }
-        for (auto it = digits.rbegin(); it != digits.rend(); ++it) {
-            result.push_back(detail::base81_digit_char(*it));
-        }
-        return result;
+            while (digits.size() > 1 && digits.back() == 0) {
+                digits.pop_back();
+            }
+            std::string result;
+            result.reserve(digits.size() + (negative ? 1 : 0));
+            if (negative) {
+                result.push_back('-');
+            }
+            for (auto it = digits.rbegin(); it != digits.rend(); ++it) {
+                result.push_back(detail::base81_digit_char(*it));
+            }
+            return result;
         }
         if (base < 2 || base > 36) {
             throw std::invalid_argument("supported bases are 2..36");
@@ -323,9 +323,6 @@ public:
     static limb from_base81_digits(std::string_view digits) {
         if (digits.empty()) {
             return zero();
-        }
-        if (digits[0] == '+' || digits[0] == '-') {
-            throw std::invalid_argument("base81 digit chunk must not contain a sign");
         }
         return from_string_base81(digits);
     }
@@ -605,20 +602,39 @@ public:
                 throw std::invalid_argument("string has only a sign");
             }
         }
-        detail::limb_int128 value = 0;
-        constexpr detail::limb_int128 BASE81_BASE = 81;
+        std::array<std::int8_t, TRITS> trits{};
         for (; index < text.size(); ++index) {
             const char ch = text[index];
             const int digit = detail::base81_digit_value(ch, 81);
             if (digit < 0) {
                 throw std::invalid_argument("invalid digit in string");
             }
-            value = value * BASE81_BASE + digit;
+            for (int idx = TRITS - 1; idx >= 4; --idx) {
+                trits[idx] = trits[idx - 4];
+            }
+            for (int idx = 0; idx < 4; ++idx) {
+                trits[idx] = 0;
+            }
+            const auto& chunk_trits = detail::base81_trits_for_digit(digit);
+            for (int idx = 0; idx < 4; ++idx) {
+                trits[idx] += chunk_trits[idx];
+            }
+            int carry = 0;
+            for (int idx = 0; idx < TRITS; ++idx) {
+                const auto [digit_val, next_carry] =
+                    detail::balanced_digit_and_carry(static_cast<int>(trits[idx]) + carry);
+                trits[idx] = static_cast<std::int8_t>(digit_val);
+                carry = static_cast<int>(next_carry);
+            }
+            if (carry != 0) {
+                throw std::overflow_error("base81 string overflow");
+            }
         }
+        limb result = from_trits(trits);
         if (negative) {
-            value = -value;
+            result = -result;
         }
-        return from_value(value);
+        return result;
     }
 
 private:

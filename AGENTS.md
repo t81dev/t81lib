@@ -19,3 +19,7 @@ This file helps AI agents discover and understand how to work with this reposito
 1. Run any relevant unit tests in `tests/unit/` via CTest or the provided scripts whenever you touch critical paths to verify behavior.
 2. Document significant algorithm changes in `doc/` or `README.md` as appropriate.
 3. Mention new files or important updates back in this file so future agents can find your work quickly.
+
+## Recent updates
+
+- Balanced ternary bigint logic in `include/t81/core/bigint.hpp` now normalizes signed limbs more efficiently and fixes `~`/division helpers so later agents can spot the modern bitwise/division flow.

@@ -174,6 +174,28 @@ bool test_divide_magnitude_large() {
     return true;
 }
 
+bool test_div_mod_scaled_multiples() {
+    using bigint = t81::core::bigint;
+    const auto divisor = t81::io::from_string<bigint>("1234567");
+    bigint dividend = bigint::zero();
+    bigint multiplier = bigint::one();
+    bigint expected_quotient = bigint::zero();
+    for (int index = 0; index < 6; ++index) {
+        dividend += divisor * multiplier;
+        expected_quotient += multiplier;
+        multiplier += multiplier;
+    }
+    const auto [quotient, remainder] = bigint::div_mod(dividend, divisor);
+    if (!check_equal(quotient, expected_quotient, "div_mod scaled quotient")) {
+        return false;
+    }
+    if (!remainder.is_zero()) {
+        std::cerr << "div_mod scaled multiples remainder should be zero\n";
+        return false;
+    }
+    return true;
+}
+
 bool test_gcd_cases() {
     using bigint = t81::core::bigint;
     const auto zero = bigint::zero();
@@ -269,7 +291,7 @@ bool test_bitwise_ops(std::mt19937_64& rng) {
         if (!check_equal(a.consensus(b), t81::core::bigint(limb_a.consensus(limb_b)), "bitwise consensus")) {
             return false;
         }
-        if (!check_equal(~a, t81::core::bigint(~limb_a), "bitwise ~")) {
+        if (!check_equal(~a, -(a + t81::core::bigint::one()), "bitwise ~")) {
             return false;
         }
 
@@ -390,6 +412,18 @@ bool test_integral_conversions() {
     return true;
 }
 
+bool test_signed_limb_reconstruction(std::mt19937_64& rng) {
+    for (int iteration = 0; iteration < 32; ++iteration) {
+        const auto value = random_large_bigint(rng);
+        const auto digits = value.signed_limbs();
+        const auto reconstructed = t81::core::bigint::from_signed_limbs(digits);
+        if (!check_equal(value, reconstructed, "signed limb reconstruction")) {
+            return false;
+        }
+    }
+    return true;
+}
+
 } // namespace
 
 int main() {
@@ -409,10 +443,16 @@ int main() {
     if (!test_divide_magnitude_large()) {
         return 1;
     }
+    if (!test_div_mod_scaled_multiples()) {
+        return 1;
+    }
     if (!test_bitwise_ops(rng)) {
         return 1;
     }
     if (!test_shift_ops(rng)) {
+        return 1;
+    }
+    if (!test_signed_limb_reconstruction(rng)) {
         return 1;
     }
     if (!test_integral_conversions()) {

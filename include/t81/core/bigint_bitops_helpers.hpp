@@ -4,6 +4,9 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
+#include <stdexcept>
+#include <utility>
 #include <vector>
 
 #include <t81/core/bigint.hpp>
@@ -24,20 +27,6 @@ inline std::vector<limb> signed_limbs(const bigint& value) {
             digit = -digit;
         }
         result.push_back(digit);
-    }
-    return result;
-}
-
-inline bigint from_signed_limbs(std::vector<limb> digits) {
-    if (digits.empty()) {
-        return bigint::zero();
-    }
-    bigint result;
-    for (std::size_t index = digits.size(); index-- > 0;) {
-        result = result.shift_limbs(1);
-        if (!digits[index].is_zero()) {
-            result += bigint(digits[index]);
-        }
     }
     return result;
 }
@@ -70,7 +59,7 @@ inline bigint from_signed_trits(std::vector<std::int8_t> trits) {
         }
         digits.push_back(limb::from_trits(chunk));
     }
-    return from_signed_limbs(digits);
+    return bigint::from_signed_limbs(std::move(digits));
 }
 
 template <typename Fn>
@@ -87,15 +76,11 @@ inline bigint expected_bitwise(const bigint& lhs,
     for (std::size_t index = 0; index < size; ++index) {
         result.push_back(fn(lhs_digits[index], rhs_digits[index]));
     }
-    return from_signed_limbs(result);
+        return bigint::from_signed_limbs(std::move(result));
 }
 
 inline bigint expected_not(const bigint& value) {
-    auto digits = signed_limbs(value);
-    for (auto& digit : digits) {
-        digit = -digit;
-    }
-    return from_signed_limbs(digits);
+    return -(value + bigint::one());
 }
 
 inline bigint expected_trit_shift_left(const bigint& value, int count) {
@@ -112,11 +97,28 @@ inline bigint expected_trit_shift_right(const bigint& value, int count) {
         return value;
     }
     auto trits = signed_trits(value);
-    if (static_cast<std::size_t>(count) >= trits.size()) {
+    if (trits.empty()) {
         return bigint::zero();
     }
-    trits.erase(trits.begin(), trits.begin() + count);
-    return from_signed_trits(std::move(trits));
+    const std::size_t shift = static_cast<std::size_t>(count);
+    const std::size_t limited_shift = std::min(shift, trits.size());
+    const bool negative = value.is_negative();
+    const bool truncated_nonzero =
+        limited_shift > 0 &&
+        std::any_of(trits.begin(), trits.begin() + limited_shift,
+                    [](std::int8_t trit) { return trit != 0; });
+    if (shift >= trits.size()) {
+        if (negative && truncated_nonzero) {
+            return -bigint::one();
+        }
+        return bigint::zero();
+    }
+    trits.erase(trits.begin(), trits.begin() + limited_shift);
+    bigint result = from_signed_trits(std::move(trits));
+    if (negative && truncated_nonzero) {
+        result -= bigint::one();
+    }
+    return result;
 }
 
 inline bigint expected_tryte_shift_left(const bigint& value, int count) {
@@ -124,7 +126,15 @@ inline bigint expected_tryte_shift_left(const bigint& value, int count) {
 }
 
 inline bigint expected_tryte_shift_right(const bigint& value, int count) {
-    return expected_trit_shift_right(value, count * 3);
+    if (count <= 0) {
+        return value;
+    }
+    constexpr int TRITS_PER_TRYTE = 3;
+    const long long trit_count = static_cast<long long>(count) * TRITS_PER_TRYTE;
+    if (trit_count > std::numeric_limits<int>::max()) {
+        throw std::overflow_error("tryte shift count too large");
+    }
+    return expected_trit_shift_right(value, static_cast<int>(trit_count));
 }
 
 } // namespace t81::core

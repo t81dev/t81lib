@@ -7,6 +7,7 @@
 #include <benchmark/benchmark.h>
 
 #include <t81/t81lib.hpp>
+#include <t81/core/detail/base_digits.hpp>
 #include <t81/io/fast_decimal.hpp>
 #include <t81/util/random.hpp>
 
@@ -102,6 +103,16 @@ std::string decimal_string(std::size_t digits) {
     result.reserve(digits);
     for (std::size_t index = 0; index < digits; ++index) {
         result.push_back(static_cast<char>('1' + (index % 9)));
+    }
+    return result;
+}
+
+std::string base81_string(std::size_t digits) {
+    std::string result;
+    result.reserve(digits);
+    const auto& alphabet = t81::core::detail::BASE81_DIGITS;
+    for (std::size_t index = 0; index < digits; ++index) {
+        result.push_back(alphabet[index % alphabet.size()]);
     }
     return result;
 }
@@ -348,6 +359,22 @@ void bench_bigint_decimal_from_string(benchmark::State& state,
     }
 }
 
+void bench_bigint_base81_to_string(benchmark::State& state,
+                                   const t81::core::bigint& value) {
+    while (state.KeepRunning()) {
+        auto text = t81::io::to_string(value, 81);
+        benchmark::DoNotOptimize(std::move(text));
+    }
+}
+
+void bench_bigint_base81_from_string(benchmark::State& state,
+                                     const std::string& text) {
+    while (state.KeepRunning()) {
+        auto parsed = t81::io::from_string<t81::core::bigint>(text, 81);
+        benchmark::DoNotOptimize(std::move(parsed));
+    }
+}
+
 void bench_bigint_multiply_large(benchmark::State& state,
                                  std::uint64_t seed,
                                  std::size_t limbs) {
@@ -550,6 +577,12 @@ const auto decimal_100_value =
     t81::io::from_string<t81::core::bigint>(decimal_100_text, 10);
 const auto decimal_1000_value =
     t81::io::from_string<t81::core::bigint>(decimal_1000_text, 10);
+const auto base81_100_text = base81_string(100);
+const auto base81_256_text = base81_string(256);
+const auto base81_100_value =
+    t81::io::from_string<t81::core::bigint>(base81_100_text, 81);
+const auto base81_256_value =
+    t81::io::from_string<t81::core::bigint>(base81_256_text, 81);
 const auto large_bigint_value = build_large_bigint(kLargeBigintLimbs);
 
 BENCHMARK_CAPTURE(bench_bigint_shift<true>, shift_left_1, 0xabcde01, kBigintLimbs, 1);
@@ -565,6 +598,10 @@ BENCHMARK_CAPTURE(bench_bigint_decimal_to_string, decimal_to_string_100, decimal
 BENCHMARK_CAPTURE(bench_bigint_decimal_to_string, decimal_to_string_1000, decimal_1000_value);
 BENCHMARK_CAPTURE(bench_bigint_decimal_from_string, decimal_from_string_100, decimal_100_text);
 BENCHMARK_CAPTURE(bench_bigint_decimal_from_string, decimal_from_string_1000, decimal_1000_text);
+BENCHMARK_CAPTURE(bench_bigint_base81_to_string, base81_to_string_100, base81_100_value);
+BENCHMARK_CAPTURE(bench_bigint_base81_to_string, base81_to_string_256, base81_256_value);
+BENCHMARK_CAPTURE(bench_bigint_base81_from_string, base81_from_string_100, base81_100_text);
+BENCHMARK_CAPTURE(bench_bigint_base81_from_string, base81_from_string_256, base81_256_text);
 
 BENCHMARK_CAPTURE(bench_bigint_pow, bigint_pow_128, 0xfeedc0de, kBigintLimbs, 128);
 BENCHMARK_CAPTURE(bench_bigint_pow, bigint_pow_512, 0xfeedc0df, kBigintLimbs, 512);
