@@ -3,6 +3,7 @@ project(t81lib VERSION 0.1.0 LANGUAGES CXX)
 
 option(T81LIB_BUILD_TESTS "Build t81lib tests" ON)
 option(T81LIB_BUILD_BENCH "Build t81lib benchmarks" OFF)
+option(T81LIB_USE_GOOGLE_BENCH "Fetch Google Benchmark when a system package is missing" ON)
 option(T81LIB_HEADER_ONLY "Build t81lib as header-only interface library" ON)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -20,6 +21,24 @@ target_compile_features(t81lib INTERFACE cxx_std_20)
 
 # Exported namespace: t81::t81lib
 add_library(t81::t81lib ALIAS t81lib)
+
+find_package(benchmark QUIET)
+
+if(T81LIB_BUILD_BENCH AND NOT benchmark_FOUND AND NOT T81LIB_USE_GOOGLE_BENCH)
+    message(FATAL_ERROR
+        "t81lib benchmarks require Google Benchmark; install it or enable T81LIB_USE_GOOGLE_BENCH.")
+endif()
+
+include(FetchContent)
+if(T81LIB_BUILD_BENCH AND NOT benchmark_FOUND AND T81LIB_USE_GOOGLE_BENCH)
+    set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Disable googletest discovery" FORCE)
+    FetchContent_Declare(
+        googlebenchmark
+        GIT_REPOSITORY https://github.com/google/benchmark.git
+        GIT_TAG v1.7.1
+    )
+    FetchContent_MakeAvailable(googlebenchmark)
+endif()
 
 if(T81LIB_BUILD_TESTS)
     enable_testing()
