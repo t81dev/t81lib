@@ -11,7 +11,7 @@ README.md — Repository overview, setup, and quickstart instructions.
 `t81lib` is a modern, header-first C++20 library that brings **balanced ternary** arithmetic
 to production-grade software. At the heart sits `t81::core::limb`—a canonical 48-trit scalar with a
 deterministic 16-byte encoding—and a carefully layered ecosystem for high-level math,
-modular helpers, and deterministic utilities.\n
+modular helpers, and deterministic utilities.
 
 ## Highlights
 
