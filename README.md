@@ -33,6 +33,28 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
+### Python bindings
+
+Enable the Python bindings by configuring with `-DT81LIB_BUILD_PYTHON_BINDINGS=ON`. Then build normally and point `PYTHONPATH` at the build directory before importing the module:
+
+```bash
+cmake -S . -B build -DT81LIB_BUILD_TESTS=ON -DT81LIB_BUILD_PYTHON_BINDINGS=ON
+cmake --build build -j
+PYTHONPATH=build python tests/python/test_bindings.py
+```
+
+After a successful build `import t81lib` exposes the `BigInt` class plus helper functions such as `zero()`, `one()`, `gcd()`, and `mod_pow()`:
+
+```python
+import t81lib
+
+value = t81lib.BigInt(42)
+value = value * t81lib.one()
+print(str(value))
+```
+
+Use `tests/python/test_bindings.py` as a simple sanity-check script and reference for building larger Python workflows.
+
 ### 2. Consume as a subproject
 
 ```cmake

@@ -5,6 +5,7 @@ option(T81LIB_BUILD_TESTS "Build t81lib tests" ON)
 option(T81LIB_BUILD_BENCH "Build t81lib benchmarks" OFF)
 option(T81LIB_USE_GOOGLE_BENCH "Fetch Google Benchmark when a system package is missing" ON)
 option(T81LIB_HEADER_ONLY "Build t81lib as header-only interface library" ON)
+option(T81LIB_BUILD_PYTHON_BINDINGS "Build Python bindings for t81lib" ON)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -52,6 +53,10 @@ endif()
 
 if(T81LIB_BUILD_BENCH)
     add_subdirectory(bench)
+endif()
+
+if(T81LIB_BUILD_PYTHON_BINDINGS)
+    add_subdirectory(python)
 endif()
 
 add_subdirectory(examples)

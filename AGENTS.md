@@ -5,6 +5,7 @@ This file helps AI agents discover and understand how to work with this reposito
 ## Discovery
 
 - **Primary entry points:** `README.md`, `include/`, `src/`, and `tests/` describe the architecture and entry points for this library. Use `rg` to locate interesting symbols before jumping into implementation.
+- **Python bindings:** The new `python/` directory holds the pybind11-based module and `tests/python/test_bindings.py` exercises it; toggle `T81LIB_BUILD_PYTHON_BINDINGS` when configuring CMake to build the module.
 - **Build tooling:** The project uses CMake. Inspect `CMakeLists.txt` and related files in `cmake/` or `doc/` for build and test instructions before making changes.
 
 ## Agent guidelines
