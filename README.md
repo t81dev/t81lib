@@ -17,8 +17,8 @@ modular helpers, and deterministic utilities.\n
   Karatsuba-aware multiplication, canonical normalization, and full conversion helpers.
 - **Concrete helpers**: Montgomery contexts, I/O formatters, random tooling, and utility guards
   keep reusable patterns consistent and testable.
-- **Specs & architecture**: Normative coverage under `doc/`, plus a human-friendly
-  `ARCHITECTURE.md` walkthrough (new!) and a docs portal at `docs/index.md` for quick orientation.
+- **Specs & architecture**: Normative coverage under [doc/](doc/), plus a human-friendly
+  [ARCHITECTURE.md](ARCHITECTURE.md) walkthrough (new!) and a docs portal at [docs/index.md](docs/index.md) for quick orientation.
 - **Examples & proofs**: `examples/` shows runnable use cases while `tests/` and
   `bench/` capture behavioral regression suites and throughput gauges.
 
@@ -97,17 +97,17 @@ Callers can also rely on guard classes for const-time exponent limits.
 - **Montgomery & helpers**: contexts, modular multiply/pow, context guards, and bridging helpers in
   `t81::core::montgomery`.
 - **I/O, util, docs**: `t81::io` for formatting/parsing, `t81::util` for randomness & invariants,
-  and mirrored design docs under `doc/`.
-- **New architecture guide**: See `ARCHITECTURE.md` for a concise narrative plus ASCII call flow of the core layers.
+  and mirrored design docs under [doc/](doc/).
+- **New architecture guide**: See [ARCHITECTURE.md](ARCHITECTURE.md) for a concise narrative plus ASCII call flow of the core layers.
 
 ## Docs & resources
 
-- `doc/t81lib-spec-v1.0.0.md` — Normative library contract for consumers.
-- `doc/design/` — Deep dives on `limb`/`bigint`/`montgomery` internals.
-- `docs/index.md` — A friendly docs portal pointing to specs, examples, and tutorials (great for GitHub Pages).
-- `examples/` — Compileable demos that exercise `limb`, `bigint`, and Montgomery helpers.
-- `tests/` & `bench/` — Regression/property suites and microbenchmarks for throughput decisions.
-- `CONTRIBUTING.md` & `CHANGELOG.md` — Expectations, workflows, and the evolution log.
+- [doc/t81lib-spec-v1.0.0.md](doc/t81lib-spec-v1.0.0.md) — Normative library contract for consumers.
+- [doc/design/](doc/design/) — Deep dives on `limb`/`bigint`/`montgomery` internals.
+- [docs/index.md](docs/index.md) — A friendly docs portal pointing to specs, examples, and tutorials (great for GitHub Pages).
+- [examples/](examples/) — Compileable demos that exercise `limb`, `bigint`, and Montgomery helpers.
+- [tests/](tests/) & [bench/](bench/) — Regression/property suites and microbenchmarks for throughput decisions.
+- [CONTRIBUTING.md](CONTRIBUTING.md) & [CHANGELOG.md](CHANGELOG.md) — Expectations, workflows, and the evolution log.
 
 ## Testing & benchmarks
 
@@ -120,11 +120,11 @@ Callers can also rely on guard classes for const-time exponent limits.
 ## Contribution & support
 
 - Open an issue to discuss architecture or API needs.
-- Follow `CONTRIBUTING.md` for branching, formatting, and testing workflows.
-- Reference `doc/design/` when proposing optimizations to ensure semantic safety.
-- Track progress in `CHANGELOG.md` for breaking changes or release notes.
+- Follow [CONTRIBUTING.md](CONTRIBUTING.md) for branching, formatting, and testing workflows.
+- Reference [doc/design/](doc/design/) when proposing optimizations to ensure semantic safety.
+- Track progress in [CHANGELOG.md](CHANGELOG.md) for breaking changes or release notes.
 - Security concerns can be reported privately; the repo currently follows a standard disclosure cadence.
 
 ## License
 
-`t81lib` is MIT-licensed; see `LICENSE`.
+`t81lib` is MIT-licensed; see [LICENSE](LICENSE).

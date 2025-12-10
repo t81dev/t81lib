@@ -71,7 +71,7 @@ Int random_nonzero_value(std::mt19937_64& rng, std::size_t limbs) {
     return value;
 }
 
-constexpr std::size_t kCacheSize = 128;
+constexpr std::size_t kCacheSize = 64;
 
 template <typename Int>
 std::vector<Int> create_random_cache(std::mt19937_64& rng,
@@ -310,7 +310,7 @@ void bench_arithmetic(benchmark::State& state,
 }
 
 constexpr std::size_t kBigintLimbs = 3;
-constexpr std::size_t kLargeBigintLimbs = 128;
+constexpr std::size_t kLargeBigintLimbs = 32;
 constexpr std::uint64_t kLargePowExponent = 32;
 
 constexpr std::uint64_t negation_seed(bool bigint) noexcept {
