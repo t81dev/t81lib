@@ -64,5 +64,10 @@ can quickly orient themselves before reading the full specs in `doc/`.
 For the formal semantics, refer to `doc/t81lib-spec-v1.0.0.md`. Internal design decisions are spelled out
 in `doc/design/limb-design.md`, `doc/design/bigint-design.md`, and `doc/design/montgomery-design.md`.
 
+## Visual guides
+
+- `doc/diagrams/architecture-stack-mermaid.md` — module layering from application to helper utilities.
+- `doc/diagrams/build-flow-mermaid.md` — configure/build/test/bindings workflow so new contributors can run the project end-to-end.
+
 This guide is intentionally light and developer-facing—if you need a runnable overview, `docs/index.md`
 acts as the higher-level docs portal introduced in the README.
