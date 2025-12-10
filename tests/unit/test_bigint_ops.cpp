@@ -181,7 +181,7 @@ bool test_gcd_cases() {
     const auto multiplier_a =
         t81::io::from_string<bigint>("12345678901234567890");
     const auto multiplier_b =
-        t81::io::from_string<bigint>("9876543210987654321");
+        t81::io::from_string<bigint>("12345678901234567891");
     const bigint large_a = base_common * multiplier_a;
     const bigint large_b = base_common * multiplier_b;
     if (!check_equal(bigint::gcd(large_a, large_b), base_common, "gcd large multiples")) {

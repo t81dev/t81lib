@@ -447,14 +447,20 @@ void bench_montgomery_mul(benchmark::State& state,
                           const t81::core::bigint& modulus) {
     std::mt19937_64 rng(seed + static_cast<std::uint64_t>(state.thread_index()));
     const auto context = t81::core::MontgomeryContext<t81::core::bigint>(modulus);
-    const auto cache = create_random_cache<t81::core::bigint>(rng, 2, kCacheSize, false);
-    std::size_t index = 0;
+    auto lhs_cache = create_random_cache<t81::core::bigint>(rng, 2, kCacheSize, false);
+    auto rhs_cache = create_random_cache<t81::core::bigint>(rng, 2, kCacheSize, false);
+    for (auto& value : lhs_cache) {
+        value = context.to_montgomery(value);
+    }
+    for (auto& value : rhs_cache) {
+        value = context.to_montgomery(value);
+    }
+    std::size_t lhs_index = 0;
+    std::size_t rhs_index = 0;
     while (state.KeepRunning()) {
-        const auto lhs = next_cache_value(cache, index);
-        const auto rhs = next_cache_value(cache, index);
-        const auto a_bar = context.to_montgomery(lhs);
-        const auto b_bar = context.to_montgomery(rhs);
-        auto result = context.mul(a_bar, b_bar);
+        const auto lhs = next_cache_value(lhs_cache, lhs_index);
+        const auto rhs = next_cache_value(rhs_cache, rhs_index);
+        auto result = context.mul(lhs, rhs);
         benchmark::DoNotOptimize(std::move(result));
     }
 }
@@ -464,14 +470,22 @@ void bench_montgomery_mul_large(benchmark::State& state,
                                 const t81::core::bigint& modulus) {
     std::mt19937_64 rng(seed + static_cast<std::uint64_t>(state.thread_index()));
     const auto context = t81::core::MontgomeryContext<t81::core::bigint>(modulus);
-    const auto cache = create_random_cache<t81::core::bigint>(rng, kLargeBigintLimbs, kCacheSize, false);
-    std::size_t index = 0;
+    auto lhs_cache =
+        create_random_cache<t81::core::bigint>(rng, kLargeBigintLimbs, kCacheSize, false);
+    auto rhs_cache =
+        create_random_cache<t81::core::bigint>(rng, kLargeBigintLimbs, kCacheSize, false);
+    for (auto& value : lhs_cache) {
+        value = context.to_montgomery(value);
+    }
+    for (auto& value : rhs_cache) {
+        value = context.to_montgomery(value);
+    }
+    std::size_t lhs_index = 0;
+    std::size_t rhs_index = 0;
     while (state.KeepRunning()) {
-        const auto lhs = next_cache_value(cache, index);
-        const auto rhs = next_cache_value(cache, index);
-        const auto a_bar = context.to_montgomery(lhs);
-        const auto b_bar = context.to_montgomery(rhs);
-        auto result = context.mul(a_bar, b_bar);
+        const auto lhs = next_cache_value(lhs_cache, lhs_index);
+        const auto rhs = next_cache_value(rhs_cache, rhs_index);
+        auto result = context.mul(lhs, rhs);
         benchmark::DoNotOptimize(std::move(result));
     }
 }
