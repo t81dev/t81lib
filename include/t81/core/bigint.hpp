@@ -17,6 +17,15 @@
 
 namespace t81::core {
 
+class bigint;
+
+std::vector<limb> signed_limbs(const bigint&);
+std::vector<std::int8_t> signed_trits(const bigint&);
+bigint from_signed_trits(std::vector<std::int8_t>);
+bigint from_signed_limbs(std::vector<limb> digits);
+template <typename Fn>
+bigint expected_bitwise(const bigint&, const bigint&, Fn);
+
 class bigint {
 public:
     bigint() noexcept = default;
@@ -546,6 +555,13 @@ public:
         }
         return result;
     }
+
+    friend std::vector<limb> signed_limbs(const bigint&);
+    friend std::vector<std::int8_t> signed_trits(const bigint&);
+    friend bigint from_signed_trits(std::vector<std::int8_t>);
+    friend bigint from_signed_limbs(std::vector<limb>);
+    template <typename Fn>
+    friend bigint expected_bitwise(const bigint&, const bigint&, Fn);
 
 private:
     template <typename Fn>

@@ -43,6 +43,10 @@ inline std::vector<std::int8_t> signed_trits(const bigint& value) {
     return trits;
 }
 
+inline bigint from_signed_limbs(std::vector<limb> digits) {
+    return bigint::from_signed_limbs(std::move(digits));
+}
+
 inline bigint from_signed_trits(std::vector<std::int8_t> trits) {
     if (trits.empty()) {
         return bigint::zero();
@@ -77,7 +81,7 @@ inline bigint expected_bitwise(const bigint& lhs,
     for (std::size_t index = 0; index < size; ++index) {
         result.push_back(fn(lhs_digits[index], rhs_digits[index]));
     }
-        return bigint::from_signed_limbs(std::move(result));
+    return from_signed_limbs(std::move(result));
 }
 
 inline bigint expected_not(const bigint& value) {

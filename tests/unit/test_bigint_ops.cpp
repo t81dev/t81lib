@@ -38,6 +38,8 @@ using t81::core::expected_tryte_shift_left;
 using t81::core::expected_tryte_shift_right;
 using t81::core::expected_trit_shift_left;
 using t81::core::expected_trit_shift_right;
+using t81::core::signed_limbs;
+using t81::core::from_signed_limbs;
 
 bool check_equal(const t81::core::bigint& lhs,
                  const t81::core::bigint& rhs,
@@ -417,8 +419,8 @@ bool test_integral_conversions() {
 bool test_signed_limb_reconstruction(std::mt19937_64& rng) {
     for (int iteration = 0; iteration < 32; ++iteration) {
         const auto value = random_large_bigint(rng);
-        const auto digits = value.signed_limbs();
-        const auto reconstructed = t81::core::bigint::from_signed_limbs(digits);
+        const auto digits = signed_limbs(value);
+        const auto reconstructed = from_signed_limbs(digits);
         if (!check_equal(value, reconstructed, "signed limb reconstruction")) {
             return false;
         }
