@@ -347,12 +347,13 @@ If benchmarks are enabled:
 cmake -S . -B build -DT81LIB_BUILD_BENCH=ON
 cmake --build build -j
 ./build/bench/bench_limb_add
+./build/bench/bench_limb_ops
 ```
 
 Benchmarks target:
 
 * `limb` add/mul throughput
-* Comparisons vs. equivalent binary operations (optional)
+* `limb` arithmetic (add/sub/mul/div/mod) comparisons between ternary operators and equivalent binary math
 * Effects of different implementations / backends (scalar vs SIMD)
 
 ---
