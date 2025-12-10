@@ -1,3 +1,6 @@
+// include/t81/core/detail/simd.hpp — SIMD helper declarations for core routines.
+
+// detail/simd.hpp - Detects available SIMD instruction sets for limb operations.
 #pragma once
 
 #include <optional>

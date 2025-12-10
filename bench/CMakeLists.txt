@@ -1,3 +1,5 @@
+# bench/CMakeLists.txt — CMake targets for running the benchmarks.
+
 add_executable(bench_limb_add bench_limb_add.cpp)
 target_link_libraries(bench_limb_add PRIVATE benchmark::benchmark t81::t81lib)
 

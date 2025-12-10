@@ -1,3 +1,5 @@
+// bench/bench_limb_ops.cpp — Benchmark for limb arithmetic primitives.
+
 #include <cstdint>
 #include <random>
 

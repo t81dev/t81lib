@@ -1,3 +1,5 @@
+// include/t81/util/debug.hpp — Debugging helpers and assertions.
+
 #pragma once
 
 #include <ostream>

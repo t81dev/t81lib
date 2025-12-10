@@ -1,3 +1,6 @@
+// include/t81/core/detail/simd_impl.hpp — SIMD implementation definitions.
+
+// detail/simd_impl.hpp - SIMD helper implementations for addition and limb packing.
 #pragma once
 
 #include <array>

@@ -1,3 +1,5 @@
+// include/t81/core/traits.hpp — Compile-time traits for limbs and bigints.
+
 #pragma once
 
 #include <type_traits>

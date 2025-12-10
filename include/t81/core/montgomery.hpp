@@ -1,3 +1,5 @@
+// include/t81/core/montgomery.hpp — Montgomery arithmetic interface declarations.
+
 #pragma once
 
 #include <cstddef>

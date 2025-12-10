@@ -1,3 +1,5 @@
+// include/t81/core/montgomery_helpers.hpp — Helpers that back Montgomery math.
+
 #pragma once
 
 #include <cstddef>

@@ -1,3 +1,5 @@
+// include/t81/io/parse.hpp — Declarations for bigint parsing utilities.
+
 #pragma once
 
 #include <array>

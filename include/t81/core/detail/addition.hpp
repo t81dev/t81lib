@@ -1,3 +1,5 @@
+// include/t81/core/detail/addition.hpp — Addition helper declarations for bigint.
+
 #pragma once
 
 #include <array>

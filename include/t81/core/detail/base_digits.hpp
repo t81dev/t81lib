@@ -1,3 +1,6 @@
+// include/t81/core/detail/base_digits.hpp — Digit traits and base conversion helpers.
+
+// detail/base_digits.hpp - Base-81 digit metadata for parsing/formatting routines.
 #pragma once
 
 #include <array>

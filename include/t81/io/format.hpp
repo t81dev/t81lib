@@ -1,3 +1,5 @@
+// include/t81/io/format.hpp — Declarations for formatting bigint values.
+
 #pragma once
 
 #include <algorithm>

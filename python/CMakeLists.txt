@@ -1,3 +1,5 @@
+# python/CMakeLists.txt — Build rules for the Python extension module.
+
 cmake_minimum_required(VERSION 3.16)
 
 include(FetchContent)

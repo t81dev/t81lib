@@ -1,3 +1,5 @@
+# cmake/t81libConfig.cmake.in — Template for the exported CMake config package.
+
 @PACKAGE_INIT@
 
 include("${CMAKE_CURRENT_LIST_DIR}/t81libTargets.cmake")

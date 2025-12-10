@@ -1,3 +1,5 @@
+// include/t81/util/random.hpp — Randomness helpers used across the library.
+
 #pragma once
 
 #include <cstddef>

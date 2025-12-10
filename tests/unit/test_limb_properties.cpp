@@ -1,3 +1,5 @@
+// tests/unit/test_limb_properties.cpp — Unit tests verifying limb invariants.
+
 #include <array>
 #include <cmath>
 #include <functional>

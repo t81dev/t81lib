@@ -1,3 +1,7 @@
+<!--
+README.md — Repository overview, setup, and quickstart instructions.
+-->
+
 # t81lib — Balanced Ternary Core Library
 
 ![CI](https://github.com/t81dev/t81lib/actions/workflows/ci.yml/badge.svg)

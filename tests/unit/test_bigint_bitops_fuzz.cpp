@@ -1,3 +1,5 @@
+// tests/unit/test_bigint_bitops_fuzz.cpp — Fuzz-style coverage for bigint bitwise operations.
+
 #include <t81/t81lib.hpp>
 #include <t81/core/bigint_bitops_helpers.hpp>
 

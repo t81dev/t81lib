@@ -1,3 +1,7 @@
+<!--
+doc/design/montgomery-design.md — Design rationale for the Montgomery reduction facilities.
+-->
+
 # Montgomery-design.md — Montgomery Arithmetic over t81::core Types
 
 **Status:** Informative (non-normative, library-level)  

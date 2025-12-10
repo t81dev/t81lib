@@ -1,3 +1,5 @@
+# tests/python/test_bindings.py — Python-side regression tests for the binding layer.
+
 import sys
 
 try:

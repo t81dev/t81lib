@@ -1,3 +1,5 @@
+// include/t81/core/bigint.hpp — Public bigint class declaration and API.
+
 #pragma once
 
 #include <algorithm>

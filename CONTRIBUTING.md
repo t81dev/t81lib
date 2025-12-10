@@ -1,3 +1,7 @@
+<!--
+CONTRIBUTING.md — Guidelines for contributing code and documentation.
+-->
+
 # Contributing to t81lib (Skeleton)
 
 1. Fork the repository.

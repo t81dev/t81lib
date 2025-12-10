@@ -1,3 +1,7 @@
+<!--
+ARCHITECTURE.md — High-level architecture overview for the library.
+-->
+
 # Architecture overview
 
 `ARCHITECTURE.md` captures how the balanced-ternary pieces are organized so new contributors

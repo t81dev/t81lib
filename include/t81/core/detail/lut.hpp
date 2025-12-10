@@ -1,3 +1,6 @@
+// include/t81/core/detail/lut.hpp — Lookup table definitions supporting arithmetic.
+
+// detail/lut.hpp - Look-up tables for mapping between trits and trytes.
 #pragma once
 
 #include <array>

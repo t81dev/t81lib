@@ -1,3 +1,5 @@
+// python/t81lib_module.cpp — Pybind11 module entrypoint exposing t81lib.
+
 #include <algorithm>
 #include <string>
 

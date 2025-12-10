@@ -1,3 +1,5 @@
+// tests/unit/test_bigint_ops.cpp — Regression tests for bigint arithmetic operators.
+
 #include <t81/t81lib.hpp>
 #include <t81/io/format.hpp>
 #include <t81/io/parse.hpp>

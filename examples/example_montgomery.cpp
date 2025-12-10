@@ -1,3 +1,5 @@
+// examples/example_montgomery.cpp — Illustrates Montgomery multiplication helpers in practice.
+
 #include <iostream>
 #include <stdexcept>
 

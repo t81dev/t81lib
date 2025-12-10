@@ -1,3 +1,5 @@
+// bench/bench_limb_add.cpp — Benchmark for limb addition routines.
+
 #include <random>
 
 #include <benchmark/benchmark.h>

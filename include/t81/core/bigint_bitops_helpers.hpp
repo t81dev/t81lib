@@ -1,3 +1,6 @@
+// include/t81/core/bigint_bitops_helpers.hpp — Bitwise helper APIs for bigint operations.
+
+// bigint_bitops_helpers.hpp - Testing utilities for bigint bitwise and trit/tryte shift helpers.
 #pragma once
 
 #include <algorithm>

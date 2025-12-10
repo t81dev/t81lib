@@ -1,3 +1,5 @@
+// tests/unit/test_limb_float_hash.cpp — Tests ensuring limb float hashing consistency.
+
 #include <cmath>
 #include <functional>
 #include <iostream>

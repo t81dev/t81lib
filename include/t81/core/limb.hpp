@@ -1,3 +1,5 @@
+// include/t81/core/limb.hpp — Limb type definition and low-level helpers.
+
 #pragma once
 
 #include <algorithm>

@@ -1,3 +1,5 @@
+// tests/unit/test_limb_basic.cpp — Basic limb arithmetic unit tests.
+
 #include <array>
 #include <iostream>
 #include <random>

@@ -1,3 +1,5 @@
+// tests/unit/test_main.cpp — Entry point that runs the unit test suite.
+
 #include <iostream>
 
 int main() {

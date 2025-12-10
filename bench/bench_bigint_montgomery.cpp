@@ -1,3 +1,5 @@
+// bench/bench_bigint_montgomery.cpp — Benchmark for Montgomery reduction performance.
+
 #include <random>
 
 #include <benchmark/benchmark.h>

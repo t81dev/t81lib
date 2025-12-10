@@ -1,3 +1,5 @@
+# tests/CMakeLists.txt — Configures the unit test targets.
+
 add_executable(test_limb_basic
     unit/test_limb_basic.cpp
 )

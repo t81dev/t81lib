@@ -1,3 +1,7 @@
+<!--
+AGENTS.md — Guidance for AI agents exploring and modifying this repository.
+-->
+
 # AGENTS
 
 This file helps AI agents discover and understand how to work with this repository.

@@ -1,3 +1,7 @@
+<!--
+docs/index.md — Primary landing page for the documentation set.
+-->
+
 # t81lib docs portal
 
 This landing page highlights the most helpful resources for people discovering `t81lib` or wanting

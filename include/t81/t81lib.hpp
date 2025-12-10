@@ -1,3 +1,5 @@
+// include/t81/t81lib.hpp — Umbrella header that exposes t81lib components.
+
 #pragma once
 
 // Umbrella header for t81lib.

@@ -1,3 +1,5 @@
+// src/io.cpp — Provides bigint parsing and formatting helpers for I/O.
+
 #include <t81/io/format.hpp>
 #include <t81/io/parse.hpp>
 

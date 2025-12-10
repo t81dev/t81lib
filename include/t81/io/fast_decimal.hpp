@@ -1,3 +1,5 @@
+// include/t81/io/fast_decimal.hpp — Fast decimal conversion helpers for I/O.
+
 #pragma once
 
 #include <array>

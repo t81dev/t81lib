@@ -1,3 +1,5 @@
+// bench/bench_t81.cpp — Benchmark exercising the core bigint paths.
+
 #include <array>
 #include <cstdint>
 #include <algorithm>
