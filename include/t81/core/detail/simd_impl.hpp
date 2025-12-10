@@ -4,7 +4,7 @@
 #include <optional>
 
 #include <t81/core/detail/addition.hpp>
-#if defined(__AVX2__)
+#if defined(__AVX2__) || defined(__AVX512F__)
 #include <immintrin.h>
 #endif
 #if defined(__ARM_NEON) || defined(__ARM_NEON__)
@@ -99,6 +99,28 @@ inline bool gather_packed_additions_neon(const limb& lhs,
 }
 #endif
 
+#if defined(__AVX512F__)
+inline bool gather_packed_additions_avx512(const limb& lhs,
+                                            const limb& rhs,
+                                            std::array<std::uint32_t, limb::TRYTES>& packed) {
+    const auto lhs_bytes = lhs.to_bytes();
+    const auto rhs_bytes = rhs.to_bytes();
+    alignas(64) int indices[limb::TRYTES];
+    for (int index = 0; index < limb::TRYTES; ++index) {
+        indices[index] = static_cast<int>(lhs_bytes[index] * 27 + rhs_bytes[index]);
+    }
+    const int* base_ptr = reinterpret_cast<const int*>(PACKED_ADD_MAP.data());
+    for (int offset = 0; offset < limb::TRYTES; offset += 16) {
+        const __m512i index_vec =
+            _mm512_loadu_si512(reinterpret_cast<const __m512i*>(indices + offset));
+        const __m512i gather =
+            _mm512_i32gather_epi32(index_vec, base_ptr, 4);
+        _mm512_storeu_si512(reinterpret_cast<__m512i*>(packed.data() + offset), gather);
+    }
+    return true;
+}
+#endif
+
 #if defined(__AVX2__)
 inline bool gather_packed_additions_avx2(const limb& lhs,
                                          const limb& rhs,
@@ -124,6 +146,19 @@ inline bool add_trytes_avx2(const limb& lhs, const limb& rhs, limb& result) {
 #if defined(__AVX2__)
     std::array<std::uint32_t, limb::TRYTES> packed{};
     if (!gather_packed_additions_avx2(lhs, rhs, packed)) {
+        return false;
+    }
+    compute_prefix(packed);
+    return finalize_result(packed, result);
+#else
+    return false;
+#endif
+}
+
+inline bool add_trytes_avx512(const limb& lhs, const limb& rhs, limb& result) {
+#if defined(__AVX512F__)
+    std::array<std::uint32_t, limb::TRYTES> packed{};
+    if (!gather_packed_additions_avx512(lhs, rhs, packed)) {
         return false;
     }
     compute_prefix(packed);
@@ -211,6 +246,32 @@ inline void accumulate_trits_avx2(const std::array<std::int8_t, limb::TRITS>& le
 }
 #endif
 
+#if defined(__AVX512F__)
+inline void accumulate_trits_avx512(const std::array<std::int8_t, limb::TRITS>& left_trits,
+                                    const std::array<std::int8_t, limb::TRITS>& right_trits,
+                                    std::array<int, limb::TRITS * 2>& accum) {
+    alignas(64) std::array<int32_t, limb::TRITS> left_values{};
+    alignas(64) std::array<int32_t, limb::TRITS> right_values{};
+    for (int index = 0; index < limb::TRITS; ++index) {
+        left_values[index] = left_trits[index];
+        right_values[index] = right_trits[index];
+    }
+    for (int j = 0; j < limb::TRITS; ++j) {
+        const __m512i right_vec = _mm512_set1_epi32(right_values[j]);
+        for (int i = 0; i < limb::TRITS; i += 16) {
+            const __m512i left_vec =
+                _mm512_loadu_si512(reinterpret_cast<const __m512i*>(left_values.data() + i));
+            const __m512i product = _mm512_mullo_epi32(left_vec, right_vec);
+            alignas(64) int32_t buffer[16];
+            _mm512_store_epi32(reinterpret_cast<__m512i*>(buffer), product);
+            for (int offset = 0; offset < 16; ++offset) {
+                accum[i + offset + j] += buffer[offset];
+            }
+        }
+    }
+}
+#endif
+
 #if defined(__ARM_NEON) || defined(__ARM_NEON__)
 inline void accumulate_trits_neon(const std::array<std::int8_t, limb::TRITS>& left_trits,
                                   const std::array<std::int8_t, limb::TRITS>& right_trits,
@@ -248,6 +309,21 @@ inline std::optional<std::pair<limb, limb>> mul_wide_avx2(const limb& lhs, const
     return std::nullopt;
 #endif
 }
+
+#if defined(__AVX512F__)
+inline std::optional<std::pair<limb, limb>> mul_wide_avx512(const limb& lhs,
+                                                            const limb& rhs) {
+    std::array<int, limb::TRITS * 2> accum{};
+    accumulate_trits_avx512(lhs.to_trits(), rhs.to_trits(), accum);
+    normalize_accumulator(accum);
+    return pair_from_accumulator(accum);
+}
+#else
+inline std::optional<std::pair<limb, limb>> mul_wide_avx512(const limb&,
+                                                            const limb&) {
+    return std::nullopt;
+}
+#endif
 
 inline std::optional<std::pair<limb, limb>> mul_wide_neon(const limb& lhs, const limb& rhs) {
 #if defined(__ARM_NEON) || defined(__ARM_NEON__)

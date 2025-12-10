@@ -15,6 +15,7 @@ modular helpers, and deterministic utilities.\n
   and deterministic hashing when you need ternary determinism in a binary world.
 - **Arbitrary-precision math**: `t81::core::bigint` layers on top of limbs with sign-plus-magnitude,
   Karatsuba-aware multiplication, canonical normalization, and full conversion helpers.
+- **SIMD accelerations**: The SIMD helpers under `include/t81/core/detail/simd_impl.hpp` contain AVX-512, AVX2, and NEON implementations for tryte addition/multiplication so the core limb arithmetic can leverage vector hardware when available.
 - **Concrete helpers**: Montgomery contexts, I/O formatters, random tooling, and utility guards
   keep reusable patterns consistent and testable.
 - **Specs & architecture**: Normative coverage under [doc/](doc/), plus a human-friendly
