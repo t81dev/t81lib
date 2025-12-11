@@ -28,3 +28,5 @@ This file helps AI agents discover and understand how to work with this reposito
 
 - Balanced ternary bigint logic in `include/t81/core/bigint.hpp` now normalizes signed limbs more efficiently and fixes `~`/division helpers so later agents can spot the modern bitwise/division flow.
 - `tests/unit/test_numeric_types.cpp` now exercises `Complex`, `Polynomial`, and `F2m` helpers so the umbrella numeric helpers stay locked down.
+- `README.md` now documents the high-level helpers (`Float`, `Ratio`, `Complex`, `Polynomial`, `F2m`, `Fixed<N>`, `Modulus`, and `MontgomeryInt`) plus the `t81::Int` alias exposed through `t81/t81lib.hpp`.
+- `include/t81/t81lib.hpp` now exposes `Float::from_string`, a `Ratio`→`Float` conversion, the `Int81` `Fixed<48>` alias, and `std::hash` hooks for `limb`/`bigint` so hashing and string-based floats land in the umbrella header.
