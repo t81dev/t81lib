@@ -37,3 +37,4 @@ This file helps AI agents discover and understand how to work with this reposito
 - Documented the `t81.torch`/`t81.nn` PyTorch helpers in `README.md` and `docs/index.md`, pointing to the `examples/demo_llama_conversion.py`,
   `examples/scaling_laws_ternary.py`, and `examples/ternary_sparse_preview.py` demos so future agents can locate the torch bridge.
 - Added production-ready Python bindings (`python/bindings.cpp`) plus packaging helpers (`setup.py`, `pyproject.toml`) that expose `Limb`/`BigInt` helpers, Montgomery contexts, NumPy quantization utilities, and a tutorial notebook `examples/ternary_quantization_demo.ipynb`.
+- Added `t81.hardware.TernaryEmulator`, documentation for hardware simulation, and `examples/ternary_hardware_sim_demo.ipynb` so agents can explore ternary gate/circuit modeling, fuzzy AI decisions, and power-aware PyTorch inference workflows.

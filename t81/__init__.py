@@ -6,6 +6,7 @@ The torch subpackage is deliberately minimal so consumers can ``import t81`` and
 system ``torch`` module.
 """
 
+from . import hardware  # expose ternary hardware helpers alongside torch
 from . import torch as torch_integration  # Enables ``import t81``.
 
-__all__ = ["torch"]
+__all__ = ["torch", "hardware"]

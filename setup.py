@@ -60,7 +60,7 @@ setup(
     url="https://github.com/t81dev/t81lib",
     packages=find_packages(include=["t81", "t81.*"]),
     python_requires=">=3.8",
-    install_requires=["numpy>=1.25"],
+    install_requires=["numpy>=1.25", "matplotlib>=3.7"],
     extras_require={
         "torch": ["torch>=2.0"],
         "dev": ["pytest", "pybind11>=2.12"],

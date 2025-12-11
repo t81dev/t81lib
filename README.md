@@ -145,6 +145,16 @@ The companion `t81.nn` module keeps scalars exact (e.g., `Ratio`-based RMSNorm, 
 
 For more advanced pipelines, the `t81.nn` helpers expose RMSNorm, softmax, and RoPE in exact rational or fixed-width representations so you can build ternary-friendly training/inference loops without re-implementing numerics. When performance matters, point profiling tools at `t81::linalg::gemm_ternary` (or `t81lib.gemm_ternary` in Python) to compare packed ternary GEMMs against baseline `torch.matmul` runs; the alpha/beta semantics make it easy to blend ternary updates with FP32 accumulators for mixed-precision schedules.
 
+## Hardware Simulation
+
+The new `t81.hardware.TernaryEmulator` lets you sketch ternary chips, evaluate fuzzy decisions, and estimate energy costs for AI edge deployments. The emulator already understands balanced ternary AND/OR/NOT/MUX gates, ripple adders, flip-flops, and hybrid binary/ternary mode scheduling, and it keeps each wire as a `t81lib.Limb` so trit-level bookkeeping matches the library core. Highlights include:
+
+- `visualize_circuit()` for matplotlib-friendly diagrams (with optional Graphviz exports) so you can illustrate drone-friendly datapaths or neuromorphic operators.
+- Fuzzy helpers like `fuzzy_and`, `fuzzy_decision`, and `fuzzy_not` so AI agents can reason about “false/maybe/true” beliefs before dispatching ternary or binary schedules.
+- `simulate_torch_forward()` plus power-tracing hooks that tally trit flips, emulate hybrid forward passes, and let you compare ternary energy to binary energy budgets.
+
+See `examples/ternary_hardware_sim_demo.ipynb` for a guided walkthrough that builds a ternary adder, runs a small inference, records virtual power/latency metrics, and highlights how balanced ternary drops switching energy for drones or tiny neuromorphic chips.
+
 ## AI Examples
 
 - [`examples/ternary_mnist_demo.ipynb`](examples/ternary_mnist_demo.ipynb) walks through quantizing a compact MNIST classifier, packing weight buffers with `t81lib.pack_dense_matrix`, and routing inference through `t81lib.gemm_ternary` for a compact comparison of accuracy, latency, and memory versus float32 and 1-bit baselines.
