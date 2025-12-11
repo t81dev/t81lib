@@ -2,7 +2,7 @@
 README.md — Repository overview, setup, and quickstart instructions.
 -->
 
-# t81lib — Balanced Ternary Core Library
+# t81lib — Balanced Ternary Quantization & Core Library
 
 ![CI](https://github.com/t81dev/t81lib/actions/workflows/ci.yml/badge.svg)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
@@ -11,27 +11,25 @@ README.md — Repository overview, setup, and quickstart instructions.
 ![15–22× smaller than FP16](https://img.shields.io/badge/15%E2%80%9322%C3%97%20smaller%20than%20FP16-orange)
 ![AVX-512 ternary GEMM](https://img.shields.io/badge/AVX-512%20ternary%20GEMM-lightgrey)
 
-`t81lib` is a modern, header-first C++20 library that brings **balanced ternary** arithmetic
-to production-grade software. At the heart sits `t81::core::limb`—a canonical 48-trit scalar with a
-deterministic 16-byte encoding—and a carefully layered ecosystem for high-level math,
-modular helpers, and deterministic utilities.
+`t81lib` is a modern, header-first C++20 and Python library that brings **balanced ternary**
+to production-grade software and ternary-aware AI workloads. At the heart sits
+`t81::core::limb`—a canonical 48-trit scalar with a deterministic 16-byte encoding—plus
+packed ternary GEMM kernels, Python bindings, and helpers for ternary quantization.
 
 ## Highlights
 
-- **Balanced ternary scalar**: `t81::Int` (alias of `t81::core::limb`) exposes safe, overflow-aware arithmetic, canonical I/O,
-  and deterministic hashing when you need ternary determinism in a binary world.
-- **Arbitrary-precision math**: `t81::core::bigint` layers on top of limbs with sign-plus-magnitude,
-  Karatsuba-aware multiplication, canonical normalization, and full conversion helpers.
-- **SIMD accelerations**: The SIMD helpers under `include/t81/core/detail/simd_impl.hpp` contain AVX-512, AVX2, and NEON implementations for tryte addition/multiplication so the core limb arithmetic can leverage vector hardware when available.
-- **Base81 I/O**: Formatting/parsing now supports bases 2..81 with the playful base-3⁴ alphabet (0-9, a-z, A-Z, and punctuation) so you can round-trip balanced-ternary-friendly strings without extra glue.
-- **Concrete helpers**: Montgomery contexts, I/O formatters, random tooling, and utility guards
-  keep reusable patterns consistent and testable.
-- **High-level helpers**: The umbrella header now also exposes `t81::Float`, `t81::Ratio`,
-  `t81::Complex`, `t81::Polynomial`, `t81::F2m`, and `t81::Fixed<N>` along with modular
-  helpers like `t81::Modulus`/`t81::MontgomeryInt` for quick prototyping of ternary-aware
-  algebra and number-theoretic math.
+- **Balanced ternary scalar**: `t81::Int` (alias of `t81::core::limb`) exposes safe, overflow-aware arithmetic,
+  canonical I/O, and deterministic hashing when you need ternary determinism in a binary world.
+- **Ternary quantization for AI**: Python helpers and `t81.torch` convert dense float weights into packed
+  \{-1,0,1\} trits, feed them to `gemm_ternary`, and keep accumulators in FP32/BF16 for training and inference.
+- **Arbitrary-precision foundations**: `t81::core::bigint` (and friends) layer on top of limbs with sign-plus-magnitude,
+  Karatsuba-aware multiplication, and canonical normalization for higher-level algebra and crypto.
+- **SIMD accelerations**: AVX-512/AVX2/NEON implementations for tryte addition/multiplication let the core limb
+  arithmetic and GEMM paths leverage vector hardware when available.
+- **Base81 I/O**: Formatting/parsing supports bases 2..81 with a base-3⁴ alphabet so you can round-trip
+  balanced-ternary-friendly strings without extra glue.
 - **Specs & architecture**: Normative coverage under [docs/](docs/), plus a human-friendly
-  [ARCHITECTURE.md](ARCHITECTURE.md) walkthrough (new!) and a docs portal at [docs/index.md](docs/index.md) for quick orientation.
+  [ARCHITECTURE.md](ARCHITECTURE.md) walkthrough and a docs portal at [docs/index.md](docs/index.md).
 - **Examples & proofs**: `examples/` shows runnable use cases while `tests/` and
   `bench/` capture behavioral regression suites and throughput gauges.
 
