@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 #include <t81/core/bigint.hpp>
@@ -22,7 +23,7 @@ public:
     const core::bigint& modulus() const noexcept { return modulus_; }
 
     core::bigint add(const core::bigint& lhs, const core::bigint& rhs) const {
-        return lhs ^ rhs;
+        return xor_bits(lhs, rhs);
     }
 
     core::bigint multiply(core::bigint lhs, core::bigint rhs) const {
@@ -49,13 +50,32 @@ public:
         auto deg = bit_degree(value);
         while (deg >= modulus_degree_) {
             std::size_t shift = static_cast<std::size_t>(deg - modulus_degree_);
-            value = value ^ shift_left(modulus_, shift);
+            value = xor_bits(value, shift_left(modulus_, shift));
             deg = bit_degree(value);
         }
         return value;
     }
 
 private:
+    static core::bigint xor_bits(core::bigint lhs, core::bigint rhs) {
+        const core::bigint two(2);
+        core::bigint result = core::bigint::zero();
+        core::bigint place = core::bigint::one();
+        while (!lhs.is_zero() || !rhs.is_zero()) {
+            auto [lhs_quotient, lhs_remainder] = core::bigint::div_mod(lhs, two);
+            auto [rhs_quotient, rhs_remainder] = core::bigint::div_mod(rhs, two);
+            const bool lhs_bit = !lhs_remainder.is_zero();
+            const bool rhs_bit = !rhs_remainder.is_zero();
+            if (lhs_bit ^ rhs_bit) {
+                result += place;
+            }
+            place *= two;
+            lhs = lhs_quotient;
+            rhs = rhs_quotient;
+        }
+        return result;
+    }
+
     static core::bigint normalize_modulus(core::bigint modulus) {
         if (modulus.is_zero()) {
             throw std::invalid_argument("modulus cannot be zero");
@@ -97,7 +117,7 @@ private:
         while (!rhs.is_zero()) {
             const auto [quotient, remainder] = core::bigint::div_mod(rhs, two);
             if (!remainder.is_zero()) {
-                result = result ^ lhs;
+                result = xor_bits(result, lhs);
             }
             lhs *= two;
             rhs = quotient;

@@ -760,21 +760,29 @@ public:
 
     MontgomeryInt& operator+=(const MontgomeryInt& other) {
         ensure_same_modulus(other);
-        core::limb sum = value_ + other.value_;
-        if (!(sum < modulus_->modulus())) {
-            sum -= modulus_->modulus();
+        const auto left = value_.to_value();
+        const auto right = other.value_.to_value();
+        const auto mod_value = modulus_->modulus().to_value();
+        auto sum = left + right;
+        sum %= mod_value;
+        if (sum < 0) {
+            sum += mod_value;
         }
-        value_ = sum;
+        value_ = core::limb::from_value(sum);
         return *this;
     }
 
     MontgomeryInt& operator-=(const MontgomeryInt& other) {
         ensure_same_modulus(other);
-        core::limb diff = value_ - other.value_;
-        if (diff.is_negative()) {
-            diff += modulus_->modulus();
+        const auto left = value_.to_value();
+        const auto right = other.value_.to_value();
+        const auto mod_value = modulus_->modulus().to_value();
+        auto diff = left - right;
+        diff %= mod_value;
+        if (diff < 0) {
+            diff += mod_value;
         }
-        value_ = diff;
+        value_ = core::limb::from_value(diff);
         return *this;
     }
 
