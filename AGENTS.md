@@ -27,3 +27,4 @@ This file helps AI agents discover and understand how to work with this reposito
 ## Recent updates
 
 - Balanced ternary bigint logic in `include/t81/core/bigint.hpp` now normalizes signed limbs more efficiently and fixes `~`/division helpers so later agents can spot the modern bitwise/division flow.
+- `tests/unit/test_numeric_types.cpp` now exercises `Complex`, `Polynomial`, and `F2m` helpers so the umbrella numeric helpers stay locked down.

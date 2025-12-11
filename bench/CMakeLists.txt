@@ -11,3 +11,6 @@ target_link_libraries(bench_limb_ops PRIVATE benchmark::benchmark t81::t81lib)
 
 add_executable(t81-bench bench_t81.cpp)
 target_link_libraries(t81-bench PRIVATE benchmark::benchmark t81::t81lib)
+
+add_executable(bench_numeric_types bench_numeric_types.cpp)
+target_link_libraries(bench_numeric_types PRIVATE benchmark::benchmark t81::t81lib)
