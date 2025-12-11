@@ -256,6 +256,13 @@ public:
         return scaled_trits(trytes * 3);
     }
 
+    explicit Float(int value) : Float(core::bigint(value).to_limb()) {}
+    Float sqrt() const;
+
+    friend Float operator+(Float lhs, const Float& rhs);
+    friend Float operator-(Float lhs, const Float& rhs);
+    friend Float operator/(Float lhs, const Float& rhs);
+
     // Ensure mantissa drops trailing zero trits after multiplication.
     friend Float operator*(Float lhs, const Float& rhs) noexcept {
         lhs.mantissa_ *= rhs.mantissa_;
@@ -495,6 +502,16 @@ public:
         return scaled_trits(trytes * 3);
     }
 
+    explicit FloatN(int value)
+        : FloatN(mantissa_type(core::bigint(value)), 0) {}
+    explicit FloatN(const Float& value)
+        : FloatN(mantissa_type(core::bigint(value.mantissa())), value.exponent()) {}
+    FloatN sqrt() const;
+
+    friend FloatN operator+(FloatN lhs, const FloatN& rhs);
+    friend FloatN operator-(FloatN lhs, const FloatN& rhs);
+    friend FloatN operator/(FloatN lhs, const FloatN& rhs);
+
     friend constexpr FloatN operator*(FloatN lhs, const FloatN& rhs) noexcept {
         lhs.mantissa_ *= rhs.mantissa_;
         lhs.exponent_ += rhs.exponent_;
@@ -563,6 +580,19 @@ public:
     }
 
     static Ratio zero() noexcept { return Ratio(); }
+    static Ratio from_float(const Float& value) {
+        if (value.is_zero()) {
+            return Ratio::zero();
+        }
+        core::bigint numerator = core::bigint(value.mantissa());
+        core::bigint denominator = core::bigint::one();
+        if (value.exponent() > 0) {
+            numerator *= detail::power_of_three(static_cast<std::size_t>(value.exponent()));
+        } else if (value.exponent() < 0) {
+            denominator *= detail::power_of_three(static_cast<std::size_t>(-value.exponent()));
+        }
+        return Ratio(std::move(numerator), std::move(denominator));
+    }
 
     const core::bigint& numerator() const noexcept { return numerator_; }
     const core::bigint& denominator() const noexcept { return denominator_; }
@@ -609,6 +639,18 @@ public:
 
     friend bool operator!=(const Ratio& lhs, const Ratio& rhs) noexcept {
         return !(lhs == rhs);
+    }
+
+    Ratio sqrt_exact() const {
+        if (is_zero()) {
+            return Ratio::zero();
+        }
+        Ratio approx = *this;
+        const Ratio two(core::limb::from_value(2));
+        for (int iteration = 0; iteration < 12; ++iteration) {
+            approx = (approx + *this / approx) / two;
+        }
+        return approx;
     }
 
     explicit operator Float() const {
@@ -718,6 +760,84 @@ private:
     core::bigint numerator_{core::bigint::zero()};
     core::bigint denominator_{core::bigint::one()};
 };
+
+namespace detail {
+
+template <int N>
+inline Ratio floatn_to_ratio(const FloatN<N>& value) {
+    if (value.is_zero()) {
+        return Ratio::zero();
+    }
+    core::bigint numerator = value.mantissa().to_bigint();
+    core::bigint denominator = core::bigint::one();
+    const int exponent = value.exponent();
+    if (exponent > 0) {
+        numerator *= detail::power_of_three(static_cast<std::size_t>(exponent));
+    } else if (exponent < 0) {
+        denominator *= detail::power_of_three(static_cast<std::size_t>(-exponent));
+    }
+    return Ratio(std::move(numerator), std::move(denominator));
+}
+
+} // namespace detail
+
+inline Float operator+(Float lhs, const Float& rhs) {
+    const Ratio result = Ratio::from_float(lhs) + Ratio::from_float(rhs);
+    return result.to_float();
+}
+
+inline Float operator-(Float lhs, const Float& rhs) {
+    const Ratio result = Ratio::from_float(lhs) - Ratio::from_float(rhs);
+    return result.to_float();
+}
+
+inline Float operator/(Float lhs, const Float& rhs) {
+    const Ratio result = Ratio::from_float(lhs) / Ratio::from_float(rhs);
+    return result.to_float();
+}
+
+Float Float::sqrt() const {
+    if (is_zero()) {
+        return zero();
+    }
+    Float approx = *this;
+    const Float two(2);
+    for (int iteration = 0; iteration < 12; ++iteration) {
+        approx = (approx + *this / approx) / two;
+    }
+    return approx;
+}
+
+template <int N>
+FloatN<N> operator+(FloatN<N> lhs, const FloatN<N>& rhs) {
+    const Ratio result = detail::floatn_to_ratio(lhs) + detail::floatn_to_ratio(rhs);
+    return FloatN<N>(result.to_float());
+}
+
+template <int N>
+FloatN<N> operator-(FloatN<N> lhs, const FloatN<N>& rhs) {
+    const Ratio result = detail::floatn_to_ratio(lhs) - detail::floatn_to_ratio(rhs);
+    return FloatN<N>(result.to_float());
+}
+
+template <int N>
+FloatN<N> operator/(FloatN<N> lhs, const FloatN<N>& rhs) {
+    const Ratio result = detail::floatn_to_ratio(lhs) / detail::floatn_to_ratio(rhs);
+    return FloatN<N>(result.to_float());
+}
+
+template <int N>
+FloatN<N> FloatN<N>::sqrt() const {
+    if (is_zero()) {
+        return zero();
+    }
+    FloatN<N> approx = *this;
+    const FloatN<N> two(2);
+    for (int iteration = 0; iteration < 12; ++iteration) {
+        approx = (approx + *this / approx) / two;
+    }
+    return approx;
+}
 
 class Modulus {
 public:
