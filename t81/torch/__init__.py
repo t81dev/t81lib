@@ -102,13 +102,13 @@ def _limbs_to_trits(packed: np.ndarray, rows: int, k_limbs: int) -> np.ndarray:
     return trits
 
 
-class TritDtype(torch.dtype):
+class TritDtype:
     __slots__ = ()
 
     def __new__(cls) -> "TritDtype":
-        return super().__new__(cls, torch.float32)
+        return super().__new__(cls)
 
-    def __repr__(self) -> str:  # pragma: no cover - torch introspects repr
+    def __repr__(self) -> str:
         return "t81.trit"
 
 

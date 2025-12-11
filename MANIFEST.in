@@ -1,2 +1,4 @@
 graft python
 graft include
+include src/t81/core/gguf_quants.cpp
+include src/t81/core/gguf_quants.h
