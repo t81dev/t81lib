@@ -45,7 +45,9 @@ ctest --test-dir build --output-on-failure
 
 ### Python bindings
 
-Enable the Python bindings by configuring with `-DT81LIB_BUILD_PYTHON_BINDINGS=ON`. Then build normally and point `PYTHONPATH` at the build directory before importing the module:
+#### Build from source (CMake)
+
+Enable the Python bindings by configuring with `-DT81LIB_BUILD_PYTHON_BINDINGS=ON`, then build and point `PYTHONPATH` at that build directory:
 
 ```bash
 cmake -S . -B build -DT81LIB_BUILD_TESTS=ON -DT81LIB_BUILD_PYTHON_BINDINGS=ON
@@ -53,7 +55,7 @@ cmake --build build -j
 PYTHONPATH=build python tests/python/test_bindings.py
 ```
 
-After a successful build `import t81lib` exposes the `BigInt` class plus helper functions such as `zero()`, `one()`, `gcd()`, and `mod_pow()`:
+After a successful build `import t81lib` exposes the `Limb`, `BigInt`, and Montgomery helpers plus bundled numerical utilities:
 
 ```python
 import t81lib
@@ -61,9 +63,42 @@ import t81lib
 value = t81lib.BigInt(42)
 value = value * t81lib.one()
 print(str(value))
+
+ctx = t81lib.BigIntMontgomeryContext(t81lib.BigInt(17))
+print(ctx.mod_pow(value, t81lib.BigInt(3)))
 ```
 
-Use `tests/python/test_bindings.py` as a simple sanity-check script and reference for building larger Python workflows.
+Use `tests/python/test_bindings.py` as a sanity-check script or reference when you need to inspect the pybind11 glue.
+
+#### Install via pip
+
+The library ships with `setup.py`/`pyproject.toml`, so `pip` will call CMake, build the same extension, and install the `t81lib` module together with the `t81` Python helpers defined at the repo root.
+
+```bash
+pip install .
+pip install .[torch]   # optional PyTorch helpers, pulls in torch>=2.0
+```
+
+The bindings expose balanced ternary primitives and helpers for integrating NumPy or buffer-compatible tensors (including Torch tensors that live on CPU). Highlights include:
+
+* `t81lib.Limb` / `t81lib.BigInt` along with `t81lib.LimbMontgomeryContext` and `t81lib.BigIntMontgomeryContext`.
+* `t81lib.quantize_to_trits` / `t81lib.dequantize_trits` for converting between floats and the \{-1,0,1\} digit stream.
+* `t81lib.pack_dense_matrix`, which clamps a NumPy float32 matrix, quantizes each row to balanced ternary, and returns a `(rows, limbs, 16)` buffer of packed limb bytes suitable for `gemm_ternary`.
+* `t81lib.unpack_packed_limbs`, which reconstructs the trits stored inside `pack_dense_matrix` when you need debugging data or logistic checks.
+
+For example:
+
+```python
+import numpy as np
+import t81lib
+
+weights = np.random.randn(16, 64).astype(np.float32)
+packed = t81lib.pack_dense_matrix(weights, threshold=0.45)
+trits = t81lib.unpack_packed_limbs(packed, rows=16, cols=64)
+dequantized = t81lib.dequantize_trits(trits)
+```
+
+Pair `pack_dense_matrix` with `t81lib.gemm_ternary` (or the PyTorch helpers under `t81.torch`) to keep packed ternary GEMMs on the host while your float32 accumulators gather the results. See `examples/ternary_quantization_demo.ipynb` for a ready-to-run walkthrough that turns a dense layer matrix into packed limbs, feeds it through `gemm_ternary`, and inspects the quantized trits.
 
 ### 2. Consume as a subproject
 
@@ -99,6 +134,17 @@ outputs = weights.matmul_input(torch.randn(32, 128))
 ```
 
 The companion `t81.nn` module keeps scalars exact (e.g., `Ratio`-based RMSNorm, RoPE, and softmax) while integrating with the same ternary GEMM plumbing, so you can simply do `model.to(dtype=t81.trit)` and let `t81.torch`/`t81.nn` handle the quantization, dispatch, and gradient flow. See `examples/demo_llama_conversion.py`, `examples/scaling_laws_ternary.py`, and `examples/ternary_sparse_preview.py` for runnable PyTorch + ternary GEMM demos.
+
+## AI use cases
+
+`t81lib` is already powering ternary-aware workflows that push the performance envelope in real-world AI systems. For rapid experimentation, the Python bindings let you swap a dense floating-point tensor for a `TernaryTensor`, quantize activations on the fly, and keep GEMMs on the host using the AVX/NEON-packed kernels. The demos above show how to:
+
+1. Convert an existing large language model to ternary weights while preserving `torch.nn.Module` semantics (`examples/demo_llama_conversion.py`).
+2. Study scaling-law behavior in ternary networks, comparing sparsity, precision, and model size trade-offs using `examples/scaling_laws_ternary.py`.
+3. Preview ternary-sparse transformers with custom `SparseTriangular` layers and quantized attention using `examples/ternary_sparse_preview.py`.
+
+For more advanced pipelines, the `t81.nn` helpers expose RMSNorm, softmax, and RoPE in exact rational or fixed-width representations so you can build ternary-friendly training/inference loops without re-implementing numerics. When performance matters, point profiling tools at `t81::linalg::gemm_ternary` (or `t81lib.gemm_ternary` in Python) to compare packed ternary GEMMs against baseline `torch.matmul` runs; the alpha/beta semantics make it easy to blend ternary updates with FP32 accumulators for mixed-precision schedules.
+
 
 ## Usage at a glance
 

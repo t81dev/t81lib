@@ -1,0 +1,71 @@
+# setup.py — Build helper that activates the CMake-based pybind11 module.
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+from setuptools import Extension, find_packages, setup
+from setuptools.command.build_ext import build_ext
+
+
+class CMakeExtension(Extension):
+    def __init__(self, name: str, sourcedir: str = "") -> None:
+        super().__init__(name, sources=[])
+        self.sourcedir = os.path.abspath(sourcedir)
+
+
+class CMakeBuild(build_ext):
+    def run(self) -> None:
+        try:
+            subprocess.check_output(["cmake", "--version"], stderr=subprocess.DEVNULL)
+        except OSError as exc:
+            raise RuntimeError("CMake must be installed to build the extensions") from exc
+        for ext in self.extensions:
+            self.build_extension(ext)
+
+    def build_extension(self, ext: CMakeExtension) -> None:
+        extdir = Path(self.get_ext_fullpath(ext.name)).parent.resolve()
+        cfg = "Debug" if self.debug else "Release"
+        build_temp = Path(self.build_temp) / ext.name
+        build_temp.mkdir(parents=True, exist_ok=True)
+
+        cmake_args = [
+            f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}",
+            f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{cfg.upper()}={extdir}",
+            f"-DPYTHON_EXECUTABLE={sys.executable}",
+            "-DT81LIB_BUILD_TESTS=OFF",
+            "-DT81LIB_BUILD_BENCH=OFF",
+            "-DT81LIB_BUILD_PYTHON_BINDINGS=ON",
+        ]
+
+        build_args = ["--config", cfg, "--target", "t81lib_python"]
+
+        subprocess.check_call(
+            ["cmake", "-S", ext.sourcedir, "-B", str(build_temp), *cmake_args]
+        )
+        subprocess.check_call(["cmake", "--build", str(build_temp), *build_args])
+
+
+this_directory = Path(__file__).parent
+long_description = (this_directory / "README.md").read_text(encoding="utf-8")
+
+setup(
+    name="t81lib",
+    version="0.1.0",
+    author="The t81lib Contributors",
+    author_email="t81lib@example.com",
+    description="Balanced ternary arithmetic primitives for AI research",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    url="https://github.com/t81dev/t81lib",
+    packages=find_packages(include=["t81", "t81.*"]),
+    python_requires=">=3.8",
+    install_requires=["numpy>=1.25"],
+    extras_require={
+        "torch": ["torch>=2.0"],
+        "dev": ["pytest", "pybind11>=2.12"],
+    },
+    ext_modules=[CMakeExtension("t81lib", sourcedir=str(this_directory / "python"))],
+    cmdclass={"build_ext": CMakeBuild},
+    zip_safe=False,
+)
