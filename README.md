@@ -144,6 +144,9 @@ convenient containers for common algebraic patterns:
   vector products over the same ternary-aware scalars.
 - `t81::Vector<T>` holds a length-`N` collection of coefficients, exposes element-wise add/subtract,
   scaling, and dot-product helpers, and reuses the same balanced-ternary value types as the numeric helpers.
+- `t81::linalg::gemm_ternary` multiplies packed balanced-ternary matrices (`A` shaped `[M, K/48]`,
+  `B` shaped `[K/48, N]`) into an FP32 accumulation buffer, exposes alpha/beta scaling, and is
+  mirrored in Python via `t81lib.gemm_ternary` so tensor-heavy workloads can run on AVX/NEON hosts.
 - `t81::F2m` wraps extension-field arithmetic over binary polynomials using a chosen modulus,
   providing reduction, addition, multiplication, and exponentiation.
 - `t81::Fixed<N>` represents fixed-width signed ternary values with modular normalization

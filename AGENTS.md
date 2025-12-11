@@ -33,3 +33,4 @@ This file helps AI agents discover and understand how to work with this reposito
 - `README.md` plus the umbrella header now document the `FloatN` template, ternary `_t3` literal, R3 NTT helpers, and `std::formatter` specializations so overlined ternary floats behave nicely in `std::format`, and `t81::Vector` provides a ready-to-use coefficient container with arithmetic helpers.
 - `README.md`/umbrella header now mention `t81::Matrix<Element, R, C>` and how it complements `Vector` for linear algebra over `FloatN`/`Fixed` scalars.
 - `F2m` now lives in `include/t81/gf2m.hpp` (still re-exported through `t81/t81lib.hpp`), and `Fixed<N>` gained balanced `/` and `%` helpers so division/magnitude math stays accessible in the umbrella header.
+- Added `t81::linalg::gemm_ternary` and the Python binding `t81lib.gemm_ternary` so packed ternary GEMMs with alpha/beta semantics are exposed across the C++/Python API surface.
