@@ -30,7 +30,7 @@ modular helpers, and deterministic utilities.
   `t81::Complex`, `t81::Polynomial`, `t81::F2m`, and `t81::Fixed<N>` along with modular
   helpers like `t81::Modulus`/`t81::MontgomeryInt` for quick prototyping of ternary-aware
   algebra and number-theoretic math.
-- **Specs & architecture**: Normative coverage under [doc/](doc/), plus a human-friendly
+- **Specs & architecture**: Normative coverage under [docs/](docs/), plus a human-friendly
   [ARCHITECTURE.md](ARCHITECTURE.md) walkthrough (new!) and a docs portal at [docs/index.md](docs/index.md) for quick orientation.
 - **Examples & proofs**: `examples/` shows runnable use cases while `tests/` and
   `bench/` capture behavioral regression suites and throughput gauges.
@@ -273,13 +273,13 @@ These helpers make it easy to prototype higher-level systems without leaving the
 - **Montgomery & helpers**: contexts, modular multiply/pow, context guards, and bridging helpers in
   `t81::core::montgomery`.
 - **I/O, util, docs**: `t81::io` for formatting/parsing, `t81::util` for randomness & invariants,
-  and mirrored design docs under [doc/](doc/).
+  and mirrored design docs under [docs/](docs/).
 - **New architecture guide**: See [ARCHITECTURE.md](ARCHITECTURE.md) for a concise narrative plus ASCII call flow of the core layers.
 
 ## Docs & resources
 
-- [doc/t81lib-spec-v1.0.0.md](doc/t81lib-spec-v1.0.0.md) — Normative library contract for consumers.
-- [doc/design/](doc/design/) — Deep dives on `limb`/`bigint`/`montgomery` internals.
+- [docs/t81lib-spec-v1.0.0.md](docs/t81lib-spec-v1.0.0.md) — Normative library contract for consumers.
+- [docs/design/](docs/design/) — Deep dives on `limb`/`bigint`/`montgomery` internals.
 - [docs/index.md](docs/index.md) — A friendly docs portal pointing to specs, examples, and tutorials (great for GitHub Pages).
 - [examples/](examples/) — Compileable demos that exercise `limb`, `bigint`, and Montgomery helpers.
 - [tests/](tests/) & [bench/](bench/) — Regression/property suites and microbenchmarks for throughput decisions.
@@ -297,7 +297,7 @@ These helpers make it easy to prototype higher-level systems without leaving the
 
 - Open an issue to discuss architecture or API needs.
 - Follow [CONTRIBUTING.md](CONTRIBUTING.md) for branching, formatting, and testing workflows.
-- Reference [doc/design/](doc/design/) when proposing optimizations to ensure semantic safety.
+- Reference [docs/design/](docs/design/) when proposing optimizations to ensure semantic safety.
 - Track progress in [CHANGELOG.md](CHANGELOG.md) for breaking changes or release notes.
 - Security concerns can be reported privately; the repo currently follows a standard disclosure cadence.
 

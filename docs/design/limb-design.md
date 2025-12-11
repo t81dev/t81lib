@@ -1,5 +1,5 @@
 <!--
-doc/design/limb-design.md — Design notes describing the limb representation.
+docs/design/limb-design.md — Design notes describing the limb representation.
 -->
 
 # limb-design.md — t81::core::limb Design Notes

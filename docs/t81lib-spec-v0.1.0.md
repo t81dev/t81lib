@@ -1,5 +1,5 @@
 <!--
-doc/t81lib-spec-v0.1.0.md — Specification of the t81lib API at version 0.1.0.
+docs/t81lib-spec-v0.1.0.md — Specification of the t81lib API at version 0.1.0.
 -->
 
 # t81lib v0.1.0 — Balanced Ternary Core Library

@@ -1,5 +1,5 @@
 <!--
-doc/diagrams/build-flow-mermaid.md — Build, test, and binding workflow for new contributors.
+docs/diagrams/build-flow-mermaid.md — Build, test, and binding workflow for new contributors.
 -->
 
 ```mermaid
@@ -11,5 +11,5 @@ graph LR
     Configure --> PythonConfig["CMake configure (-DT81LIB_BUILD_PYTHON_BINDINGS=ON)"]
     PythonConfig --> PythonBuild["cmake --build build -j"]
     PythonBuild --> PyTests["PYTHONPATH=build python tests/python/test_bindings.py"]
-    Clone --> Docs["docs/index.md and doc/ diagrams"]
+    Clone --> Docs["docs/index.md and docs/ diagrams"]
 ```
