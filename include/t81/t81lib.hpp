@@ -34,6 +34,11 @@
 
 namespace t81 {
 
+namespace detail {
+inline const core::bigint& power_of_three(std::size_t exponent);
+inline std::string format_mantissa(core::bigint mantissa, int exponent, bool negative);
+} // namespace detail
+
 using Int = core::limb;
 class Float {
 public:
@@ -1538,14 +1543,6 @@ struct formatter<t81::FloatN<N>, char> : std::formatter<std::string_view, char> 
     auto format(const t81::FloatN<N>& value, FormatContext& ctx) {
         const std::string text = t81::to_string(value);
         return std::formatter<std::string_view, char>::format(text, ctx);
-    }
-};
-
-template <>
-struct hash<t81::core::limb> {
-    size_t operator()(const t81::core::limb& value) const noexcept {
-        const std::uint64_t raw = static_cast<std::uint64_t>(value.to_value());
-        return std::hash<std::uint64_t>{}(raw);
     }
 };
 
