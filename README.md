@@ -7,6 +7,9 @@ README.md — Repository overview, setup, and quickstart instructions.
 ![CI](https://github.com/t81dev/t81lib/actions/workflows/ci.yml/badge.svg)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
 ![Docs](https://img.shields.io/badge/docs-via%20GitHub%20Pages-brightgreen)
+![≈1.58-bit but balanced ternary](https://img.shields.io/badge/%E2%89%A51.58-bit%20but%20balanced%20ternary-purple)
+![15–22× smaller than FP16](https://img.shields.io/badge/15%E2%80%9322%C3%97%20smaller%20than%20FP16-orange)
+![AVX-512 ternary GEMM](https://img.shields.io/badge/AVX-512%20ternary%20GEMM-lightgrey)
 
 `t81lib` is a modern, header-first C++20 library that brings **balanced ternary** arithmetic
 to production-grade software. At the heart sits `t81::core::limb`—a canonical 48-trit scalar with a
@@ -125,6 +128,11 @@ Once installed: `find_package(t81lib REQUIRED)` + `target_link_libraries(... t81
 
 `import t81` now pulls in the PyTorch bridge under `t81.torch`, which repacks `t81::linalg::gemm_ternary` into a `TernaryTensor` that plays nicely with `torch.matmul`/`torch.mm` and exposes the custom `t81.trit` dtype. Call `TernaryTensor.from_float(...)` to quantize ternary weights and `TernaryTensor.matmul_input(...)` to fire off packed GEMMs inside your training/inference loops:
 
+**Table of contents**
+
+- [Ternary layers](#ternary-layers)
+- [One-click conversion](#one-click-conversion)
+
 ```python
 import torch
 import t81.torch as t81_torch
@@ -134,6 +142,29 @@ outputs = weights.matmul_input(torch.randn(32, 128))
 ```
 
 The companion `t81.nn` module keeps scalars exact (e.g., `Ratio`-based RMSNorm, RoPE, and softmax) while integrating with the same ternary GEMM plumbing, so you can simply do `model.to(dtype=t81.trit)` and let `t81.torch`/`t81.nn` handle the quantization, dispatch, and gradient flow. See `examples/demo_llama_conversion.py`, `examples/scaling_laws_ternary.py`, and `examples/ternary_sparse_preview.py` for runnable PyTorch + ternary GEMM demos.
+
+## Ternary layers
+
+`t81.nn.Linear` is now a drop-in replacement for `torch.nn.Linear` that keeps each bias term in FP32/BF16 while quantizing only the weights. The ternary weights are packed lazily on the first forward pass so you can still call `torch.compile()`/FSDP and friends without retriggering the packing logic, and the cached `TernaryTensor` feeds the same `matmul_input` path that powers `t81.torch`.
+
+```python
+from t81.nn import Linear
+import torch
+
+linear = torch.compile(Linear(256, 128))
+x = torch.randn(8, 256)
+y = linear(x)  # weights quantized once; bias remains FP32/BF16
+```
+
+### One-click conversion
+
+`./scripts/convert_to_ternary.py` recursively walks a checkpoint (Sequential/ModuleList/ModuleDict aware), swaps every `torch.nn.Linear` for `t81.nn.Linear`, keeps biases in FP32/BF16, and reports original vs converted sizes so you know the reduction multiplier.
+
+```bash
+./scripts/convert_to_ternary.py Llama-3.2-3B --threshold 0.45
+```
+
+The script auto-detects `.pt/.pth/.safetensors` formats or Hugging Face repo IDs, preserves activation-friendly thresholds, and keeps every other module untouched so you can deploy converted weights with existing inference tooling.
 
 ## AI use cases
 
