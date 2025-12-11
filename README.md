@@ -129,10 +129,14 @@ convenient containers for common algebraic patterns:
   ternary scalar without importing `core` names.
 
 - `t81::Float` stores a ternary mantissa/exponent pair, keeps the mantissa normalized,
-  and supports multiplying while trimming trailing zero trits.
+  and supports multiplying while trimming trailing zero trits; `Float::from_string`
+  now understands scientific-style `e`/`E` trit exponents plus the `₃` tryte exponent
+  marker, and `t81::to_string` accepts a `max_fractional_digits` hint so you can round
+  or truncate the printed fractional portion.
 - `t81::FloatN<N>` mirrors `Float` but pins the mantissa to `N` trits via `Fixed<N>` so you can reason about fixed precision floats at compile time.
 - `t81::Ratio` keeps normalized, sign-aware rational numbers powered by `core::bigint` numerators
-  and denominators, complete with arithmetic and comparison helpers.
+  and denominators, complete with arithmetic and comparison helpers; use `Ratio::to_float()`
+  to get a rounded ternary `Float` when you need a floating-point view.
 - `t81::Complex` and `t81::Polynomial` model simple complex arithmetic and polynomial math
   on any coefficient that satisfies the usual operators.
 - `t81::Vector<T>` holds a length-`N` collection of coefficients, and `t81::Matrix<Element, R, C>`
@@ -143,7 +147,8 @@ convenient containers for common algebraic patterns:
 - `t81::F2m` wraps extension-field arithmetic over binary polynomials using a chosen modulus,
   providing reduction, addition, multiplication, and exponentiation.
 - `t81::Fixed<N>` represents fixed-width signed ternary values with modular normalization
-  and arithmetic in the range `-(3^N-1)/2` .. `(3^N-1)/2`.
+  and arithmetic in the range `-(3^N-1)/2` .. `(3^N-1)/2`, and the new three-way comparison
+  lets you put `Fixed<N>` (and the `Int81` alias) into ordered containers.
 - `t81::Modulus` and `t81::MontgomeryInt` let you declaratively build Montgomery contexts,
   cache powers of three, and multiply/add in Montgomery space with consistent modular safety.
 - `t81::ntt` exposes a radix-3 NTT pipeline for `Polynomial<core::limb>` multiplication when the modulus supports a primitive third root of unity.
