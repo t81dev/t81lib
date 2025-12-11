@@ -41,3 +41,9 @@ add_executable(test_limb_properties
 )
 target_link_libraries(test_limb_properties PRIVATE t81::t81lib)
 add_test(NAME limb_properties COMMAND test_limb_properties)
+
+add_executable(test_numeric_types
+    unit/test_numeric_types.cpp
+)
+target_link_libraries(test_numeric_types PRIVATE t81::t81lib)
+add_test(NAME numeric_types COMMAND test_numeric_types)
