@@ -145,6 +145,10 @@ The companion `t81.nn` module keeps scalars exact (e.g., `Ratio`-based RMSNorm, 
 
 For more advanced pipelines, the `t81.nn` helpers expose RMSNorm, softmax, and RoPE in exact rational or fixed-width representations so you can build ternary-friendly training/inference loops without re-implementing numerics. When performance matters, point profiling tools at `t81::linalg::gemm_ternary` (or `t81lib.gemm_ternary` in Python) to compare packed ternary GEMMs against baseline `torch.matmul` runs; the alpha/beta semantics make it easy to blend ternary updates with FP32 accumulators for mixed-precision schedules.
 
+## AI Examples
+
+- [`examples/ternary_mnist_demo.ipynb`](examples/ternary_mnist_demo.ipynb) walks through quantizing a compact MNIST classifier, packing weight buffers with `t81lib.pack_dense_matrix`, and routing inference through `t81lib.gemm_ternary` for a compact comparison of accuracy, latency, and memory versus float32 and 1-bit baselines.
+- [`examples/ternary_transformer_demo.ipynb`](examples/ternary_transformer_demo.ipynb) builds a micro GPT stack, caches ternary projections via column-aware packing, profiles generation with `t81lib.gemm_ternary`, and highlights sparse attention multiplications via `t81lib.spmm_simple`.
 
 ## Usage at a glance
 
