@@ -341,3 +341,8 @@ def scaling_laws_experiment(config: Optional[Mapping[str, Any]] = None) -> Dict[
 
 
 _patch_transformers_attention()
+
+try:
+    from .linear import Linear  # noqa: E402 - keep linear helper alongside the numerics
+except Exception:  # pragma: no cover - safeguard if torch components missing
+    Linear = None  # type: ignore[assignment]
