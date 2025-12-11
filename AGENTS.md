@@ -30,4 +30,6 @@ This file helps AI agents discover and understand how to work with this reposito
 - `tests/unit/test_numeric_types.cpp` now exercises `Complex`, `Polynomial`, and `F2m` helpers so the umbrella numeric helpers stay locked down.
 - `README.md` now documents the high-level helpers (`Float`, `Ratio`, `Complex`, `Polynomial`, `F2m`, `Fixed<N>`, `Modulus`, and `MontgomeryInt`) plus the `t81::Int` alias exposed through `t81/t81lib.hpp`.
 - `include/t81/t81lib.hpp` now exposes `Float::from_string`, a `Ratio`→`Float` conversion, the `Int81` `Fixed<48>` alias, and `std::hash` hooks for `limb`/`bigint` so hashing and string-based floats land in the umbrella header.
-- `README.md` plus the umbrella header now document the `FloatN` template, ternary `_t3` literal, R3 NTT helpers, and `std::formatter` specializations so overlined ternary floats behave nicely in `std::format`.
+- `README.md` plus the umbrella header now document the `FloatN` template, ternary `_t3` literal, R3 NTT helpers, and `std::formatter` specializations so overlined ternary floats behave nicely in `std::format`, and `t81::Vector` provides a ready-to-use coefficient container with arithmetic helpers.
+- `README.md`/umbrella header now mention `t81::Matrix<Element, R, C>` and how it complements `Vector` for linear algebra over `FloatN`/`Fixed` scalars.
+- `F2m` now lives in `include/t81/gf2m.hpp` (still re-exported through `t81/t81lib.hpp`), and `Fixed<N>` gained balanced `/` and `%` helpers so division/magnitude math stays accessible in the umbrella header.

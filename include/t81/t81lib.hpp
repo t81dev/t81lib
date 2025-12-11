@@ -13,6 +13,7 @@
 #include <t81/io/parse.hpp>
 #include <t81/util/random.hpp>
 #include <t81/util/debug.hpp>
+#include <t81/gf2m.hpp>
 
 #include <algorithm>
 #include <array>
@@ -21,7 +22,9 @@
 #include <cstdint>
 #include <functional>
 #include <format>
+#include <initializer_list>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -61,10 +64,46 @@ public:
         std::size_t fractional_digits = 0;
         bool has_digit = false;
         const core::bigint three = core::bigint(core::limb::from_value(3));
-        constexpr char OVERLINE_LEAD = '\xC2';
-        constexpr char OVERLINE_TAIL = '\xAF';
+        constexpr std::string_view OVERLINE_PREFIX("\xC2\xAF", 2);
+        constexpr std::string_view PRECOMPOSED_OVERLINE("\xE2\x80\xBE", 3);
+        constexpr std::string_view COMBINING_OVERLINE("\xCC\x85", 2);
+        constexpr std::string_view TRYTE_EXPONENT_INDICATOR("\xE2\x82\x83", 3);
+
+        const auto prefix_length = [&](std::size_t position) {
+            if (position + OVERLINE_PREFIX.size() <= text.size() &&
+                text.substr(position, OVERLINE_PREFIX.size()) == OVERLINE_PREFIX) {
+                return OVERLINE_PREFIX.size();
+            }
+            if (position + PRECOMPOSED_OVERLINE.size() <= text.size() &&
+                text.substr(position, PRECOMPOSED_OVERLINE.size()) == PRECOMPOSED_OVERLINE) {
+                return PRECOMPOSED_OVERLINE.size();
+            }
+            return std::size_t{0};
+        };
+
+        const auto tryte_indicator_length = [&](std::size_t position) {
+            if (position + TRYTE_EXPONENT_INDICATOR.size() <= text.size() &&
+                text.substr(position, TRYTE_EXPONENT_INDICATOR.size()) == TRYTE_EXPONENT_INDICATOR) {
+                return TRYTE_EXPONENT_INDICATOR.size();
+            }
+            return std::size_t{0};
+        };
+
+        enum class ExponentIndicator { None, Trit, Tryte };
+        ExponentIndicator exponent_indicator = ExponentIndicator::None;
 
         while (index < text.size()) {
+            if (text[index] == 'e' || text[index] == 'E') {
+                exponent_indicator = ExponentIndicator::Trit;
+                ++index;
+                break;
+            }
+            const std::size_t tryte_len = tryte_indicator_length(index);
+            if (tryte_len > 0) {
+                exponent_indicator = ExponentIndicator::Tryte;
+                index += tryte_len;
+                break;
+            }
             const char ch = text[index];
             if (ch == '.') {
                 if (seen_decimal) {
@@ -74,30 +113,35 @@ public:
                 ++index;
                 continue;
             }
-            int digit_value = 0;
-            if (ch == OVERLINE_LEAD && index + 1 < text.size() &&
-                text[index + 1] == OVERLINE_TAIL) {
-                index += 2;
-                if (index == text.size()) {
-                    throw std::invalid_argument("float literal ends after overline");
-                }
-                const char next = text[index];
-                if (next == '0') {
-                    digit_value = 0;
-                } else if (next == '1') {
-                    digit_value = -1;
-                } else if (next == '2') {
-                    digit_value = -2;
-                } else {
-                    throw std::invalid_argument("invalid overlined digit");
-                }
-                ++index;
-            } else if (ch >= '0' && ch <= '2') {
-                digit_value = ch - '0';
-                ++index;
-            } else {
+            std::size_t cursor = index;
+            bool overlined = false;
+            const std::size_t prefix_len = prefix_length(cursor);
+            if (prefix_len > 0) {
+                overlined = true;
+                cursor += prefix_len;
+            }
+            if (cursor >= text.size()) {
+                throw std::invalid_argument("float literal ends after overline");
+            }
+            const char digit_char = text[cursor];
+            if (digit_char < '0' || digit_char > '2') {
                 throw std::invalid_argument("invalid ternary digit");
             }
+            ++cursor;
+            if (!overlined && cursor + COMBINING_OVERLINE.size() <= text.size() &&
+                text.substr(cursor, COMBINING_OVERLINE.size()) == COMBINING_OVERLINE) {
+                overlined = true;
+                cursor += COMBINING_OVERLINE.size();
+            }
+            int digit_value = digit_char - '0';
+            if (overlined) {
+                if (digit_char == '0') {
+                    digit_value = 0;
+                } else {
+                    digit_value = -digit_value;
+                }
+            }
+            index = cursor;
             mantissa *= three;
             if (digit_value != 0) {
                 mantissa += core::bigint(digit_value);
@@ -113,10 +157,63 @@ public:
         if (!has_digit) {
             throw std::invalid_argument("float literal missing digits");
         }
+        bool exponent_negative = false;
+        std::size_t exponent_value = 0;
+        if (exponent_indicator != ExponentIndicator::None) {
+            if (index == text.size()) {
+                throw std::invalid_argument("float literal exponent missing digits");
+            }
+            if (text[index] == '+' || text[index] == '-') {
+                exponent_negative = (text[index] == '-');
+                ++index;
+            }
+            if (index == text.size()) {
+                throw std::invalid_argument("float literal exponent missing digits");
+            }
+            const auto max_before_mul =
+                static_cast<std::size_t>(std::numeric_limits<int>::max()) / 10;
+            const auto remainder_limit =
+                static_cast<std::size_t>(std::numeric_limits<int>::max()) % 10;
+            while (index < text.size()) {
+                const char digit_char = text[index];
+                if (digit_char < '0' || digit_char > '9') {
+                    throw std::invalid_argument("invalid float literal exponent digit");
+                }
+                const std::size_t digit = static_cast<std::size_t>(digit_char - '0');
+                if (exponent_value > max_before_mul ||
+                    (exponent_value == max_before_mul && digit > remainder_limit)) {
+                    throw std::overflow_error("float literal exponent too large");
+                }
+                exponent_value = exponent_value * 10 + digit;
+                ++index;
+            }
+        } else if (index != text.size()) {
+            throw std::invalid_argument("unexpected character in float literal");
+        }
         if (negative && !mantissa.is_zero()) {
             mantissa = -mantissa;
         }
-        const int exponent = static_cast<int>(fractional_digits);
+        int exponent = static_cast<int>(fractional_digits);
+        if (exponent_indicator != ExponentIndicator::None) {
+            if (exponent_value > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+                throw std::overflow_error("float literal exponent too large");
+            }
+            int exponent_units = static_cast<int>(exponent_value);
+            if (exponent_indicator == ExponentIndicator::Tryte) {
+                if (exponent_units > std::numeric_limits<int>::max() / 3) {
+                    throw std::overflow_error("float literal exponent too large");
+                }
+                exponent_units *= 3;
+            }
+            const int change = exponent_negative ? -exponent_units : exponent_units;
+            const long long adjusted_exponent =
+                static_cast<long long>(exponent) - static_cast<long long>(change);
+            if (adjusted_exponent < std::numeric_limits<int>::min() ||
+                adjusted_exponent > std::numeric_limits<int>::max()) {
+                throw std::overflow_error("float literal exponent overflow");
+            }
+            exponent = static_cast<int>(adjusted_exponent);
+        }
         return Float(mantissa.to_limb(), exponent);
     }
 
@@ -142,6 +239,22 @@ public:
 
     friend bool operator==(const Float& lhs, const Float& rhs) noexcept {
         return lhs.mantissa_ == rhs.mantissa_ && lhs.exponent_ == rhs.exponent_;
+    }
+
+    friend std::strong_ordering operator<=>(const Float& lhs, const Float& rhs) noexcept {
+        if (lhs.mantissa_ == rhs.mantissa_ && lhs.exponent_ == rhs.exponent_) {
+            return std::strong_ordering::equal;
+        }
+        const long long exponent_delta =
+            static_cast<long long>(lhs.exponent_) - rhs.exponent_;
+        core::bigint left = core::bigint(lhs.mantissa_);
+        core::bigint right = core::bigint(rhs.mantissa_);
+        if (exponent_delta > 0) {
+            right *= detail::power_of_three(static_cast<std::size_t>(exponent_delta));
+        } else if (exponent_delta < 0) {
+            left *= detail::power_of_three(static_cast<std::size_t>(-exponent_delta));
+        }
+        return left <=> right;
     }
 
 private:
@@ -199,6 +312,15 @@ inline void append_ternary_digit(std::string& output, int digit) {
         default:
             throw std::logic_error("unexpected ternary digit");
     }
+}
+
+inline const core::bigint& power_of_three(std::size_t exponent) {
+    static const core::bigint three = core::bigint(core::limb::from_value(3));
+    static thread_local std::vector<core::bigint> cache{core::bigint::one()};
+    while (cache.size() <= exponent) {
+        cache.push_back(cache.back() * three);
+    }
+    return cache[exponent];
 }
 
 inline std::vector<int> balanced_digits(core::bigint value) {
@@ -279,7 +401,8 @@ inline std::string format_mantissa(core::bigint mantissa, int exponent, bool neg
 
 } // namespace detail
 
-inline std::string to_string(const Float& value) {
+inline std::string to_string(const Float& value,
+                             std::optional<std::size_t> max_fractional_digits = std::nullopt) {
     if (value.is_zero()) {
         return "0";
     }
@@ -288,7 +411,26 @@ inline std::string to_string(const Float& value) {
     if (negative) {
         mantissa = -mantissa;
     }
-    return detail::format_mantissa(std::move(mantissa), value.exponent(), negative);
+    int exponent = value.exponent();
+    if (max_fractional_digits.has_value() && exponent > 0) {
+        const std::size_t target_fractional =
+            std::min(*max_fractional_digits,
+                     static_cast<std::size_t>(std::numeric_limits<int>::max()));
+        const int target_exponent = static_cast<int>(target_fractional);
+        if (exponent > target_exponent) {
+            const std::size_t delta = static_cast<std::size_t>(exponent - target_exponent);
+            const core::bigint divisor = detail::power_of_three(delta);
+            const auto [quotient, remainder] = core::bigint::div_mod(mantissa, divisor);
+            core::bigint rounded = quotient;
+            const core::bigint double_remainder = remainder * core::bigint(2);
+            if (double_remainder >= divisor) {
+                rounded += core::bigint::one();
+            }
+            mantissa = std::move(rounded);
+            exponent = target_exponent;
+        }
+    }
+    return detail::format_mantissa(std::move(mantissa), exponent, negative);
 }
 
 namespace literals {
@@ -339,6 +481,22 @@ public:
 
     friend constexpr bool operator!=(const FloatN& lhs, const FloatN& rhs) noexcept {
         return !(lhs == rhs);
+    }
+
+    friend std::strong_ordering operator<=>(const FloatN& lhs, const FloatN& rhs) noexcept {
+        if (lhs.mantissa_ == rhs.mantissa_ && lhs.exponent_ == rhs.exponent_) {
+            return std::strong_ordering::equal;
+        }
+        const long long exponent_delta =
+            static_cast<long long>(lhs.exponent_) - rhs.exponent_;
+        core::bigint left = lhs.mantissa().to_bigint();
+        core::bigint right = rhs.mantissa().to_bigint();
+        if (exponent_delta > 0) {
+            right *= detail::power_of_three(static_cast<std::size_t>(exponent_delta));
+        } else if (exponent_delta < 0) {
+            left *= detail::power_of_three(static_cast<std::size_t>(-exponent_delta));
+        }
+        return left <=> right;
     }
 
 private:
@@ -436,19 +594,26 @@ public:
         core::bigint limit = limb_max * denominator_;
         int exponent = 0;
 
-        while (abs_numerator > limit) {
-            limit *= three;
-            --exponent;
-        }
-
-        while (exponent < 0) {
-            const auto [next_limit, remainder] = core::bigint::div_mod(limit, three);
-            if (!remainder.is_zero() || abs_numerator > next_limit) {
-                break;
+        const auto increase_limit = [&]() {
+            while (abs_numerator > limit) {
+                limit *= three;
+                --exponent;
             }
-            limit = next_limit;
-            ++exponent;
-        }
+        };
+
+        const auto decrease_limit = [&]() {
+            while (exponent < 0) {
+                const auto [next_limit, remainder] = core::bigint::div_mod(limit, three);
+                if (!remainder.is_zero() || abs_numerator > next_limit) {
+                    break;
+                }
+                limit = next_limit;
+                ++exponent;
+            }
+        };
+
+        increase_limit();
+        decrease_limit();
 
         if (exponent >= 0) {
             core::bigint scaled_abs = abs_numerator;
@@ -466,13 +631,9 @@ public:
             core::bigint scaled_num = numerator_;
             core::bigint scaled_den = denominator_;
             if (exp > 0) {
-                for (int count = 0; count < exp; ++count) {
-                    scaled_num *= three;
-                }
+                scaled_num *= detail::power_of_three(static_cast<std::size_t>(exp));
             } else if (exp < 0) {
-                for (int count = 0; count < -exp; ++count) {
-                    scaled_den *= three;
-                }
+                scaled_den *= detail::power_of_three(static_cast<std::size_t>(-exp));
             }
             return std::pair<core::bigint, core::bigint>{std::move(scaled_num), std::move(scaled_den)};
         };
@@ -503,6 +664,10 @@ public:
                 --exponent;
             }
         }
+    }
+
+    Float to_float() const {
+        return static_cast<Float>(*this);
     }
 
 private:
@@ -694,6 +859,189 @@ public:
 private:
     Component real_{};
     Component imag_{};
+};
+
+template <typename T>
+class Vector {
+public:
+    using value_type = T;
+
+    Vector() noexcept = default;
+    explicit Vector(std::size_t size, value_type value = value_type{}) : elements_(size, value) {}
+    Vector(std::initializer_list<value_type> init) : elements_(init) {}
+    explicit Vector(std::vector<value_type> elements) : elements_(std::move(elements)) {}
+
+    std::size_t size() const noexcept { return elements_.size(); }
+    bool empty() const noexcept { return elements_.empty(); }
+
+    value_type& operator[](std::size_t index) { return elements_[index]; }
+    const value_type& operator[](std::size_t index) const { return elements_[index]; }
+
+    std::vector<value_type>& data() noexcept { return elements_; }
+    const std::vector<value_type>& data() const noexcept { return elements_; }
+
+    Vector& operator+=(const Vector& other) {
+        ensure_same_size(other);
+        for (std::size_t index = 0; index < elements_.size(); ++index) {
+            elements_[index] += other.elements_[index];
+        }
+        return *this;
+    }
+
+    Vector& operator-=(const Vector& other) {
+        ensure_same_size(other);
+        for (std::size_t index = 0; index < elements_.size(); ++index) {
+            elements_[index] -= other.elements_[index];
+        }
+        return *this;
+    }
+
+    Vector& operator*=(const value_type& scalar) {
+        for (auto& element : elements_) {
+            element *= scalar;
+        }
+        return *this;
+    }
+
+    friend Vector operator+(Vector lhs, const Vector& rhs) {
+        lhs += rhs;
+        return lhs;
+    }
+
+    friend Vector operator-(Vector lhs, const Vector& rhs) {
+        lhs -= rhs;
+        return lhs;
+    }
+
+    friend Vector operator*(Vector lhs, const value_type& scalar) {
+        lhs *= scalar;
+        return lhs;
+    }
+
+    friend Vector operator*(const value_type& scalar, Vector rhs) {
+        rhs *= scalar;
+        return rhs;
+    }
+
+    value_type dot(const Vector& other) const {
+        ensure_same_size(other);
+        value_type result{};
+        for (std::size_t index = 0; index < elements_.size(); ++index) {
+            result += elements_[index] * other.elements_[index];
+        }
+        return result;
+    }
+
+private:
+    void ensure_same_size(const Vector& other) const {
+        if (elements_.size() != other.elements_.size()) {
+            throw std::invalid_argument("Vector size mismatch");
+        }
+    }
+
+    std::vector<value_type> elements_;
+};
+
+template <typename Element, std::size_t Rows, std::size_t Cols>
+class Matrix {
+public:
+    static_assert(Rows > 0 && Cols > 0, "Matrix requires positive dimensions");
+
+    using value_type = Element;
+
+    Matrix() noexcept = default;
+    explicit Matrix(value_type value) { storage_.fill(value); }
+    Matrix(std::initializer_list<value_type> init) {
+        if (init.size() != storage_.size()) {
+            throw std::invalid_argument("Matrix initializer size mismatch");
+        }
+        std::copy(init.begin(), init.end(), storage_.begin());
+    }
+
+    value_type& operator()(std::size_t row, std::size_t column) {
+        return storage_.at(row * Cols + column);
+    }
+
+    const value_type& operator()(std::size_t row, std::size_t column) const {
+        return storage_.at(row * Cols + column);
+    }
+
+    std::size_t rows() const noexcept { return Rows; }
+    std::size_t cols() const noexcept { return Cols; }
+
+    Matrix& operator+=(const Matrix& other) {
+        for (std::size_t index = 0; index < storage_.size(); ++index) {
+            storage_[index] += other.storage_[index];
+        }
+        return *this;
+    }
+
+    Matrix& operator-=(const Matrix& other) {
+        for (std::size_t index = 0; index < storage_.size(); ++index) {
+            storage_[index] -= other.storage_[index];
+        }
+        return *this;
+    }
+
+    Matrix& operator*=(const value_type& scalar) {
+        for (auto& cell : storage_) {
+            cell *= scalar;
+        }
+        return *this;
+    }
+
+    friend Matrix operator+(Matrix lhs, const Matrix& rhs) {
+        lhs += rhs;
+        return lhs;
+    }
+
+    friend Matrix operator-(Matrix lhs, const Matrix& rhs) {
+        lhs -= rhs;
+        return lhs;
+    }
+
+    friend Matrix operator*(Matrix lhs, const value_type& scalar) {
+        lhs *= scalar;
+        return lhs;
+    }
+
+    friend Matrix operator*(const value_type& scalar, Matrix rhs) {
+        rhs *= scalar;
+        return rhs;
+    }
+
+    template <std::size_t OtherCols>
+    Matrix<Element, Rows, OtherCols> operator*(const Matrix<Element, Cols, OtherCols>& other) const {
+        Matrix<Element, Rows, OtherCols> result;
+        for (std::size_t row = 0; row < Rows; ++row) {
+            for (std::size_t col = 0; col < OtherCols; ++col) {
+                Element sum{};
+                for (std::size_t inner = 0; inner < Cols; ++inner) {
+                    sum += (*this)(row, inner) * other(inner, col);
+                }
+                result(row, col) = sum;
+            }
+        }
+        return result;
+    }
+
+    Vector<Element> multiply(const Vector<Element>& vector) const {
+        if (vector.size() != Cols) {
+            throw std::invalid_argument("Matrix-vector size mismatch");
+        }
+        Vector<Element> result(Rows);
+        for (std::size_t row = 0; row < Rows; ++row) {
+            Element sum{};
+            for (std::size_t col = 0; col < Cols; ++col) {
+                sum += (*this)(row, col) * vector[col];
+            }
+            result[row] = sum;
+        }
+        return result;
+    }
+
+private:
+    std::array<value_type, Rows * Cols> storage_{};
 };
 
 template <typename Coefficient>
@@ -948,108 +1296,6 @@ inline Polynomial<core::limb> multiply_polynomials(const Polynomial<core::limb>&
 
 } // namespace ntt
 
-class F2m {
-public:
-    explicit F2m(core::bigint modulus)
-        : modulus_(normalize_modulus(std::move(modulus))),
-          modulus_degree_(bit_degree(modulus_)) {
-        if (modulus_degree_ < 0) {
-            throw std::invalid_argument("F2m modulus must be non-zero");
-        }
-        pow2_cache_.push_back(core::bigint::one());
-    }
-
-    const core::bigint& modulus() const noexcept { return modulus_; }
-
-    core::bigint add(const core::bigint& lhs, const core::bigint& rhs) const {
-        return lhs ^ rhs;
-    }
-
-    core::bigint multiply(core::bigint lhs, core::bigint rhs) const {
-        lhs = reduce(std::move(lhs));
-        rhs = reduce(std::move(rhs));
-        auto product = poly_multiply(lhs, rhs);
-        return reduce(std::move(product));
-    }
-
-    core::bigint pow(core::bigint base, std::size_t exponent) const {
-        auto value = reduce(std::move(base));
-        core::bigint result = core::bigint::one();
-        while (exponent > 0) {
-            if ((exponent & 1) != 0) {
-                result = multiply(result, value);
-            }
-            value = multiply(value, value);
-            exponent >>= 1;
-        }
-        return result;
-    }
-
-    core::bigint reduce(core::bigint value) const {
-        auto deg = bit_degree(value);
-        while (deg >= modulus_degree_) {
-            std::size_t shift = static_cast<std::size_t>(deg - modulus_degree_);
-            value = value ^ shift_left(modulus_, shift);
-            deg = bit_degree(value);
-        }
-        return value;
-    }
-
-private:
-    static core::bigint normalize_modulus(core::bigint modulus) {
-        if (modulus.is_zero()) {
-            throw std::invalid_argument("modulus cannot be zero");
-        }
-        return modulus;
-    }
-
-    static int bit_degree(core::bigint value) {
-        if (value.is_zero()) {
-            return -1;
-        }
-        value = value.abs();
-        int degree = -1;
-        const core::bigint two(2);
-        while (!value.is_zero()) {
-            const auto [quotient, remainder] = core::bigint::div_mod(value, two);
-            value = quotient;
-            ++degree;
-        }
-        return degree;
-    }
-
-    core::bigint shift_left(const core::bigint& value, std::size_t bits) const {
-        return value * pow2(bits);
-    }
-
-    core::bigint pow2(std::size_t bits) const {
-        if (bits >= pow2_cache_.size()) {
-            for (std::size_t next = pow2_cache_.size(); next <= bits; ++next) {
-                pow2_cache_.push_back(pow2_cache_.back() * core::bigint(2));
-            }
-        }
-        return pow2_cache_[bits];
-    }
-
-    static core::bigint poly_multiply(core::bigint lhs, core::bigint rhs) {
-        core::bigint result = core::bigint::zero();
-        const core::bigint two(2);
-        while (!rhs.is_zero()) {
-            const auto [quotient, remainder] = core::bigint::div_mod(rhs, two);
-            if (!remainder.is_zero()) {
-                result = result ^ lhs;
-            }
-            lhs *= two;
-            rhs = quotient;
-        }
-        return result;
-    }
-
-    core::bigint modulus_;
-    int modulus_degree_;
-    mutable std::vector<core::bigint> pow2_cache_;
-};
-
 template <int N>
 class Fixed {
 public:
@@ -1152,6 +1398,30 @@ public:
         return *this;
     }
 
+    Fixed& operator/=(const Fixed& other) {
+        const core::bigint divisor = other.to_bigint();
+        if (divisor.is_zero()) {
+            throw std::domain_error("fixed division by zero");
+        }
+        const core::bigint dividend = to_bigint();
+        const auto [quotient, remainder] = core::bigint::div_mod(dividend, divisor);
+        (void)remainder;
+        trits_ = from_bigint(std::move(quotient));
+        return *this;
+    }
+
+    Fixed& operator%=(const Fixed& other) {
+        const core::bigint divisor = other.to_bigint();
+        if (divisor.is_zero()) {
+            throw std::domain_error("fixed modulo by zero");
+        }
+        const core::bigint dividend = to_bigint();
+        const auto [quotient, remainder] = core::bigint::div_mod(dividend, divisor);
+        (void)quotient;
+        trits_ = from_bigint(std::move(remainder));
+        return *this;
+    }
+
     friend constexpr Fixed operator+(Fixed lhs, const Fixed& rhs) {
         lhs += rhs;
         return lhs;
@@ -1167,12 +1437,26 @@ public:
         return lhs;
     }
 
+    friend Fixed operator/(Fixed lhs, const Fixed& rhs) {
+        lhs /= rhs;
+        return lhs;
+    }
+
+    friend Fixed operator%(Fixed lhs, const Fixed& rhs) {
+        lhs %= rhs;
+        return lhs;
+    }
+
     friend constexpr bool operator==(const Fixed& lhs, const Fixed& rhs) noexcept {
         return lhs.trits_ == rhs.trits_;
     }
 
     friend constexpr bool operator!=(const Fixed& lhs, const Fixed& rhs) noexcept {
         return !(lhs == rhs);
+    }
+
+    friend std::strong_ordering operator<=>(const Fixed& lhs, const Fixed& rhs) noexcept {
+        return lhs.to_bigint() <=> rhs.to_bigint();
     }
 
 private:
