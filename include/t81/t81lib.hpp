@@ -14,6 +14,7 @@
 #include <t81/util/random.hpp>
 #include <t81/util/debug.hpp>
 #include <t81/gf2m.hpp>
+#include <t81/linalg/gemm.hpp>
 
 #include <algorithm>
 #include <array>
