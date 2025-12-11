@@ -36,3 +36,4 @@ This file helps AI agents discover and understand how to work with this reposito
 - Added `t81::linalg::gemm_ternary` and the Python binding `t81lib.gemm_ternary` so packed ternary GEMMs with alpha/beta semantics are exposed across the C++/Python API surface.
 - Documented the `t81.torch`/`t81.nn` PyTorch helpers in `README.md` and `docs/index.md`, pointing to the `examples/demo_llama_conversion.py`,
   `examples/scaling_laws_ternary.py`, and `examples/ternary_sparse_preview.py` demos so future agents can locate the torch bridge.
+- Added production-ready Python bindings (`python/bindings.cpp`) plus packaging helpers (`setup.py`, `pyproject.toml`) that expose `Limb`/`BigInt` helpers, Montgomery contexts, NumPy quantization utilities, and a tutorial notebook `examples/ternary_quantization_demo.ipynb`.

@@ -15,7 +15,7 @@ FetchContent_MakeAvailable(pybind11)
 
 set(T81LIB_PYTHON_MODULE_NAME "t81lib")
 
-pybind11_add_module(t81lib_python MODULE t81lib_module.cpp)
+pybind11_add_module(t81lib_python MODULE bindings.cpp)
 
 target_link_libraries(t81lib_python PRIVATE t81lib)
 
