@@ -29,6 +29,7 @@ endif()
 
 # Exported namespace: t81::t81lib
 add_library(t81::t81lib ALIAS t81lib)
+add_library(t81::t81 ALIAS t81lib)
 
 find_package(benchmark QUIET)
 

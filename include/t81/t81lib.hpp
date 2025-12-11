@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <array>
 #include <compare>
+#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -38,6 +39,21 @@ namespace detail {
 inline const core::bigint& power_of_three(std::size_t exponent);
 inline std::string format_mantissa(core::bigint mantissa, int exponent, bool negative);
 } // namespace detail
+
+inline std::string_view trim(std::string_view text) noexcept {
+    const auto is_whitespace = [](char ch) {
+        return std::isspace(static_cast<unsigned char>(ch));
+    };
+    std::size_t start = 0;
+    while (start < text.size() && is_whitespace(text[start])) {
+        ++start;
+    }
+    std::size_t end = text.size();
+    while (end > start && is_whitespace(text[end - 1])) {
+        --end;
+    }
+    return text.substr(start, end - start);
+}
 
 using Int = core::limb;
 class Float {
@@ -86,10 +102,15 @@ public:
             return std::size_t{0};
         };
 
+        constexpr std::string_view DECOMPOSED_TRYTE_INDICATOR("3\xCC\xB2", 3);
         const auto tryte_indicator_length = [&](std::size_t position) {
             if (position + TRYTE_EXPONENT_INDICATOR.size() <= text.size() &&
                 text.substr(position, TRYTE_EXPONENT_INDICATOR.size()) == TRYTE_EXPONENT_INDICATOR) {
                 return TRYTE_EXPONENT_INDICATOR.size();
+            }
+            if (position + DECOMPOSED_TRYTE_INDICATOR.size() <= text.size() &&
+                text.substr(position, DECOMPOSED_TRYTE_INDICATOR.size()) == DECOMPOSED_TRYTE_INDICATOR) {
+                return DECOMPOSED_TRYTE_INDICATOR.size();
             }
             return std::size_t{0};
         };
