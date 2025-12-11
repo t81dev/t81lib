@@ -8,6 +8,11 @@ option(T81LIB_BUILD_BENCH "Build t81lib benchmarks" OFF)
 option(T81LIB_USE_GOOGLE_BENCH "Fetch Google Benchmark when a system package is missing" ON)
 option(T81LIB_HEADER_ONLY "Build t81lib as header-only interface library" ON)
 option(T81LIB_BUILD_PYTHON_BINDINGS "Build Python bindings for t81lib" ON)
+option(T81LIB_ENABLE_TORCH_BINDINGS
+    "Enable PyTorch-aware C++ helpers when the [torch] extra is requested" OFF)
+
+set(TORCH_CMAKE_PREFIX_PATH "" CACHE STRING
+    "Additional CMake prefix paths supplied by torch.utils.cmake_prefix_path")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -21,6 +26,19 @@ target_include_directories(t81lib
 )
 
 target_compile_features(t81lib INTERFACE cxx_std_20)
+
+include(CheckCXXCompilerFlag)
+
+check_cxx_compiler_flag("-mavx512f" T81LIB_SUPPORTS_GNU_AVX512F)
+if(T81LIB_SUPPORTS_GNU_AVX512F)
+    target_compile_options(t81lib INTERFACE -mavx512f)
+endif()
+if(MSVC)
+    check_cxx_compiler_flag("/arch:AVX512" T81LIB_SUPPORTS_MSVC_AVX512)
+    if(T81LIB_SUPPORTS_MSVC_AVX512)
+        target_compile_options(t81lib INTERFACE /arch:AVX512)
+    endif()
+endif()
 
 # ARM targets default to enabling the NEON path.
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|armv8|armv7|armhf|armeabi)") 
