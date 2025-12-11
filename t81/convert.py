@@ -4,7 +4,7 @@ import argparse
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 import torch
 from torch import nn
@@ -165,17 +165,26 @@ def _convert_model_instance(
 
 
 def convert(
-    model_id_or_path: str,
+    model_id_or_path: str | PreTrainedModel,
     threshold: float = 0.45,
     keep_biases_bf16: bool = True,
     device_map: str | Mapping[str, Any] | None = "auto",
     torch_dtype: torch.dtype | None = None,
+    *,
+    inplace: bool = False,
 ) -> PreTrainedModel:
     """
     Load a Hugging Face model and swap every ``nn.Linear`` for ``t81.nn.Linear`` so the
     weights get quantized lazily via ``t81.torch.TernaryTensor``.
+    If an existing ``PreTrainedModel`` is passed, set ``inplace=True`` and the instance
+    is modified without reloading from disk.
     """
-    model = _load_model(model_id_or_path, device_map=device_map, torch_dtype=torch_dtype)
+    if isinstance(model_id_or_path, PreTrainedModel):
+        if not inplace:
+            raise ValueError("convert() requires inplace=True when passing a PreTrainedModel instance")
+        model = model_id_or_path
+    else:
+        model = _load_model(model_id_or_path, device_map=device_map, torch_dtype=torch_dtype)
     stats = _convert_model_instance(model, threshold, keep_biases_bf16)
     _report_stats(stats, replaced=sum(1 for _ in model.modules() if isinstance(_, TernaryLinear)))
     return model
@@ -191,11 +200,16 @@ def save_pretrained_t81(
     *,
     threshold: float | None = None,
     keep_biases_bf16: bool | None = None,
+    call_save_pretrained: bool = True,
+    save_fn: Callable[[PreTrainedModel, str], None] | None = None,
     **kwargs: Any,
 ) -> None:
     directory = Path(save_directory)
     directory.mkdir(parents=True, exist_ok=True)
-    self.save_pretrained(directory, **kwargs)
+    if call_save_pretrained:
+        original_save = getattr(type(self), "__t81_original_save_pretrained__", None)
+        save_callable = save_fn or original_save or self.save_pretrained
+        save_callable(self, directory, **kwargs)
     metadata = {
         "threshold": threshold if threshold is not None else getattr(self, "_t81_threshold", 0.45),
         "keep_biases_bf16": keep_biases_bf16
@@ -293,6 +307,24 @@ def _bind_pretrained_methods() -> None:
 
     setattr(_PreTrainedModel, "save_pretrained_t81", save_pretrained_t81)
     setattr(_PreTrainedModel, "from_pretrained_t81", classmethod(from_pretrained_t81))
+    if not hasattr(_PreTrainedModel, "__t81_original_save_pretrained__"):
+        setattr(_PreTrainedModel, "__t81_original_save_pretrained__", _PreTrainedModel.save_pretrained)
+    if not getattr(_PreTrainedModel, "__t81_save_pretrained_hook__", False):
+        original_save = getattr(_PreTrainedModel, "__t81_original_save_pretrained__")
+
+        def _t81_save_pretrained(self, save_directory, *args, **kwargs):
+            result = original_save(self, save_directory, *args, **kwargs)
+            save_pretrained_t81(
+                self,
+                save_directory,
+                threshold=getattr(self, "_t81_threshold", 0.45),
+                keep_biases_bf16=getattr(self, "_t81_keep_biases_bf16", True),
+                call_save_pretrained=False,
+            )
+            return result
+
+        setattr(_PreTrainedModel, "save_pretrained", _t81_save_pretrained)
+        setattr(_PreTrainedModel, "__t81_save_pretrained_hook__", True)
 
 
 _bind_pretrained_methods()

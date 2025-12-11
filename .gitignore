@@ -9,3 +9,7 @@ dist/
 .DS_Store
 .vscode/
 .idea/
+build-full/
+pipx_home/
+pipx_logs/
+t81lib.egg-info/

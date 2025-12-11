@@ -40,11 +40,12 @@ def _write_tryte_block(destination: np.ndarray, block: np.ndarray) -> None:
         destination[tryte_index] = _TRITS_TO_TRYTE[tri_index]
 
 
-def _quantize_tensor(tensor: torch.Tensor) -> torch.Tensor:
+def _quantize_tensor(tensor: torch.Tensor, threshold: float = 0.5) -> torch.Tensor:
+    threshold = float(max(0.0, min(threshold, 0.9999)))
     clipped = tensor.clamp(-1.0, 1.0)
     trits = torch.zeros_like(clipped, dtype=torch.int8)
-    trits[clipped >= 0.5] = 1
-    trits[clipped <= -0.5] = -1
+    trits[clipped >= threshold] = 1
+    trits[clipped <= -threshold] = -1
     return trits
 
 
@@ -140,7 +141,12 @@ def _apply_ternary_conversion(module: nn.Module) -> None:
         for name, parameter in submodule.named_parameters(recurse=False):
             if parameter.ndim != 2:
                 continue
-            cache[name] = TernaryTensor.from_float(parameter.detach())
+            threshold = getattr(
+                submodule,
+                "ternary_threshold",
+                getattr(submodule, "threshold", 0.5),
+            )
+            cache[name] = TernaryTensor.from_float(parameter.detach(), threshold=threshold)
         if cache:
             setattr(submodule, "_t81_ternary_cache", cache)
             if not hasattr(submodule, "_t81_hook_handle"):
@@ -157,6 +163,7 @@ class TernaryTensor(torch.Tensor):
         "_k_limbs",
         "_float_source",
         "_base_device",
+        "_threshold",
     )
 
     def __new__(
@@ -167,6 +174,7 @@ class TernaryTensor(torch.Tensor):
         k_actual: int,
         k_limbs: int,
         float_source: Optional[torch.Tensor] = None,
+        threshold: float = 0.5,
     ) -> "TernaryTensor":
         storage = torch.empty(shape, dtype=torch.float32, device="cpu")
         tensor = torch.Tensor._make_subclass(cls, storage, shape)
@@ -177,6 +185,7 @@ class TernaryTensor(torch.Tensor):
         tensor._k_limbs = k_limbs
         tensor._float_source = float_source
         tensor._base_device = torch.device("cpu")
+        tensor._threshold = float(max(0.0, min(threshold, 0.9999)))
         return tensor
 
     @property
@@ -193,18 +202,28 @@ class TernaryTensor(torch.Tensor):
         return tensor
 
     @classmethod
-    def from_float(cls, source: torch.Tensor, quantize: bool = True) -> "TernaryTensor":
+    def from_float(
+        cls, source: torch.Tensor, quantize: bool = True, threshold: float = 0.5
+    ) -> "TernaryTensor":
         tensor = cls._ensure_int2d(source)
         cpu_float = _to_cpu_float(tensor).contiguous()
         rows, cols = cpu_float.shape
         k_limbs = (cols + 47) // 48
-        quantized = _quantize_tensor(cpu_float) if quantize else cpu_float.to(torch.int8)
+        quantized = _quantize_tensor(cpu_float, threshold) if quantize else cpu_float.to(torch.int8)
         packed = _pack_rowwise(quantized.numpy(), rows, k_limbs, cols)
-        return cls(packed, (rows, cols), k_actual=cols, k_limbs=k_limbs, float_source=cpu_float)
+        return cls(
+            packed,
+            (rows, cols),
+            k_actual=cols,
+            k_limbs=k_limbs,
+            float_source=cpu_float,
+            threshold=threshold,
+        )
 
     def update_from_float(self, source: torch.Tensor) -> None:
         cpu_float = _to_cpu_float(self._ensure_int2d(source)).contiguous()
-        quantized = _quantize_tensor(cpu_float)
+        threshold = getattr(self, "_threshold", 0.5)
+        quantized = _quantize_tensor(cpu_float, threshold)
         packed = _pack_rowwise(quantized.numpy(), cpu_float.shape[0], self._k_limbs, self._k_actual)
         self._packed_view[:, :] = packed.view(np.uint8).reshape(-1, 16)
         self._float_source = cpu_float

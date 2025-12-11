@@ -10,5 +10,7 @@ from . import hardware  # expose ternary hardware helpers alongside torch
 from . import torch as torch_integration  # Enables ``import t81``.
 from .convert import convert
 from .nn import Linear
+from .qat import ternary
+from .trainer import TernaryTrainer, TernaryTrainingArguments
 
-__all__ = ["torch", "hardware", "convert", "Linear"]
+__all__ = ["torch", "hardware", "convert", "Linear", "ternary", "TernaryTrainer", "TernaryTrainingArguments"]

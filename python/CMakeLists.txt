@@ -21,11 +21,18 @@ endif()
 
 pybind11_add_module(t81lib_python MODULE bindings.cpp)
 
-target_link_libraries(t81lib_python PRIVATE t81lib)
+target_compile_features(t81lib_python PRIVATE cxx_std_20)
+
+#target_link_libraries(t81lib_python PRIVATE t81lib)
 
 target_compile_definitions(
     t81lib_python
     PRIVATE T81LIB_TORCH_ENABLED=$<BOOL:${T81LIB_ENABLE_TORCH_BINDINGS}>)
+
+target_include_directories(t81lib_python PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+)
 
 if(T81LIB_ENABLE_TORCH_BINDINGS)
     find_package(Torch CONFIG REQUIRED)
