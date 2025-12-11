@@ -1,5 +1,5 @@
 <!--
-doc/design/bigint-design.md — Design overview of the bigint abstractions and APIs.
+docs/design/bigint-design.md — Design overview of the bigint abstractions and APIs.
 -->
 
 # bigint-design.md — t81::core::bigint Design Notes

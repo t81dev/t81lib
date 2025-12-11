@@ -1,5 +1,5 @@
 <!--
-doc/diagrams/architecture-stack-mermaid.md — Visual guide to the module layering for new contributors.
+docs/diagrams/architecture-stack-mermaid.md — Visual guide to the module layering for new contributors.
 -->
 
 ```mermaid

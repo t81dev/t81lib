@@ -1,5 +1,5 @@
 <!--
-doc/design/montgomery-design.md — Design rationale for the Montgomery reduction facilities.
+docs/design/montgomery-design.md — Design rationale for the Montgomery reduction facilities.
 -->
 
 # Montgomery-design.md — Montgomery Arithmetic over t81::core Types
