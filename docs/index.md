@@ -16,6 +16,9 @@ to understand the balanced ternary engine without digging through specs immediat
 - **Design notes** — `doc/design/limb-design.md`, `.../bigint-design.md`, `.../montgomery-design.md` explain internal
   choices, algorithms, and invariants.
 - **Examples** — `examples/` hosts runnable demos that mirror the README snippets.
+- **PyTorch bridge** — `t81.torch`/`t81.nn` expose the custom `t81.trit` dtype, `TernaryTensor`,
+  and GEMM-backed helpers; see `examples/demo_llama_conversion.py`, `examples/scaling_laws_ternary.py`, and
+  `examples/ternary_sparse_preview.py` for runnable workflows.
 - **Tests & benchmarks** — `tests/` documents the unit/property coverage while `bench/` shows throughput patterns.
 
 ## Stay aligned

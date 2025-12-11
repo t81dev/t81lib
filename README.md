@@ -86,6 +86,20 @@ vcpkg install t81lib[tests,benchmarks]:x64-windows
 
 Once installed: `find_package(t81lib REQUIRED)` + `target_link_libraries(... t81::t81lib)`.
 
+## PyTorch helpers
+
+`import t81` now pulls in the PyTorch bridge under `t81.torch`, which repacks `t81::linalg::gemm_ternary` into a `TernaryTensor` that plays nicely with `torch.matmul`/`torch.mm` and exposes the custom `t81.trit` dtype. Call `TernaryTensor.from_float(...)` to quantize ternary weights and `TernaryTensor.matmul_input(...)` to fire off packed GEMMs inside your training/inference loops:
+
+```python
+import torch
+import t81.torch as t81_torch
+
+weights = t81_torch.TernaryTensor.from_float(torch.randn(128, 128))
+outputs = weights.matmul_input(torch.randn(32, 128))
+```
+
+The companion `t81.nn` module keeps scalars exact (e.g., `Ratio`-based RMSNorm, RoPE, and softmax) while integrating with the same ternary GEMM plumbing, so you can simply do `model.to(dtype=t81.trit)` and let `t81.torch`/`t81.nn` handle the quantization, dispatch, and gradient flow. See `examples/demo_llama_conversion.py`, `examples/scaling_laws_ternary.py`, and `examples/ternary_sparse_preview.py` for runnable PyTorch + ternary GEMM demos.
+
 ## Usage at a glance
 
 ```cpp
