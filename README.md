@@ -77,6 +77,24 @@ For the GGUF helpers added in this release run:
 PYTHONPATH=build python tests/python/test_gguf.py  # requires torch + transformers
 ```
 
+#### Install via pipx (recommended)
+
+Use `pipx` to keep the package isolated and expose the console scripts:
+
+```
+pipx install .[torch]
+pipx ensurepath  # adds ~/.local/bin if needed
+```
+
+If you already have `t81lib` installed, refresh the venv and inject the optional dependencies:
+
+```
+pipx install . --force
+pipx inject t81lib torch transformers accelerate
+```
+
+After reinstalling, `t81-convert`, `t81-gguf`, and `t81-qat` become globally available in `~/.local/bin` so you can run the CLI without dropping into Python.
+
 #### Install via pip
 
 The library ships with `setup.py`/`pyproject.toml`, so `pip` will call CMake, build the same extension, and install the `t81lib` module together with the `t81` Python helpers defined at the repo root.

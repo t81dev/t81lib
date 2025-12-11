@@ -18,10 +18,13 @@
 #include "t81/core/gguf_quants.h"
 
 #include <t81/core/bigint.hpp>
+#include <t81/core/bigint_bitops_helpers.hpp>
 #include <t81/core/limb.hpp>
 #include <t81/core/montgomery.hpp>
+#include <t81/io/format.hpp>
 #include <t81/linalg/gemm.hpp>
 #include <t81/sparse/simple.hpp>
+#include <t81/t81lib.hpp>
 
 namespace py = pybind11;
 namespace core = t81::core;
@@ -215,8 +218,8 @@ py::tuple quantize_row_tq1_0(py::array_t<float, py::array::c_style | py::array::
     const std::size_t blocks = static_cast<std::size_t>(
         (length + static_cast<std::int64_t>(t81::core::gguf::TQ1_TRITS_PER_BLOCK) - 1) /
         static_cast<std::int64_t>(t81::core::gguf::TQ1_TRITS_PER_BLOCK));
-    py::array_t<std::uint16_t> packed({blocks});
-    auto packed_info = packed.request();
+    py::array_t<std::uint16_t> packed(static_cast<py::ssize_t>(blocks));
+    auto packed_info = packed.request(true);
     auto* dest = packed_info.ptr ? static_cast<std::uint16_t*>(packed_info.ptr) : nullptr;
     float actual_scale = scale;
     if (actual_scale <= 0.0f) {
@@ -245,8 +248,9 @@ py::array_t<float> dequant_row_tq1_0(py::array_t<std::uint16_t, py::array::c_sty
     if (static_cast<std::size_t>(info.size) < expected_blocks) {
         throw py::value_error("packed buffer too small for the requested column count");
     }
-    py::array_t<float> result({static_cast<std::size_t>(cols)});
-    auto* destination = static_cast<float*>(result.request().ptr);
+    py::array_t<float> result(static_cast<py::ssize_t>(cols));
+    auto result_info = result.request(true);
+    auto* destination = static_cast<float*>(result_info.ptr);
     t81::core::gguf::dequantize_row_tq1_0(
         static_cast<const std::uint16_t*>(info.ptr),
         cols,
@@ -731,6 +735,20 @@ PYBIND11_MODULE(t81lib, module) {
         .def("bitwise_xor", &core::bigint::operator^, py::arg("other"))
         .def("bitwise_andnot", &core::bigint::bitwise_andnot, py::arg("other"))
         .def_static("mod_pow", &core::bigint::mod_pow, py::arg("base"), py::arg("exponent"), py::arg("modulus"));
+
+    py::class_<t81::Ratio> py_ratio(module, "Ratio", "Exact ratio built from t81bigint numerators/denominators");
+    py_ratio.def(py::init<>())
+        .def(py::init([](long long numerator, long long denominator) {
+            return t81::Ratio(core::limb::from_value(numerator), core::limb::from_value(denominator));
+        }), py::arg("numerator") = 0, py::arg("denominator") = 1)
+        .def("numerator", [](const t81::Ratio& value) { return value.numerator(); })
+        .def("denominator", [](const t81::Ratio& value) { return value.denominator(); })
+        .def("is_zero", &t81::Ratio::is_zero)
+        .def("sqrt_exact", &t81::Ratio::sqrt_exact)
+        .def("__repr__", [](const t81::Ratio& value) {
+            return "<t81lib.Ratio " + t81::io::to_string(value.numerator()) +
+                   " / " + t81::io::to_string(value.denominator()) + ">";
+        });
 
     bind_montgomery_context<core::limb>(module, "LimbMontgomeryContext");
     bind_montgomery_context<core::bigint>(module, "BigIntMontgomeryContext");

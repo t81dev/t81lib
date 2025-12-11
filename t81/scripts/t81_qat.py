@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import argparse
+from typing import TYPE_CHECKING
 
-import datasets
 import torch
-from datasets import Dataset
-from transformers import AutoModelForCausalLM, AutoTokenizer, DataCollatorForLanguageModeling
 
 from t81.trainer import TernaryTrainer, TernaryTrainingArguments
+
+if TYPE_CHECKING:
+    from datasets import Dataset
+    from transformers import AutoModelForCausalLM, AutoTokenizer, DataCollatorForLanguageModeling
 
 
 def _parse_dtype(value: str) -> torch.dtype:
@@ -19,7 +21,7 @@ def _parse_dtype(value: str) -> torch.dtype:
     return getattr(torch, normalized)
 
 
-def _find_text_column(full_dataset: Dataset) -> str:
+def _find_text_column(full_dataset: "Dataset") -> str:
     for name, feature in full_dataset.features.items():
         if getattr(feature, "dtype", None) == "string":
             return name
@@ -58,6 +60,16 @@ def main() -> int:
     parser.add_argument("--block-size", type=int, default=2048)
     parser.add_argument("--max-train-samples", type=int, help="Truncate training samples for quick experiments")
     args = parser.parse_args()
+
+    try:
+        import datasets
+        from datasets import Dataset
+        from transformers import AutoModelForCausalLM, AutoTokenizer, DataCollatorForLanguageModeling
+    except ImportError as exc:  # pragma: no cover - optional dependencies
+        raise RuntimeError(
+            "t81lib's QAT CLI requires 'datasets' and 'transformers'; "
+            "install them via 'pipx inject t81lib torch transformers accelerate'"
+        ) from exc
 
     dataset = datasets.load_dataset(
         args.dataset_name,

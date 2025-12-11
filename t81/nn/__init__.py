@@ -211,10 +211,11 @@ def _patch_transformers_attention() -> None:
 
     if transformers is None or GPT2Attention is None:
         return
-    if getattr(GPT2Attention._attn, "__t81_patched__", False):
+    attn_attr = getattr(GPT2Attention, "_attn", None)
+    if attn_attr is None or getattr(attn_attr, "__t81_patched__", False):
         return
 
-    original_attn = GPT2Attention._attn
+    original_attn = attn_attr
 
     def _patched_attn(self: Any, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, attention_mask: Optional[torch.Tensor], head_mask: Optional[torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
         if q.dtype is not trit:
