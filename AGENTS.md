@@ -34,3 +34,4 @@ This file helps AI agents discover and understand how to work with this reposito
 - `README.md`/umbrella header now mention `t81::Matrix<Element, R, C>` and how it complements `Vector` for linear algebra over `FloatN`/`Fixed` scalars.
 - `F2m` now lives in `include/t81/gf2m.hpp` (still re-exported through `t81/t81lib.hpp`), and `Fixed<N>` gained balanced `/` and `%` helpers so division/magnitude math stays accessible in the umbrella header.
 - Added `t81::linalg::gemm_ternary` and the Python binding `t81lib.gemm_ternary` so packed ternary GEMMs with alpha/beta semantics are exposed across the C++/Python API surface.
+- Documented the new `t81/torch` Python submodule, custom `t81.trit` dtype, and `TernaryTensor` wrapper with PyTorch hooks plus an `examples/demo_llama_conversion.py` script so future agents know where to find the PyTorch integration work.
