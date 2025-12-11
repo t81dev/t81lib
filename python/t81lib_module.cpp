@@ -2,13 +2,19 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <pybind11/pybind11.h>
 
+#include <pybind11/stl.h>
+
 #include <t81/core/bigint.hpp>
 #include <t81/linalg/gemm.hpp>
+
+#include <t81/sparse/simple.hpp>
 
 namespace py = pybind11;
 using t81::core::bigint;
@@ -153,6 +159,60 @@ PYBIND11_MODULE(t81lib, module) {
         py::arg("alpha") = 1.0f,
         py::arg("beta") = 0.0f,
         "AVX/NEON-accelerated GEMM over packed ternary limbs");
+
+    module.def(
+        "spmm_simple",
+        [](const std::vector<long long>& values,
+           const std::vector<int32_t>& row_indices,
+           const std::vector<int32_t>& col_indices,
+           int rows,
+           int cols,
+           py::buffer B_buffer,
+           py::buffer C_buffer,
+           int N,
+           float alpha,
+           float beta) {
+            if (values.size() != row_indices.size() || values.size() != col_indices.size()) {
+                throw py::value_error("Values and indices lengths must match");
+            }
+            if (rows < 0 || cols < 0) {
+                throw py::value_error("Matrix dimensions must be non-negative");
+            }
+            if (N < 0) {
+                throw py::value_error("Feature dimension N must be non-negative");
+            }
+
+            t81::sparse::SimpleSparseTernary matrix;
+            matrix.rows = rows;
+            matrix.cols = cols;
+            matrix.row_indices = row_indices;
+            matrix.col_indices = col_indices;
+            matrix.values.reserve(values.size());
+            for (const auto scalar_value : values) {
+                matrix.values.emplace_back(static_cast<long long>(scalar_value));
+            }
+
+            const std::size_t n_size = static_cast<std::size_t>(N);
+            const std::size_t expected_b = static_cast<std::size_t>(cols) * n_size;
+            const std::size_t expected_c = static_cast<std::size_t>(rows) * n_size;
+            py::buffer B_view = std::move(B_buffer);
+            py::buffer C_view = std::move(C_buffer);
+            const auto b_span = make_float_span(B_view, expected_b);
+            auto c_span = make_float_span(C_view, expected_c);
+
+            t81::sparse::spmm_simple(matrix, b_span, c_span, N, alpha, beta);
+        },
+        py::arg("values"),
+        py::arg("row_indices"),
+        py::arg("col_indices"),
+        py::arg("rows"),
+        py::arg("cols"),
+        py::arg("B"),
+        py::arg("C"),
+        py::arg("N"),
+        py::arg("alpha") = 1.0f,
+        py::arg("beta") = 0.0f,
+        "COO-style sparse × dense multiply over ternary weights");
 
     module.def("zero", &bigint::zero, "Return a bigint representing zero");
     module.def("one", &bigint::one, "Return a bigint representing one");
