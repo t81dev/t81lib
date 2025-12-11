@@ -30,3 +30,4 @@ This file helps AI agents discover and understand how to work with this reposito
 - `tests/unit/test_numeric_types.cpp` now exercises `Complex`, `Polynomial`, and `F2m` helpers so the umbrella numeric helpers stay locked down.
 - `README.md` now documents the high-level helpers (`Float`, `Ratio`, `Complex`, `Polynomial`, `F2m`, `Fixed<N>`, `Modulus`, and `MontgomeryInt`) plus the `t81::Int` alias exposed through `t81/t81lib.hpp`.
 - `include/t81/t81lib.hpp` now exposes `Float::from_string`, a `Ratio`→`Float` conversion, the `Int81` `Fixed<48>` alias, and `std::hash` hooks for `limb`/`bigint` so hashing and string-based floats land in the umbrella header.
+- `README.md` plus the umbrella header now document the `FloatN` template, ternary `_t3` literal, R3 NTT helpers, and `std::formatter` specializations so overlined ternary floats behave nicely in `std::format`.
