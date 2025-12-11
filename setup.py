@@ -91,5 +91,12 @@ setup(
     },
     ext_modules=[CMakeExtension("t81lib", sourcedir=str(this_directory / "python"))],
     cmdclass={"build_ext": CMakeBuild},
+    entry_points={
+        "console_scripts": [
+            "t81-convert = t81.convert:main",
+            "t81-qat = t81.scripts.t81_qat:main",
+            "t81-gguf = t81.scripts.t81_gguf:main",
+        ],
+    },
     zip_safe=False,
 )

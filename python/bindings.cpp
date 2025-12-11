@@ -15,6 +15,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "t81/core/gguf_quants.h"
+
 #include <t81/core/bigint.hpp>
 #include <t81/core/limb.hpp>
 #include <t81/core/montgomery.hpp>
@@ -200,6 +202,127 @@ py::array_t<std::uint8_t> pack_dense_matrix(py::array_t<float, py::array::c_styl
         }
     }
     return packed;
+}
+
+py::tuple quantize_row_tq1_0(py::array_t<float, py::array::c_style | py::array::forcecast> row,
+                             float threshold,
+                             float scale) {
+    const auto info = row.request();
+    if (info.ndim != 1) {
+        throw py::value_error("quantize_row_tq1_0 requires a 1-D float array");
+    }
+    const std::int64_t length = static_cast<std::int64_t>(info.shape[0]);
+    const std::size_t blocks = static_cast<std::size_t>(
+        (length + static_cast<std::int64_t>(t81::core::gguf::TQ1_TRITS_PER_BLOCK) - 1) /
+        static_cast<std::int64_t>(t81::core::gguf::TQ1_TRITS_PER_BLOCK));
+    py::array_t<std::uint16_t> packed({blocks});
+    auto packed_info = packed.request();
+    auto* dest = packed_info.ptr ? static_cast<std::uint16_t*>(packed_info.ptr) : nullptr;
+    float actual_scale = scale;
+    if (actual_scale <= 0.0f) {
+        actual_scale = t81::core::gguf::compute_scale(
+            static_cast<const float*>(info.ptr), length);
+    }
+    t81::core::gguf::quantize_row_tq1_0(
+        static_cast<const float*>(info.ptr),
+        length,
+        threshold,
+        actual_scale,
+        dest);
+    return py::make_tuple(actual_scale, std::move(packed));
+}
+
+py::array_t<float> dequant_row_tq1_0(py::array_t<std::uint16_t, py::array::c_style | py::array::forcecast> packed,
+                                     int cols,
+                                     float scale) {
+    if (cols < 0) {
+        throw py::value_error("cols must be non-negative");
+    }
+    const auto info = packed.request();
+    const std::size_t expected_blocks = static_cast<std::size_t>(
+        (static_cast<std::size_t>(cols) + t81::core::gguf::TQ1_TRITS_PER_BLOCK - 1) /
+        t81::core::gguf::TQ1_TRITS_PER_BLOCK);
+    if (static_cast<std::size_t>(info.size) < expected_blocks) {
+        throw py::value_error("packed buffer too small for the requested column count");
+    }
+    py::array_t<float> result({static_cast<std::size_t>(cols)});
+    auto* destination = static_cast<float*>(result.request().ptr);
+    t81::core::gguf::dequantize_row_tq1_0(
+        static_cast<const std::uint16_t*>(info.ptr),
+        cols,
+        scale,
+        destination);
+    return result;
+}
+
+py::array_t<float> dequant_tensor_tq1_impl(py::buffer buffer,
+                                           std::int64_t rows,
+                                           std::int64_t cols,
+                                           std::int64_t block_rows,
+                                           bool has_refinements) {
+    if (rows < 0 || cols < 0) {
+        throw py::value_error("rows and cols must be non-negative");
+    }
+    const auto info = buffer.request();
+    const std::size_t total_bytes =
+        static_cast<std::size_t>(std::max<py::ssize_t>(0, info.size)) *
+        static_cast<std::size_t>(info.itemsize);
+    if (info.ptr == nullptr && total_bytes > 0) {
+        throw py::value_error("buffer pointer is null");
+    }
+    if (info.itemsize != 1) {
+        throw py::value_error("buffer must be observed as bytes");
+    }
+
+    py::array_t<float> result({static_cast<std::size_t>(rows), static_cast<std::size_t>(cols)});
+    auto* destination = static_cast<float*>(result.request().ptr);
+    const std::size_t row_blocks = static_cast<std::size_t>(
+        (static_cast<std::size_t>(cols) + t81::core::gguf::TQ1_TRITS_PER_BLOCK - 1) /
+        t81::core::gguf::TQ1_TRITS_PER_BLOCK);
+    const std::size_t row_bytes = row_blocks * sizeof(std::uint16_t);
+    const std::size_t group_rows = static_cast<std::size_t>(
+        std::max<std::int64_t>(1, block_rows));
+    std::size_t offset = 0;
+    std::int64_t current_row = 0;
+    std::vector<std::uint16_t> row_buffer(row_blocks);
+
+    while (current_row < rows) {
+        if (offset + sizeof(std::uint16_t) > total_bytes) {
+            throw py::value_error("buffer truncated while reading scale");
+        }
+        std::uint16_t scale_bits = 0;
+        std::memcpy(&scale_bits, static_cast<const std::uint8_t*>(info.ptr) + offset, sizeof(scale_bits));
+        offset += sizeof(std::uint16_t);
+        if (has_refinements) {
+            constexpr std::size_t kRefinementBytes = 8;
+            if (offset + kRefinementBytes > total_bytes) {
+                throw py::value_error("buffer truncated while skipping refinement bytes");
+            }
+            offset += kRefinementBytes;
+        }
+        const float scale = t81::core::gguf::half_to_float(scale_bits);
+        const std::size_t rows_in_group = static_cast<std::size_t>(
+            std::min<std::int64_t>(group_rows, rows - current_row));
+
+        for (std::size_t group_index = 0; group_index < rows_in_group; ++group_index) {
+            if (offset + row_bytes > total_bytes) {
+                throw py::value_error("buffer truncated while reading quantized rows");
+            }
+            if (row_bytes > 0) {
+                std::memcpy(row_buffer.data(),
+                            static_cast<const std::uint8_t*>(info.ptr) + offset,
+                            row_bytes);
+            }
+            offset += row_bytes;
+            t81::core::gguf::dequantize_row_tq1_0(
+                row_buffer.data(),
+                cols,
+                scale,
+                destination + static_cast<std::size_t>(current_row) * static_cast<std::size_t>(cols));
+            ++current_row;
+        }
+    }
+    return result;
 }
 
 py::array_t<std::int8_t> unpack_packed_limbs(py::array_t<std::uint8_t, py::array::c_style | py::array::forcecast> packed,
@@ -417,6 +540,44 @@ PYBIND11_MODULE(t81lib, module) {
                py::arg("matrix"),
                py::arg("threshold") = 0.5f,
                "Quantize a 2D float array to balanced ternary and return packed limb bytes in a (rows, limbs, bytes) view");
+
+    module.def("quantize_row_tq1_0", &quantize_row_tq1_0,
+               py::arg("row"),
+               py::arg("threshold") = 0.45f,
+               py::arg("scale") = 0.0f,
+               "Pack a single row of floats into TQ1_0 blocks and return (scale, packed blocks)");
+
+    module.def("dequant_row_tq1_0", &dequant_row_tq1_0,
+               py::arg("blocks"),
+               py::arg("cols"),
+               py::arg("scale"),
+               "Dequantize a single TQ1_0 row back to float32");
+
+    module.def("dequant_tq1_0",
+               [](py::buffer buffer,
+                  int64_t rows,
+                  int64_t cols,
+                  int64_t block_rows) {
+                   return dequant_tensor_tq1_impl(buffer, rows, cols, block_rows, false);
+               },
+               py::arg("buffer"),
+               py::arg("rows"),
+               py::arg("cols"),
+               py::arg("block_rows") = static_cast<int64_t>(t81::core::gguf::TQ1_BLOCK_ROWS),
+               "Dequantize an entire TQ1_0 tensor payload");
+
+    module.def("dequant_tq2_0",
+               [](py::buffer buffer,
+                  int64_t rows,
+                  int64_t cols,
+                  int64_t block_rows) {
+                   return dequant_tensor_tq1_impl(buffer, rows, cols, block_rows, true);
+               },
+               py::arg("buffer"),
+               py::arg("rows"),
+               py::arg("cols"),
+               py::arg("block_rows") = static_cast<int64_t>(t81::core::gguf::TQ1_BLOCK_ROWS),
+               "Dequantize an entire TQ2_0 tensor payload (refinements ignored for now)");
 
     module.def("unpack_packed_limbs", &unpack_packed_limbs,
                py::arg("packed"),
