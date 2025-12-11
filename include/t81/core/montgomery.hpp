@@ -3,6 +3,7 @@
 #pragma once
 
 #include <cstddef>
+#include <iostream>
 #include <stdexcept>
 #include <type_traits>
 
@@ -104,9 +105,14 @@ public:
     }
 
     limb to_montgomery(const limb& value) const {
+        std::cerr << "to_montgomery start" << std::endl;
         const limb reduced = detail::reduce_mod(value, modulus_);
+        std::cerr << "reduced" << std::endl;
         const auto [low, high] = limb::mul_wide(reduced, R2_mod_m_);
-        return redc(low, high);
+        std::cerr << "mul" << std::endl;
+        auto result = redc(low, high);
+        std::cerr << "to_montgomery end" << std::endl;
+        return result;
     }
 
     limb from_montgomery(const limb& value) const {
@@ -163,25 +169,35 @@ private:
     }
 
     limb redc(const limb& low, const limb& high) const {
+        std::cerr << "redc start" << std::endl;
         const auto [u_low, u_high] = limb::mul_wide(low, m_prime_);
+        std::cerr << "redc after u" << std::endl;
         const auto [um_low, um_high] = limb::mul_wide(u_low, modulus_);
+        std::cerr << "redc after um" << std::endl;
         const detail::limb_int128 low_sum = low.to_value() + um_low.to_value();
         auto [normalized_low, carry] = detail::radix_digit(low_sum);
+        std::cerr << "redc after normalized low" << std::endl;
         detail::limb_int128 high_sum =
             high.to_value() + um_high.to_value() + carry;
         auto [result, high_carry] = detail::radix_digit(high_sum);
+        std::cerr << "redc after high initial" << std::endl;
         while (high_carry != 0) {
             detail::limb_int128 adjusted = result.to_value() + high_carry * detail::RADIX;
             auto next = detail::radix_digit(adjusted);
             result = next.first;
             high_carry = next.second;
+            std::cerr << "redc loop" << std::endl;
         }
+        std::cerr << "redc loop done" << std::endl;
         while (result.is_negative()) {
             result += modulus_;
+            std::cerr << "redc positive adjust" << std::endl;
         }
         while (!(result < modulus_)) {
             result -= modulus_;
+            std::cerr << "redc reduce" << std::endl;
         }
+        std::cerr << "redc end" << std::endl;
         return result;
     }
 
