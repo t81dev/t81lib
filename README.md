@@ -71,6 +71,12 @@ print(ctx.mod_pow(value, t81lib.BigInt(3)))
 
 Use `tests/python/test_bindings.py` as a sanity-check script or reference when you need to inspect the pybind11 glue.
 
+For the GGUF helpers added in this release run:
+
+```
+PYTHONPATH=build python tests/python/test_gguf.py  # requires torch + transformers
+```
+
 #### Install via pip
 
 The library ships with `setup.py`/`pyproject.toml`, so `pip` will call CMake, build the same extension, and install the `t81lib` module together with the `t81` Python helpers defined at the repo root.

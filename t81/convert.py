@@ -21,6 +21,7 @@ from transformers import (
 )
 
 from .nn import Linear as TernaryLinear
+from . import gguf
 
 _METADATA_FILENAME = "t81_metadata.json"
 
@@ -289,6 +290,16 @@ def main() -> int:
         type=_parse_dtype,
         help="Optional torch dtype for the underlying float copy.",
     )
+    parser.add_argument(
+        "--output-gguf",
+        help="Write the converted model as a GGUF file after saving.",
+    )
+    parser.add_argument(
+        "--gguf-quant",
+        choices=("TQ1_0", "TQ2_0"),
+        default="TQ1_0",
+        help="GGUF quantization format to emit.",
+    )
     args = parser.parse_args()
 
     model = convert(
@@ -299,6 +310,13 @@ def main() -> int:
         torch_dtype=args.torch_dtype,
     )
     model.save_pretrained_t81(args.output_dir)
+    if args.output_gguf:
+        gguf.write_gguf(
+            model,
+            args.output_gguf,
+            quant=args.gguf_quant,
+            threshold=args.threshold,
+        )
     return 0
 
 
