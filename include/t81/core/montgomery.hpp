@@ -179,9 +179,6 @@ private:
         while (result.is_negative()) {
             result += modulus_;
         }
-        while (result.is_negative()) {
-            result += modulus_;
-        }
         while (!(result < modulus_)) {
             result -= modulus_;
         }
