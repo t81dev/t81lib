@@ -17,7 +17,14 @@
 #include <algorithm>
 #include <array>
 #include <compare>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <format>
+#include <limits>
 #include <stdexcept>
+#include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -34,6 +41,84 @@ public:
     }
 
     static Float zero() noexcept { return {}; }
+
+    static Float from_string(std::string_view text) {
+        if (text.empty()) {
+            throw std::invalid_argument("float literal cannot be empty");
+        }
+        std::size_t index = 0;
+        bool negative = false;
+        if (text[index] == '+' || text[index] == '-') {
+            negative = (text[index] == '-');
+            ++index;
+            if (index == text.size()) {
+                throw std::invalid_argument("float literal missing digits");
+            }
+        }
+
+        core::bigint mantissa = core::bigint::zero();
+        bool seen_decimal = false;
+        std::size_t fractional_digits = 0;
+        bool has_digit = false;
+        const core::bigint three = core::bigint(core::limb::from_value(3));
+        constexpr char OVERLINE_LEAD = '\xC2';
+        constexpr char OVERLINE_TAIL = '\xAF';
+
+        while (index < text.size()) {
+            const char ch = text[index];
+            if (ch == '.') {
+                if (seen_decimal) {
+                    throw std::invalid_argument("float literal has multiple decimal points");
+                }
+                seen_decimal = true;
+                ++index;
+                continue;
+            }
+            int digit_value = 0;
+            if (ch == OVERLINE_LEAD && index + 1 < text.size() &&
+                text[index + 1] == OVERLINE_TAIL) {
+                index += 2;
+                if (index == text.size()) {
+                    throw std::invalid_argument("float literal ends after overline");
+                }
+                const char next = text[index];
+                if (next == '0') {
+                    digit_value = 0;
+                } else if (next == '1') {
+                    digit_value = -1;
+                } else if (next == '2') {
+                    digit_value = -2;
+                } else {
+                    throw std::invalid_argument("invalid overlined digit");
+                }
+                ++index;
+            } else if (ch >= '0' && ch <= '2') {
+                digit_value = ch - '0';
+                ++index;
+            } else {
+                throw std::invalid_argument("invalid ternary digit");
+            }
+            mantissa *= three;
+            if (digit_value != 0) {
+                mantissa += core::bigint(digit_value);
+            }
+            has_digit = true;
+            if (seen_decimal) {
+                ++fractional_digits;
+                if (fractional_digits > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+                    throw std::overflow_error("too many fractional trits");
+                }
+            }
+        }
+        if (!has_digit) {
+            throw std::invalid_argument("float literal missing digits");
+        }
+        if (negative && !mantissa.is_zero()) {
+            mantissa = -mantissa;
+        }
+        const int exponent = static_cast<int>(fractional_digits);
+        return Float(mantissa.to_limb(), exponent);
+    }
 
     core::limb mantissa() const noexcept { return mantissa_; }
     int exponent() const noexcept { return exponent_; }
@@ -77,6 +162,205 @@ private:
         }
     }
     core::limb mantissa_{core::limb::zero()};
+    int exponent_ = 0;
+};
+
+template <int N>
+class Fixed;
+
+namespace detail {
+
+inline constexpr char OVERLINE_LEAD = '\xC2';
+inline constexpr char OVERLINE_TAIL = '\xAF';
+
+inline void append_overlined_digit(std::string& output, char digit) {
+    output.push_back(OVERLINE_LEAD);
+    output.push_back(OVERLINE_TAIL);
+    output.push_back(digit);
+}
+
+inline void append_ternary_digit(std::string& output, int digit) {
+    switch (digit) {
+        case 0:
+            output.push_back('0');
+            return;
+        case 1:
+            output.push_back('1');
+            return;
+        case 2:
+            output.push_back('2');
+            return;
+        case -1:
+            append_overlined_digit(output, '1');
+            return;
+        case -2:
+            append_overlined_digit(output, '2');
+            return;
+        default:
+            throw std::logic_error("unexpected ternary digit");
+    }
+}
+
+inline std::vector<int> balanced_digits(core::bigint value) {
+    if (value.is_zero()) {
+        return {0};
+    }
+    std::vector<int> digits;
+    const core::bigint three = core::bigint(core::limb::from_value(3));
+    while (!value.is_zero()) {
+        auto [quotient, remainder] = core::bigint::div_mod(value, three);
+        int digit = static_cast<int>(remainder.to_limb().to_value());
+        if (digit > 1) {
+            digit -= 3;
+            quotient += core::bigint::one();
+        } else if (digit < -1) {
+            digit += 3;
+            quotient -= core::bigint::one();
+        }
+        digits.push_back(digit);
+        value = std::move(quotient);
+    }
+    return digits;
+}
+
+inline void trim_leading_digits(std::vector<int>& digits) {
+    while (digits.size() > 1 && digits.back() == 0) {
+        digits.pop_back();
+    }
+}
+
+inline std::string format_mantissa(core::bigint mantissa, int exponent, bool negative) {
+    std::vector<int> digits = balanced_digits(std::move(mantissa));
+    if (exponent < 0) {
+        const std::size_t shift = static_cast<std::size_t>(-exponent);
+        digits.insert(digits.begin(), shift, 0);
+        exponent = 0;
+    }
+    trim_leading_digits(digits);
+    if (digits.empty()) {
+        digits.push_back(0);
+    }
+    const std::size_t total = digits.size();
+    const std::size_t fractional = exponent > 0 ? static_cast<std::size_t>(exponent) : 0;
+    const std::size_t integer_digits =
+        total > fractional ? total - fractional : 0;
+
+    std::string output;
+    if (negative) {
+        output.push_back('-');
+    }
+
+    if (integer_digits == 0) {
+        output.push_back('0');
+    } else {
+        for (std::size_t idx = integer_digits; idx-- > 0;) {
+            append_ternary_digit(output, digits[fractional + idx]);
+        }
+    }
+
+    if (fractional > 0) {
+        output.push_back('.');
+        if (fractional > total) {
+            for (std::size_t pad = fractional - total; pad-- > 0;) {
+                output.push_back('0');
+            }
+            for (std::size_t idx = total; idx-- > 0;) {
+                append_ternary_digit(output, digits[idx]);
+            }
+        } else {
+            for (std::size_t idx = fractional; idx-- > 0;) {
+                append_ternary_digit(output, digits[idx]);
+            }
+        }
+    }
+
+    return output;
+}
+
+} // namespace detail
+
+inline std::string to_string(const Float& value) {
+    if (value.is_zero()) {
+        return "0";
+    }
+    core::bigint mantissa = core::bigint(value.mantissa());
+    const bool negative = mantissa.is_negative();
+    if (negative) {
+        mantissa = -mantissa;
+    }
+    return detail::format_mantissa(std::move(mantissa), value.exponent(), negative);
+}
+
+namespace literals {
+
+inline Float operator"" _t3(const char* literal, std::size_t length) {
+    return Float::from_string(std::string_view(literal, length));
+}
+
+} // namespace literals
+
+template <int N>
+class FloatN {
+public:
+    static_assert(N > 0, "FloatN requires positive trit width");
+
+    using mantissa_type = Fixed<N>;
+
+    constexpr FloatN() noexcept = default;
+    constexpr explicit FloatN(mantissa_type mantissa, int exponent = 0)
+        : mantissa_(std::move(mantissa)), exponent_(exponent) {
+        normalize();
+    }
+
+    static constexpr FloatN zero() noexcept { return {}; }
+
+    constexpr const mantissa_type& mantissa() const noexcept { return mantissa_; }
+    constexpr int exponent() const noexcept { return exponent_; }
+    constexpr bool is_zero() const noexcept { return mantissa_.is_zero(); }
+
+    constexpr FloatN scaled_trits(int trits) const noexcept {
+        return FloatN(mantissa_, exponent_ + trits, true);
+    }
+
+    constexpr FloatN scaled_trytes(int trytes) const noexcept {
+        return scaled_trits(trytes * 3);
+    }
+
+    friend constexpr FloatN operator*(FloatN lhs, const FloatN& rhs) noexcept {
+        lhs.mantissa_ *= rhs.mantissa_;
+        lhs.exponent_ += rhs.exponent_;
+        lhs.normalize();
+        return lhs;
+    }
+
+    friend constexpr bool operator==(const FloatN& lhs, const FloatN& rhs) noexcept {
+        return lhs.mantissa_ == rhs.mantissa_ && lhs.exponent_ == rhs.exponent_;
+    }
+
+    friend constexpr bool operator!=(const FloatN& lhs, const FloatN& rhs) noexcept {
+        return !(lhs == rhs);
+    }
+
+private:
+    constexpr FloatN(mantissa_type mantissa, int exponent, bool skip_normalize) noexcept
+        : mantissa_(std::move(mantissa)), exponent_(exponent) {
+        if (!skip_normalize) {
+            normalize();
+        }
+    }
+
+    constexpr void normalize() noexcept {
+        if (mantissa_.is_zero()) {
+            exponent_ = 0;
+            return;
+        }
+        while (mantissa_.divisible_by_three()) {
+            mantissa_.divide_by_three();
+            --exponent_;
+        }
+    }
+
+    mantissa_type mantissa_{};
     int exponent_ = 0;
 };
 
@@ -140,6 +424,85 @@ public:
 
     friend bool operator!=(const Ratio& lhs, const Ratio& rhs) noexcept {
         return !(lhs == rhs);
+    }
+
+    explicit operator Float() const {
+        if (is_zero()) {
+            return Float::zero();
+        }
+        const core::bigint abs_numerator = numerator_.abs();
+        const core::bigint limb_max = core::bigint(core::limb::max());
+        const core::bigint three = core::bigint(core::limb::from_value(3));
+        core::bigint limit = limb_max * denominator_;
+        int exponent = 0;
+
+        while (abs_numerator > limit) {
+            limit *= three;
+            --exponent;
+        }
+
+        while (exponent < 0) {
+            const auto [next_limit, remainder] = core::bigint::div_mod(limit, three);
+            if (!remainder.is_zero() || abs_numerator > next_limit) {
+                break;
+            }
+            limit = next_limit;
+            ++exponent;
+        }
+
+        if (exponent >= 0) {
+            core::bigint scaled_abs = abs_numerator;
+            while (true) {
+                const core::bigint next_scaled = scaled_abs * three;
+                if (next_scaled > limit) {
+                    break;
+                }
+                scaled_abs = next_scaled;
+                ++exponent;
+            }
+        }
+
+        auto scale_ratio = [&](int exp) {
+            core::bigint scaled_num = numerator_;
+            core::bigint scaled_den = denominator_;
+            if (exp > 0) {
+                for (int count = 0; count < exp; ++count) {
+                    scaled_num *= three;
+                }
+            } else if (exp < 0) {
+                for (int count = 0; count < -exp; ++count) {
+                    scaled_den *= three;
+                }
+            }
+            return std::pair<core::bigint, core::bigint>{std::move(scaled_num), std::move(scaled_den)};
+        };
+
+        auto round_scaled = [&](core::bigint scaled_num, const core::bigint& scaled_den) {
+            const auto abs_scaled = scaled_num.abs();
+            const auto [quotient, remainder] = core::bigint::div_mod(abs_scaled, scaled_den);
+            core::bigint result = quotient;
+            const core::bigint double_remainder = remainder * core::bigint(2);
+            if (double_remainder > scaled_den) {
+                result += core::bigint::one();
+            }
+            if (scaled_num.is_negative()) {
+                result = -result;
+            }
+            return result;
+        };
+
+        while (true) {
+            const auto [scaled_numerator, scaled_denominator] = scale_ratio(exponent);
+            const core::bigint mantissa_bigint = round_scaled(scaled_numerator, scaled_denominator);
+            try {
+                return Float(mantissa_bigint.to_limb(), exponent);
+            } catch (const std::overflow_error&) {
+                if (exponent == std::numeric_limits<int>::min()) {
+                    throw;
+                }
+                --exponent;
+            }
+        }
     }
 
 private:
@@ -437,6 +800,154 @@ private:
     std::vector<Coefficient> coeffs_;
 };
 
+namespace ntt {
+
+inline bool is_power_of_three(std::size_t value) noexcept {
+    if (value == 0) {
+        return false;
+    }
+    while (value > 1) {
+        if (value % 3 != 0) {
+            return false;
+        }
+        value /= 3;
+    }
+    return true;
+}
+
+inline std::size_t next_power_of_three(std::size_t minimum) {
+    if (minimum == 0) {
+        return 1;
+    }
+    std::size_t result = 1;
+    while (result < minimum) {
+        if (result > std::numeric_limits<std::size_t>::max() / 3) {
+            throw std::overflow_error("NTT size overflow");
+        }
+        result *= 3;
+    }
+    return result;
+}
+
+inline MontgomeryInt montgomery_pow(MontgomeryInt base, std::size_t exponent) {
+    const Modulus& modulus = base.modulus();
+    MontgomeryInt result(modulus, core::limb::one());
+    while (exponent > 0) {
+        if ((exponent & 1) != 0) {
+            result *= base;
+        }
+        base *= base;
+        exponent >>= 1;
+    }
+    return result;
+}
+
+inline core::limb modular_inverse(core::limb value, const core::limb& modulus) {
+    if (value.is_zero()) {
+        throw std::invalid_argument("modular inverse of zero");
+    }
+    core::bigint a = core::bigint(modulus);
+    core::bigint b = core::bigint(value);
+    if (b.is_negative()) {
+        b += a;
+    }
+    core::bigint x0 = core::bigint::zero();
+    core::bigint x1 = core::bigint::one();
+    while (!b.is_zero()) {
+        const auto [quotient, remainder] = core::bigint::div_mod(a, b);
+        a = b;
+        b = remainder;
+        const auto temp = x0 - quotient * x1;
+        x0 = x1;
+        x1 = temp;
+    }
+    if (!(a == core::bigint::one())) {
+        throw std::invalid_argument("value not invertible modulo modulus");
+    }
+    if (x0.is_negative()) {
+        x0 += core::bigint(modulus);
+    }
+    return x0.to_limb();
+}
+
+inline void apply_ternary_ntt(std::vector<MontgomeryInt>& values,
+                              const Modulus& modulus,
+                              const MontgomeryInt& primitive_root) {
+    const std::size_t length = values.size();
+    if (length <= 1) {
+        return;
+    }
+    if (!is_power_of_three(length)) {
+        throw std::invalid_argument("NTT length must be a power of three");
+    }
+    for (std::size_t stage = 1; stage < length; stage *= 3) {
+        const std::size_t block_size = stage * 3;
+        const std::size_t stride = length / block_size;
+        const MontgomeryInt omega = montgomery_pow(primitive_root, stride);
+        for (std::size_t block_start = 0; block_start < length; block_start += block_size) {
+            MontgomeryInt twiddle(modulus, core::limb::one());
+            for (std::size_t offset = 0; offset < stage; ++offset) {
+                const std::size_t index0 = block_start + offset;
+                const std::size_t index1 = index0 + stage;
+                const std::size_t index2 = index1 + stage;
+                const MontgomeryInt value0 = values[index0];
+                const MontgomeryInt value1 = values[index1];
+                const MontgomeryInt value2 = values[index2];
+                const MontgomeryInt twiddle_sq = twiddle * twiddle;
+                values[index0] = value0 + value1 + value2;
+                values[index1] = value0 + twiddle * value1 + twiddle_sq * value2;
+                values[index2] = value0 + twiddle_sq * value1 + twiddle * value2;
+                twiddle *= omega;
+            }
+        }
+    }
+}
+
+inline Polynomial<core::limb> multiply_polynomials(const Polynomial<core::limb>& lhs,
+                                                   const Polynomial<core::limb>& rhs,
+                                                   const Modulus& modulus,
+                                                   core::limb primitive_root) {
+    const auto& lhs_coeffs = lhs.coefficients();
+    const auto& rhs_coeffs = rhs.coefficients();
+    if (lhs_coeffs.empty() || rhs_coeffs.empty()) {
+        return Polynomial<core::limb>::zero();
+    }
+    const std::size_t result_size = lhs_coeffs.size() + rhs_coeffs.size() - 1;
+    const std::size_t transform_size = next_power_of_three(result_size);
+    MontgomeryInt root(modulus, primitive_root);
+    std::vector<MontgomeryInt> values_a(transform_size, MontgomeryInt(modulus));
+    std::vector<MontgomeryInt> values_b(transform_size, MontgomeryInt(modulus));
+    for (std::size_t index = 0; index < lhs_coeffs.size(); ++index) {
+        values_a[index] = MontgomeryInt(modulus, lhs_coeffs[index]);
+    }
+    for (std::size_t index = 0; index < rhs_coeffs.size(); ++index) {
+        values_b[index] = MontgomeryInt(modulus, rhs_coeffs[index]);
+    }
+    apply_ternary_ntt(values_a, modulus, root);
+    apply_ternary_ntt(values_b, modulus, root);
+    std::vector<MontgomeryInt> pointwise(transform_size, MontgomeryInt(modulus));
+    for (std::size_t index = 0; index < transform_size; ++index) {
+        pointwise[index] = values_a[index] * values_b[index];
+    }
+    const MontgomeryInt inverse_root = montgomery_pow(root, transform_size - 1);
+    apply_ternary_ntt(pointwise, modulus, inverse_root);
+    const core::detail::limb_int128 transform_value =
+        static_cast<core::detail::limb_int128>(transform_size);
+    const core::limb transform_limb = core::limb::from_value(transform_value);
+    const core::limb inv_transform = modular_inverse(transform_limb, modulus.modulus());
+    const MontgomeryInt inv_size(modulus, inv_transform);
+    for (auto& value : pointwise) {
+        value *= inv_size;
+    }
+    std::vector<core::limb> result_coeffs(result_size);
+    for (std::size_t index = 0; index < result_size; ++index) {
+        result_coeffs[index] = pointwise[index].to_limb();
+    }
+    return Polynomial<core::limb>(std::move(result_coeffs));
+}
+
+} // namespace ntt
+
 class F2m {
 public:
     explicit F2m(core::bigint modulus)
@@ -544,83 +1055,229 @@ class Fixed {
 public:
     static_assert(N > 0, "Fixed requires positive trit width");
 
-    Fixed() noexcept = default;
-    explicit Fixed(core::bigint value) { value_ = normalize(std::move(value)); }
-
     static constexpr int trits = N;
 
-    core::bigint to_bigint() const noexcept { return value_; }
+    constexpr Fixed() noexcept = default;
+    explicit Fixed(core::bigint value) : trits_(from_bigint(std::move(value))) {}
+    explicit constexpr Fixed(std::array<std::int8_t, N> trits)
+        : trits_(normalize_trits(std::move(trits))) {}
 
-    Fixed& operator+=(const Fixed& other) {
-        value_ = normalize(value_ + other.value_);
+    constexpr const std::array<std::int8_t, N>& digits() const noexcept {
+        return trits_;
+    }
+
+    core::bigint to_bigint() const {
+        core::bigint result = core::bigint::zero();
+        core::bigint weight = core::bigint::one();
+        const core::bigint three = core::bigint(core::limb::from_value(3));
+        for (int index = 0; index < N; ++index) {
+            if (trits_[index] != 0) {
+                result += weight * core::bigint(trits_[index]);
+            }
+            weight *= three;
+        }
+        return result;
+    }
+
+    constexpr bool is_zero() const noexcept {
+        for (int index = 0; index < N; ++index) {
+            if (trits_[index] != 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    constexpr bool divisible_by_three() const noexcept {
+        static_assert(N > 0);
+        return trits_[0] == 0;
+    }
+
+    constexpr void divide_by_three() noexcept {
+        for (int index = 0; index < N - 1; ++index) {
+            trits_[index] = trits_[index + 1];
+        }
+        trits_[N - 1] = 0;
+    }
+
+    constexpr Fixed& operator+=(const Fixed& other) {
+        int carry = 0;
+        for (int index = 0; index < N; ++index) {
+            const int sum = static_cast<int>(trits_[index]) +
+                            static_cast<int>(other.trits_[index]) + carry;
+            const auto [digit, next_carry] =
+                core::detail::balanced_digit_and_carry(sum);
+            trits_[index] = static_cast<std::int8_t>(digit);
+            carry = static_cast<int>(next_carry);
+        }
+        (void)carry;
         return *this;
     }
 
-    Fixed& operator-=(const Fixed& other) {
-        value_ = normalize(value_ - other.value_);
+    constexpr Fixed& operator-=(const Fixed& other) {
+        int carry = 0;
+        for (int index = 0; index < N; ++index) {
+            const int sum = static_cast<int>(trits_[index]) +
+                            static_cast<int>(-other.trits_[index]) + carry;
+            const auto [digit, next_carry] =
+                core::detail::balanced_digit_and_carry(sum);
+            trits_[index] = static_cast<std::int8_t>(digit);
+            carry = static_cast<int>(next_carry);
+        }
+        (void)carry;
         return *this;
     }
 
-    Fixed& operator*=(const Fixed& other) {
-        value_ = normalize(value_ * other.value_);
+    constexpr Fixed& operator*=(const Fixed& other) {
+        std::array<int, N> accum{};
+        for (int lhs = 0; lhs < N; ++lhs) {
+            for (int rhs = 0; rhs < N; ++rhs) {
+                const int index = lhs + rhs;
+                if (index >= N) {
+                    continue;
+                }
+                accum[static_cast<std::size_t>(index)] +=
+                    static_cast<int>(trits_[lhs]) * static_cast<int>(other.trits_[rhs]);
+            }
+        }
+        int carry = 0;
+        for (int index = 0; index < N; ++index) {
+            const int sum = accum[static_cast<std::size_t>(index)] + carry;
+            const auto [digit, next_carry] =
+                core::detail::balanced_digit_and_carry(sum);
+            trits_[index] = static_cast<std::int8_t>(digit);
+            carry = static_cast<int>(next_carry);
+        }
+        (void)carry;
         return *this;
     }
 
-    friend Fixed operator+(Fixed lhs, const Fixed& rhs) {
+    friend constexpr Fixed operator+(Fixed lhs, const Fixed& rhs) {
         lhs += rhs;
         return lhs;
     }
 
-    friend Fixed operator-(Fixed lhs, const Fixed& rhs) {
+    friend constexpr Fixed operator-(Fixed lhs, const Fixed& rhs) {
         lhs -= rhs;
         return lhs;
     }
 
-    friend Fixed operator*(Fixed lhs, const Fixed& rhs) {
+    friend constexpr Fixed operator*(Fixed lhs, const Fixed& rhs) {
         lhs *= rhs;
         return lhs;
     }
 
+    friend constexpr bool operator==(const Fixed& lhs, const Fixed& rhs) noexcept {
+        return lhs.trits_ == rhs.trits_;
+    }
+
+    friend constexpr bool operator!=(const Fixed& lhs, const Fixed& rhs) noexcept {
+        return !(lhs == rhs);
+    }
+
 private:
-    static const core::bigint& modulus() {
-        static core::bigint value = pow3(trits);
-        return value;
+    static constexpr std::array<std::int8_t, N>
+    normalize_trits(std::array<std::int8_t, N> digits) {
+        int carry = 0;
+        for (int index = 0; index < N; ++index) {
+            const int sum = static_cast<int>(digits[index]) + carry;
+            const auto [digit, next_carry] =
+                core::detail::balanced_digit_and_carry(sum);
+            digits[static_cast<std::size_t>(index)] = static_cast<std::int8_t>(digit);
+            carry = static_cast<int>(next_carry);
+        }
+        (void)carry;
+        return digits;
     }
 
-    static core::bigint pow3(int count) {
-        if (count < 0 || count > trits) {
-            throw std::out_of_range("Fixed pow3 count out of range");
-        }
-        static const auto cache = [] {
-            std::array<core::bigint, trits + 1> values{};
-            values[0] = core::bigint::one();
-            for (int index = 1; index <= trits; ++index) {
-                values[index] = values[index - 1] * core::bigint(3);
+    static std::array<std::int8_t, N> from_bigint(core::bigint value) {
+        std::array<std::int8_t, N> digits{};
+        const core::bigint three = core::bigint(core::limb::from_value(3));
+        for (int index = 0; index < N; ++index) {
+            const auto [quotient, remainder] = core::bigint::div_mod(value, three);
+            value = quotient;
+            int digit = static_cast<int>(remainder.to_limb().to_value());
+            int carry = 0;
+            if (digit > 1) {
+                digit -= 3;
+                carry = 1;
+            } else if (digit < -1) {
+                digit += 3;
+                carry = -1;
             }
-            return values;
-        }();
-        return cache[count];
+            digits[static_cast<std::size_t>(index)] = static_cast<std::int8_t>(digit);
+            if (carry != 0) {
+                value += core::bigint(carry);
+            }
+        }
+        return digits;
     }
 
-    static core::bigint normalize(core::bigint value) {
-        const auto [quotient, remainder] = core::bigint::div_mod(value, modulus());
-        (void)quotient;
-        core::bigint positive = remainder;
-        if (positive.is_negative()) {
-            positive += modulus();
-        }
-        const core::bigint half = modulus() / core::bigint(2);
-        if (positive > half) {
-            positive -= modulus();
-        }
-        return positive;
-    }
-
-    core::bigint value_{core::bigint::zero()};
+    std::array<std::int8_t, N> trits_{};
 };
+
+template <int N>
+inline std::string to_string(const FloatN<N>& value) {
+    if (value.is_zero()) {
+        return "0";
+    }
+    core::bigint mantissa = value.mantissa().to_bigint();
+    const bool negative = mantissa.is_negative();
+    if (negative) {
+        mantissa = -mantissa;
+    }
+    return detail::format_mantissa(std::move(mantissa), value.exponent(), negative);
+}
+
+using Int81 = Fixed<48>;
 
 inline constexpr int T81LIB_VERSION_MAJOR = 0;
 inline constexpr int T81LIB_VERSION_MINOR = 1;
 inline constexpr int T81LIB_VERSION_PATCH = 0;
 
 } // namespace t81
+
+namespace std {
+
+template <>
+struct formatter<t81::Float, char> : std::formatter<std::string_view, char> {
+    template <typename FormatContext>
+    auto format(const t81::Float& value, FormatContext& ctx) {
+        const std::string text = t81::to_string(value);
+        return std::formatter<std::string_view, char>::format(text, ctx);
+    }
+};
+
+template <int N>
+struct formatter<t81::FloatN<N>, char> : std::formatter<std::string_view, char> {
+    template <typename FormatContext>
+    auto format(const t81::FloatN<N>& value, FormatContext& ctx) {
+        const std::string text = t81::to_string(value);
+        return std::formatter<std::string_view, char>::format(text, ctx);
+    }
+};
+
+template <>
+struct hash<t81::core::limb> {
+    size_t operator()(const t81::core::limb& value) const noexcept {
+        const std::uint64_t raw = static_cast<std::uint64_t>(value.to_value());
+        return std::hash<std::uint64_t>{}(raw);
+    }
+};
+
+template <>
+struct hash<t81::core::bigint> {
+    size_t operator()(const t81::core::bigint& value) const noexcept {
+        size_t seed = std::hash<int>{}(value.signum());
+        const auto limb_hasher = std::hash<std::uint64_t>{};
+        for (std::size_t index = 0; index < value.limb_count(); ++index) {
+            const std::uint64_t limb_hash_input =
+                static_cast<std::uint64_t>(value.limb_at(index).to_value());
+            const size_t limb_hash = limb_hasher(limb_hash_input);
+            seed ^= limb_hash + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+        }
+        return seed;
+    }
+};
+
+} // namespace std

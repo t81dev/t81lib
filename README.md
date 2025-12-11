@@ -15,7 +15,7 @@ modular helpers, and deterministic utilities.
 
 ## Highlights
 
-- **Balanced ternary scalar**: `limb` exposes safe, overflow-aware arithmetic, canonical I/O,
+- **Balanced ternary scalar**: `t81::Int` (alias of `t81::core::limb`) exposes safe, overflow-aware arithmetic, canonical I/O,
   and deterministic hashing when you need ternary determinism in a binary world.
 - **Arbitrary-precision math**: `t81::core::bigint` layers on top of limbs with sign-plus-magnitude,
   Karatsuba-aware multiplication, canonical normalization, and full conversion helpers.
@@ -23,6 +23,10 @@ modular helpers, and deterministic utilities.
 - **Base81 I/O**: Formatting/parsing now supports bases 2..81 with the playful base-3⁴ alphabet (0-9, a-z, A-Z, and punctuation) so you can round-trip balanced-ternary-friendly strings without extra glue.
 - **Concrete helpers**: Montgomery contexts, I/O formatters, random tooling, and utility guards
   keep reusable patterns consistent and testable.
+- **High-level helpers**: The umbrella header now also exposes `t81::Float`, `t81::Ratio`,
+  `t81::Complex`, `t81::Polynomial`, `t81::F2m`, and `t81::Fixed<N>` along with modular
+  helpers like `t81::Modulus`/`t81::MontgomeryInt` for quick prototyping of ternary-aware
+  algebra and number-theoretic math.
 - **Specs & architecture**: Normative coverage under [doc/](doc/), plus a human-friendly
   [ARCHITECTURE.md](ARCHITECTURE.md) walkthrough (new!) and a docs portal at [docs/index.md](docs/index.md) for quick orientation.
 - **Examples & proofs**: `examples/` shows runnable use cases while `tests/` and
@@ -86,11 +90,11 @@ Once installed: `find_package(t81lib REQUIRED)` + `target_link_libraries(... t81
 
 ```cpp
 #include <t81/t81lib.hpp>
-using t81::core::limb;
+using t81::Int;
 
-limb a = limb::from_int(42);
-limb b = limb::from_int(-7);
-limb sum = a + b; //... deterministically balanced ternary
+Int a = Int::from_int(42);
+Int b = Int::from_int(-7);
+Int sum = a + b; //... deterministically balanced ternary
 ```
 
 ```cpp
@@ -115,6 +119,29 @@ auto product = modular_multiply(ctx, limb::from_value(5), limb::from_value(7));
 ```
 
 Callers can also rely on guard classes for const-time exponent limits.
+
+## High-level numeric helpers
+
+Beyond the core limb and bigint foundations, the umbrella header now exposes
+convenient containers for common algebraic patterns:
+
+- `t81::Int` is the umbrella alias for `t81::core::limb`, letting you grab the balanced
+  ternary scalar without importing `core` names.
+
+- `t81::Float` stores a ternary mantissa/exponent pair, keeps the mantissa normalized,
+  and supports multiplying while trimming trailing zero trits.
+- `t81::Ratio` keeps normalized, sign-aware rational numbers powered by `core::bigint` numerators
+  and denominators, complete with arithmetic and comparison helpers.
+- `t81::Complex` and `t81::Polynomial` model simple complex arithmetic and polynomial math
+  on any coefficient that satisfies the usual operators.
+- `t81::F2m` wraps extension-field arithmetic over binary polynomials using a chosen modulus,
+  providing reduction, addition, multiplication, and exponentiation.
+- `t81::Fixed<N>` represents fixed-width signed ternary values with modular normalization
+  and arithmetic in the range `-(3^N-1)/2` .. `(3^N-1)/2`.
+- `t81::Modulus` and `t81::MontgomeryInt` let you declaratively build Montgomery contexts,
+  cache powers of three, and multiply/add in Montgomery space with consistent modular safety.
+
+These helpers make it easy to prototype higher-level systems without leaving the umbrella header.
 
 ## Architecture snapshot
 
