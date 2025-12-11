@@ -33,3 +33,6 @@ torch = [
     "accelerate>=0.20",
 ]
 dev = ["pytest", "pybind11>=2.12", "cibuildwheel>=2.15"]
+
+[project.scripts]
+t81-convert = "t81.convert:main"
