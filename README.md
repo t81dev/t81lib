@@ -135,6 +135,11 @@ convenient containers for common algebraic patterns:
   and denominators, complete with arithmetic and comparison helpers.
 - `t81::Complex` and `t81::Polynomial` model simple complex arithmetic and polynomial math
   on any coefficient that satisfies the usual operators.
+- `t81::Vector<T>` holds a length-`N` collection of coefficients, and `t81::Matrix<Element, R, C>`
+  exposes resize-fixed matrices with element-wise arithmetic, scalar/Matrix multiplication, and
+  vector products over the same ternary-aware scalars.
+- `t81::Vector<T>` holds a length-`N` collection of coefficients, exposes element-wise add/subtract,
+  scaling, and dot-product helpers, and reuses the same balanced-ternary value types as the numeric helpers.
 - `t81::F2m` wraps extension-field arithmetic over binary polynomials using a chosen modulus,
   providing reduction, addition, multiplication, and exponentiation.
 - `t81::Fixed<N>` represents fixed-width signed ternary values with modular normalization
