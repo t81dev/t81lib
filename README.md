@@ -130,6 +130,7 @@ convenient containers for common algebraic patterns:
 
 - `t81::Float` stores a ternary mantissa/exponent pair, keeps the mantissa normalized,
   and supports multiplying while trimming trailing zero trits.
+- `t81::FloatN<N>` mirrors `Float` but pins the mantissa to `N` trits via `Fixed<N>` so you can reason about fixed precision floats at compile time.
 - `t81::Ratio` keeps normalized, sign-aware rational numbers powered by `core::bigint` numerators
   and denominators, complete with arithmetic and comparison helpers.
 - `t81::Complex` and `t81::Polynomial` model simple complex arithmetic and polynomial math
@@ -140,6 +141,8 @@ convenient containers for common algebraic patterns:
   and arithmetic in the range `-(3^N-1)/2` .. `(3^N-1)/2`.
 - `t81::Modulus` and `t81::MontgomeryInt` let you declaratively build Montgomery contexts,
   cache powers of three, and multiply/add in Montgomery space with consistent modular safety.
+- `t81::ntt` exposes a radix-3 NTT pipeline for `Polynomial<core::limb>` multiplication when the modulus supports a primitive third root of unity.
+- `t81::literals::_t3` is a user-defined literal for ternary strings (overlines included), and the new `std::formatter` specializations for `Float` and `FloatN` make `std::format`/`std::print` render the canonical ternary notation.
 
 These helpers make it easy to prototype higher-level systems without leaving the umbrella header.
 
