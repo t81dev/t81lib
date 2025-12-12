@@ -14,6 +14,22 @@ option(T81LIB_BUILD_PYTHON_BINDINGS
 option(T81LIB_ENABLE_TORCH_BINDINGS
        "Enable PyTorch-aware C++ helpers when the [torch] extra is requested" OFF)
 
+option(USE_CUDA "Enable CUDA backend" OFF)
+option(USE_ROCM "Enable ROCm/HIP backend" OFF)
+
+if(USE_CUDA)
+    enable_language(CUDA)
+    find_package(CUDAToolkit 11.0 REQUIRED)
+    set(CMAKE_CUDA_ARCHITECTURES 70 80 90)
+endif()
+
+if(USE_ROCM)
+    enable_language(HIP)
+    find_package(hip REQUIRED)
+    find_package(hipblas REQUIRED)
+    set(CMAKE_HIP_ARCHITECTURES gfx90a gfx942)
+endif()
+
 set(TORCH_CMAKE_PREFIX_PATH "" CACHE STRING
     "Additional CMake prefix paths supplied by torch.utils.cmake_prefix_path")
 

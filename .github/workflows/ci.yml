@@ -87,3 +87,65 @@ jobs:
         with:
           name: ${{ env.ARTIFACT_LABEL }}
           path: artifacts
+
+  gpu-cuda:
+    name: CUDA GPU smoke
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    env:
+      BUILD_DIR: build-gpu-cuda
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install CUDA toolchain
+        uses: nvidia/setup-cuda@v2
+        with:
+          cuda-version: "12.4"
+      - name: Configure
+        run: |
+          cmake -S . -B "$BUILD_DIR" \
+            -DT81LIB_BUILD_TESTS=ON \
+            -DT81LIB_BUILD_PYTHON_BINDINGS=ON \
+            -DUSE_CUDA=ON \
+            -DUSE_ROCM=OFF
+      - name: Build
+        run: cmake --build "$BUILD_DIR" --parallel
+      - name: Test
+        run: ctest --test-dir "$BUILD_DIR" --output-on-failure
+      - name: Run GPU-focused python tests
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pytest
+          PYTHONPATH="$BUILD_DIR" python3 tests/python/test_gpu_ops.py
+
+  gpu-rocm:
+    name: ROCm GPU smoke
+    runs-on: ubuntu-22.04
+    needs: build-and-test
+    env:
+      BUILD_DIR: build-gpu-rocm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ROCm toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rocm-dev hipblas
+          echo "/opt/rocm/bin" >> $GITHUB_PATH
+          echo "/opt/rocm/lib" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=/opt/rocm/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+      - name: Configure
+        run: |
+          cmake -S . -B "$BUILD_DIR" \
+            -DT81LIB_BUILD_TESTS=ON \
+            -DT81LIB_BUILD_PYTHON_BINDINGS=ON \
+            -DUSE_ROCM=ON \
+            -DUSE_CUDA=OFF \
+            -DCMAKE_PREFIX_PATH=/opt/rocm
+      - name: Build
+        run: cmake --build "$BUILD_DIR" --parallel
+      - name: Test
+        run: ctest --test-dir "$BUILD_DIR" --output-on-failure
+      - name: Run ROCm-focused python tests
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pytest
+          PYTHONPATH="$BUILD_DIR" python3 tests/python/test_gpu_ops.py
