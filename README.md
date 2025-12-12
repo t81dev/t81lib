@@ -146,6 +146,15 @@ vcpkg install t81lib[tests,benchmarks]:x64-windows
 
 Once installed: `find_package(t81lib REQUIRED)` + `target_link_libraries(... t81::t81lib)`.
 
+## CLI helpers & documentation
+
+Once you install the `torch`/`transformers` extras (via `pipx install .[torch]`
+or `pip install t81lib[torch]`), the `t81-convert`, `t81-gguf`, and `t81-qat`
+console scripts appear in your `PATH`. See `docs/references/cli-usage.md` for an
+annotated walkthrough of the flags, `docs/diagrams/cli-workflows-mermaid.md` for
+Mermaid workflow diagrams, and `examples/cli-examples.md` for copy/paste-ready
+snippets covering conversion, GGUF export, and QAT runs.
+
 ## PyTorch helpers
 
 `import t81` now pulls in the PyTorch bridge under `t81.torch`, which repacks `t81::linalg::gemm_ternary` into a `TernaryTensor` that plays nicely with `torch.matmul`/`torch.mm` and exposes the custom `t81.trit` dtype. Call `TernaryTensor.from_float(...)` to quantize ternary weights and `TernaryTensor.matmul_input(...)` to fire off packed GEMMs inside your training/inference loops:
