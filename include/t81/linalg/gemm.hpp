@@ -24,8 +24,8 @@ namespace t81::linalg {
 #endif
         }
 
-        inline constexpr auto build_tryte_contributions()
-            -> std::array<std::array<double, 27>, core::limb::TRYTES> {
+        inline constexpr auto build_tryte_contributions() -> std::array<
+            std::array<double, 27>, core::limb::TRYTES> {
             std::array<std::array<double, 27>, core::limb::TRYTES> table{};
             double weight = 1.0;
             for (std::size_t position = 0; position < core::limb::TRYTES; ++position) {
@@ -36,7 +36,7 @@ namespace t81::linalg {
                 }
                 weight *= 27.0;
             }
-            return table;
+        return table;
         }
 
         inline const auto &tryte_contribution_table() {
