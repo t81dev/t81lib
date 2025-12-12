@@ -96,6 +96,16 @@ The codebase is thoughtfully commented, consistently formatted by `clang-format`
   2. Create a `scripts/` benchmark script that trains the model, applies `t81` quantization, and logs accuracy, model size, and latency.
   3. Document the benchmark/results in a new `BENCHMARKS.md` (link from `README.md`) so the community can reproduce and compare.
 
+### Recommendation 5: Harden the GPU Tensor Metadata Path
+
+* **Why**: GPU acceleration for ternary ops unlocks real inference speedups only if the dispatcher can safely read raw device pointers and keep outputs on-device, and the Python bindings need a stable contract (TensorMetadata) to wrap Torch/NumPy tensors the same way.
+* **Benefits**: Enables CUDA/ROCm kernels (where/clamp/lerp/addcmul) to run without host copies, makes GPU/CPU fallbacks explicit, and gives PyTorch users a predictable ABI.
+* **Effort**: Medium.
+* **Implementation**:
+  1. Continue documenting the `t81::TensorMetadata` ABI (`device_type`, `dtype`, `sizes`, `strides`, `data_ptr`, `storage_offset`, `requires_sync`) so future kernels and Python helpers rely on the same struct.
+  2. Expand the dispatcher to record broadcasting/non-contiguous layouts (or copy them to contiguous buffers when needed) so `backend_available == CUDA/ROCm` paths no longer require perfect contiguity.
+  3. Run the CUDA 12.4 / ROCm 6+ CI jobs, validate the latency/accuracy guardrails in `tests/python/test_gpu_ops.py`, and flag any ABI mismatches between `torch.Tensor` and `TensorMetadata` so the GPU helpers can be certified before release.
+
 ---
 
 The above roadmap tightly ties into the existing structure (`docs/`, `scripts/`, CLI helpers) while making the project more approachable, ensuring quality, highlighting the Python story, and showcasing real-world value through benchmarks.

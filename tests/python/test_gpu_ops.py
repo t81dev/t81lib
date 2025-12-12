@@ -7,6 +7,11 @@ import time
 import pytest
 
 try:
+    import torch
+except ImportError:
+    torch = None
+
+try:
     import t81lib
 except ImportError as exc:
     raise SystemExit(
@@ -92,3 +97,28 @@ def test_clamp_rocm_latency_and_accuracy():
     for index, value in enumerate(result):
         expected = min(1.0, max(-1.0, values[index]))
         assert math.isclose(value, expected, abs_tol=1e-6)
+
+
+@pytest.mark.skipif(torch is None, reason="torch not installed")
+def test_where_torch_cpu_tensor():
+    cond = torch.tensor([1.0, 0.0, -1.0], dtype=torch.float32)
+    x = torch.tensor([1.1, 2.2, 3.3], dtype=torch.float32)
+    y = torch.tensor([-1.0, -2.0, -3.0], dtype=torch.float32)
+    result = t81lib.where(cond, x, y)
+    assert isinstance(result, torch.Tensor)
+    assert torch.allclose(result, torch.tensor([1.1, -2.0, -3.0], dtype=torch.float32))
+
+
+@pytest.mark.skipif(
+    torch is None or not torch.cuda.is_available(),
+    reason="requires CUDA-capable torch tensor",
+)
+def test_where_torch_cuda_tensor():
+    cond = torch.tensor([1.0, 0.0], dtype=torch.float32, device="cuda")
+    x = torch.tensor([4.0, 4.0], dtype=torch.float32, device="cuda")
+    y = torch.tensor([0.0, -4.0], dtype=torch.float32, device="cuda")
+    result = t81lib.where(cond, x, y)
+    assert isinstance(result, torch.Tensor)
+    assert result.device.type == "cuda"
+    expected = torch.tensor([4.0, -4.0], dtype=torch.float32, device="cuda")
+    assert torch.allclose(result, expected)

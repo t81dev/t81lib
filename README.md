@@ -97,6 +97,10 @@ target_link_libraries(... t81::t81lib)
 
 `pip install .[torch]` unlocks the `t81lib`/`t81` namespace, NumPy quantization helpers, and the `t81.torch`/`t81.nn` layers that mix ternary weights with FP32/BF16 biases. Jump deeper via [docs/python-api.md](docs/python-api.md), [docs/python-cookbook.md](docs/python-cookbook.md), and [docs/torch.md](docs/torch.md).
 
+## GPU backends & tensor metadata
+
+Enable CUDA/ROCm through the optional `-DUSE_CUDA=ON` and `-DUSE_ROCM=ON` flags during CMake configuration so the Python bindings link against the new GPU kernels (`python/CMakeLists.txt`). Once enabled, `t81lib.where`, `t81lib.clamp`, `t81lib.lerp`, and `t81lib.addcmul` accept either NumPy buffers or PyTorch tensors and route the work directly to CUDA/HIP kernels via the lightweight [`t81::TensorMetadata`](include/t81/tensor_metadata.hpp) ABI. The metadata struct carries device/dtype/shape/stride info plus raw `data_ptr`, letting the dispatcher avoid host copies and keep outputs on-device. When torch is installed, `t81lib` automatically wraps GPU tensors; when only NumPy is available it falls back to CPU buffers. Consult [docs/torch.md](docs/torch.md) and `python/bindings.cpp` for the extraction helpers and lifetime semantics.
+
 ## CLI helpers
 
 `t81-convert`, `t81-gguf`, and `t81-qat` automate quantize→export→train flows with progress reporting and validation hooks. Browse [docs/references/cli-usage.md](docs/references/cli-usage.md), [docs/diagrams/cli-workflows-mermaid.md](docs/diagrams/cli-workflows-mermaid.md), and [examples/cli-examples.md](examples/cli-examples.md) for recipes.

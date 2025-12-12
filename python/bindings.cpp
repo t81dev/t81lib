@@ -163,7 +163,6 @@ namespace {
             try {
                 return py::module_::import("torch");
             } catch (const py::error_already_set &) {
-                py::gil_scoped_release release;
                 return py::object();
             }
         }();
@@ -213,7 +212,7 @@ namespace {
         if (info.size < 0 || info.itemsize <= 0) {
             throw py::value_error("buffer has invalid dimensions or element size");
         }
-        if (info.format != "f" && info.itemsize != static_cast<py::ssize_t>(sizeof(float))) {
+        if (info.itemsize != static_cast<py::ssize_t>(sizeof(float))) {
             throw py::value_error("buffer must hold float32 elements");
         }
         if (!buffer_is_c_contiguous(info)) {
@@ -233,7 +232,7 @@ namespace {
 
     PyTensorHandle metadata_from_buffer(const py::object &obj) {
         py::buffer buffer(obj);
-        const auto info = buffer.request(true);
+        const auto info = buffer.request(false);
         TensorMetadata metadata = metadata_from_buffer_info(info);
         PyTensorHandle handle;
         handle.meta = std::move(metadata);
@@ -641,8 +640,6 @@ PYBIND11_MODULE(t81lib, module) {
         t81::linalg::detail::backend_available(t81::linalg::Backend::CUDA);
     module.attr("HAS_ROCM_BACKEND") =
         t81::linalg::detail::backend_available(t81::linalg::Backend::ROCm);
-    using FloatArray =
-        py::array_t<float, py::array::c_style | py::array::forcecast>;
 
     module.def(
         "gemm_ternary",
@@ -687,28 +684,16 @@ PYBIND11_MODULE(t81lib, module) {
 
     module.def(
         "where",
-        [](FloatArray condition, FloatArray x, FloatArray y) {
-            const auto cond_info = condition.request();
-            const auto x_info = x.request();
-            const auto y_info = y.request();
-            const std::size_t total = buffer_element_count(cond_info);
-            if (buffer_element_count(x_info) != total ||
-                buffer_element_count(y_info) != total) {
-                throw py::value_error(
-                    "where requires inputs with the same number of elements");
-            }
-            py::array_t<float> output(cond_info.shape);
-            const auto out_info = output.request();
-            const auto cond_span = std::span<const float>{
-                static_cast<const float *>(cond_info.ptr), total};
-            const auto x_span = std::span<const float>{
-                static_cast<const float *>(x_info.ptr), total};
-            const auto y_span = std::span<const float>{
-                static_cast<const float *>(y_info.ptr), total};
-            auto out_span = std::span<float>{
-                static_cast<float *>(out_info.ptr), total};
-            t81::linalg::detail::where(cond_span, x_span, y_span, out_span);
-            return output;
+        [](py::object condition, py::object x, py::object y) {
+            const auto cond_handle = extract_tensor_handle(condition);
+            const auto x_handle = extract_tensor_handle(x);
+            const auto y_handle = extract_tensor_handle(y);
+            auto out_handle = create_output_like(x_handle);
+            t81::linalg::detail::where(cond_handle.meta,
+                                       x_handle.meta,
+                                       y_handle.meta,
+                                       out_handle.meta);
+            return out_handle.owner;
         },
         py::arg("condition"),
         py::arg("x"),
@@ -717,20 +702,15 @@ PYBIND11_MODULE(t81lib, module) {
 
     module.def(
         "clamp",
-        [](FloatArray values, float min_value, float max_value) {
+        [](py::object values, float min_value, float max_value) {
             if (min_value > max_value) {
                 throw py::value_error("min_value must be <= max_value");
             }
-            const auto info = values.request();
-            const std::size_t total = buffer_element_count(info);
-            py::array_t<float> output(info.shape);
-            const auto out_info = output.request();
-            std::span<const float> input_span{
-                static_cast<const float *>(info.ptr), total};
-            std::span<float> out_span{
-                static_cast<float *>(out_info.ptr), total};
-            t81::linalg::detail::clamp(input_span, min_value, max_value, out_span);
-            return output;
+            const auto input_handle = extract_tensor_handle(values);
+            auto out_handle = create_output_like(input_handle);
+            t81::linalg::detail::clamp(
+                input_handle.meta, out_handle.meta, min_value, max_value);
+            return out_handle.owner;
         },
         py::arg("x"),
         py::arg("min"),
@@ -739,28 +719,16 @@ PYBIND11_MODULE(t81lib, module) {
 
     module.def(
         "lerp",
-        [](FloatArray start, FloatArray end, FloatArray weight) {
-            const auto start_info = start.request();
-            const auto end_info = end.request();
-            const auto weight_info = weight.request();
-            const std::size_t total = buffer_element_count(start_info);
-            if (buffer_element_count(end_info) != total ||
-                buffer_element_count(weight_info) != total) {
-                throw py::value_error(
-                    "lerp requires start, end, and weight to align");
-            }
-            py::array_t<float> output(start_info.shape);
-            const auto out_info = output.request();
-            std::span<const float> start_span{
-                static_cast<const float *>(start_info.ptr), total};
-            std::span<const float> end_span{
-                static_cast<const float *>(end_info.ptr), total};
-            std::span<const float> weight_span{
-                static_cast<const float *>(weight_info.ptr), total};
-            std::span<float> out_span{
-                static_cast<float *>(out_info.ptr), total};
-            t81::linalg::detail::lerp(start_span, end_span, weight_span, out_span);
-            return output;
+        [](py::object start, py::object end, py::object weight) {
+            const auto start_handle = extract_tensor_handle(start);
+            const auto end_handle = extract_tensor_handle(end);
+            const auto weight_handle = extract_tensor_handle(weight);
+            auto out_handle = create_output_like(start_handle);
+            t81::linalg::detail::lerp(start_handle.meta,
+                                      end_handle.meta,
+                                      weight_handle.meta,
+                                      out_handle.meta);
+            return out_handle.owner;
         },
         py::arg("start"),
         py::arg("end"),
@@ -769,32 +737,20 @@ PYBIND11_MODULE(t81lib, module) {
 
     module.def(
         "addcmul",
-        [](FloatArray input,
-           FloatArray tensor1,
-           FloatArray tensor2,
+        [](py::object input,
+           py::object tensor1,
+           py::object tensor2,
            float value) {
-            const auto input_info = input.request();
-            const auto tensor1_info = tensor1.request();
-            const auto tensor2_info = tensor2.request();
-            const std::size_t total = buffer_element_count(input_info);
-            if (buffer_element_count(tensor1_info) != total ||
-                buffer_element_count(tensor2_info) != total) {
-                throw py::value_error(
-                    "addcmul requires input and tensors to share the same size");
-            }
-            py::array_t<float> output(input_info.shape);
-            const auto out_info = output.request();
-            std::span<const float> input_span{
-                static_cast<const float *>(input_info.ptr), total};
-            std::span<const float> tensor1_span{
-                static_cast<const float *>(tensor1_info.ptr), total};
-            std::span<const float> tensor2_span{
-                static_cast<const float *>(tensor2_info.ptr), total};
-            std::span<float> out_span{
-                static_cast<float *>(out_info.ptr), total};
-            t81::linalg::detail::addcmul(
-                input_span, tensor1_span, tensor2_span, value, out_span);
-            return output;
+            const auto input_handle = extract_tensor_handle(input);
+            const auto tensor1_handle = extract_tensor_handle(tensor1);
+            const auto tensor2_handle = extract_tensor_handle(tensor2);
+            auto out_handle = create_output_like(input_handle);
+            t81::linalg::detail::addcmul(input_handle.meta,
+                                         tensor1_handle.meta,
+                                         tensor2_handle.meta,
+                                         value,
+                                         out_handle.meta);
+            return out_handle.owner;
         },
         py::arg("input"),
         py::arg("tensor1"),
