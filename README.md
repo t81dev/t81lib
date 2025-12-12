@@ -108,6 +108,17 @@ Optional CUDA/ROCm backends can be enabled with `-DUSE_CUDA=ON` / `-DUSE_ROCM=ON
 
 `t81-convert`, `t81-gguf`, and `t81-qat` automate quantize→export→train flows with progress reporting and validation hooks. Browse [docs/references/cli-usage.md](docs/references/cli-usage.md), [docs/diagrams/cli-workflows-mermaid.md](docs/diagrams/cli-workflows-mermaid.md), and [examples/cli-examples.md](examples/cli-examples.md) for recipes.
 
+## GGUF v4 compliance
+
+t81’s GGUF exports already mirror the llama.cpp conventions; v4’s mandatory `gguf_header` additions are worth calling out for everybody writing their own converter:
+
+- **Header bump** – write `version = 4` instead of 3 so llama.cpp accepts the file and no longer fails with “unsupported version”.
+- **Global alignment metadata** – after `tensor_count`/`kv_count` emit `alignment` (default 32, power-of-two) and `reserved` (0) before the metadata block, and compute tensor padding with `GGML_PAD(size, alignment)` so every tensor data block ends on that boundary.
+- **Tensor padding & metadata rules** – rely on the new alignment field instead of optional metadata keys, keep `general.alignment` as a `uint32_t` power-of-two, and let missing/invalid values fail fast instead of corrupting mmaped loads.
+- **Implementation note** – `struct gguf_header { char magic[4]; uint32_t version; uint64_t tensor_count, kv_count; uint32_t alignment; uint32_t reserved; };` plus explicit `fwrite(&alignment, sizeof(uint32_t), 1, f); fwrite(&reserved, sizeof(uint32_t), 1, f);` immediately after writing `kv_count` is enough to match the official layout.
+
+The eight extra header bytes are negligible even for huge models, but they unlock ARM64-friendly alignment, predictable metadata parsing, and wide compatibility with upcoming llama.cpp releases.
+
 ## Use cases
 
 - Ternary LLM weight quantization and GGUF exports for Hugging Face + `llama.cpp`.

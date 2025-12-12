@@ -20,10 +20,10 @@ from transformers import PreTrainedModel
 import t81lib
 from .nn import Linear as TernaryLinear
 
-HEADER_STRUCT = struct.Struct("<4sIIIIQQQQ")
 HEADER_MAGIC = b"GGUF"
-HEADER_VERSION = 0x00000003
+HEADER_VERSION = 4
 HEADER_ALIGNMENT = 32
+HEADER_STRUCT = struct.Struct("<4sIQQII")
 HEADER_SIZE = HEADER_STRUCT.size
 
 GGML_TYPE_TQ1_0 = 250
@@ -236,9 +236,6 @@ def write_gguf(
         len(tensor_payloads),
         metadata_count,
         HEADER_ALIGNMENT,
-        HEADER_ALIGNMENT,
-        tensor_infos_offset,
-        tensor_data_offset,
         0,
     )
 
@@ -257,7 +254,11 @@ def write_gguf(
         handle.write(tensor_data_section)
 
 
-def _parse_metadata(buffer: bytes, offset: int, count: int) -> Mapping[str, Any]:
+def _parse_metadata(
+    buffer: bytes,
+    offset: int,
+    count: int,
+) -> tuple[Mapping[str, Any], int]:
     metadata: dict[str, Any] = {}
     cursor = offset
     for _ in range(count):
@@ -285,7 +286,7 @@ def _parse_metadata(buffer: bytes, offset: int, count: int) -> Mapping[str, Any]
             cursor = value_end + 1
         else:
             raise ValueError(f"unsupported metadata value type {value_type}")
-    return metadata
+    return metadata, cursor
 
 
 def _parse_tensor_infos(buffer: bytes, offset: int, count: int) -> list[_TensorInfo]:
@@ -343,15 +344,19 @@ def read_gguf(path: str | Path, *, dequantize: bool = True) -> Mapping[str, torc
         version,
         num_tensors,
         metadata_kv_count,
-        _metadata_alignment,
-        _tensor_alignment,
-        tensor_infos_offset,
-        tensor_data_offset,
+        alignment,
+        reserved,
     ) = HEADER_STRUCT.unpack_from(buffer, 0)
     if magic != HEADER_MAGIC or version != HEADER_VERSION:
         raise ValueError("GGUF header mismatch")
+    if alignment != HEADER_ALIGNMENT:
+        raise ValueError("unsupported GGUF alignment")
+    if reserved != 0:
+        raise ValueError("reserved header field must be zero")
 
-    metadata = _parse_metadata(buffer, HEADER_SIZE, metadata_kv_count)
+    metadata, metadata_end = _parse_metadata(buffer, HEADER_SIZE, metadata_kv_count)
+    metadata_size = metadata_end - HEADER_SIZE
+    tensor_infos_offset = _align(HEADER_SIZE + metadata_size)
     block_rows = int(metadata.get("quantization.block_size", GGUF_QUANT_BLOCK_ROWS))
     tensor_infos = _parse_tensor_infos(buffer, tensor_infos_offset, num_tensors)
     sorted_infos = sorted(tensor_infos, key=lambda info: info.offset)
