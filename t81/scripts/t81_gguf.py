@@ -5,17 +5,42 @@ CLI for exporting transformers models as ternary GGUF files.
 from __future__ import annotations
 
 import argparse
+import importlib
+import sys
 from pathlib import Path
 
-from t81 import convert
-from t81 import gguf
 
-
-def _parse_dtype(value: str):
-    return convert._parse_dtype(value)
+def _handle_missing_dependency(exc: ImportError) -> None:
+    names = getattr(exc, "name", None)
+    print(
+        "t81-gguf depends on the torch + transformers extras from t81lib.",
+        file=sys.stderr,
+    )
+    print(
+        "Install them with `pip install .[torch]` (or `pip install t81lib[torch]`) and retry.",
+        file=sys.stderr,
+    )
+    if names:
+        print(f"ImportError: No module named {names}", file=sys.stderr)
+    else:
+        print(f"ImportError: {exc}", file=sys.stderr)
 
 
 def main() -> int:
+    try:
+        from t81 import gguf
+    except ImportError as exc:
+        _handle_missing_dependency(exc)
+        return 1
+    try:
+        convert = importlib.import_module("t81.convert")
+    except ImportError as exc:
+        _handle_missing_dependency(exc)
+        return 1
+
+    def _parse_dtype(value: str):
+        return convert._parse_dtype(value)
+
     parser = argparse.ArgumentParser(
         description="Convert a HF model to t81 and export it as a ternary GGUF file."
     )
@@ -51,6 +76,12 @@ def main() -> int:
         help="Optional torch dtype for the conversion.",
     )
     parser.add_argument(
+        "--force-cpu-device-map",
+        action="store_true",
+        dest="force_cpu_device_map",
+        help="Force `device_map=None` so the converted weights stay on CPU/disk instead of using accelerate offloading.",
+    )
+    parser.add_argument(
         "--keep-biases-bf16",
         dest="keep_biases_bf16",
         action="store_true",
@@ -73,8 +104,9 @@ def main() -> int:
         source,
         threshold=args.threshold,
         keep_biases_bf16=args.keep_biases_bf16,
-        device_map=args.device_map,
+        device_map=convert._normalize_device_map_arg(args.device_map),
         torch_dtype=args.torch_dtype,
+        force_cpu_device_map=args.force_cpu_device_map,
     )
 
     gguf.write_gguf(

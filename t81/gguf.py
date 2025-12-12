@@ -239,6 +239,7 @@ def write_gguf(
         HEADER_ALIGNMENT,
         tensor_infos_offset,
         tensor_data_offset,
+        0,
     )
 
     output_path = Path(path)

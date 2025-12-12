@@ -44,6 +44,51 @@ _AUTO_MODEL_CLASSES = (
 )
 
 
+def _normalize_device_map_arg(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    if normalized == "none":
+        return None
+    if normalized == "auto":
+        return "auto"
+    return value
+
+
+def _accelerate_dispatch_active() -> bool:
+    try:
+        from accelerate.state import AcceleratorState
+    except ImportError:
+        return False
+    try:
+        state = AcceleratorState()
+    except ValueError:
+        return False
+    device_map = getattr(state, "device_map", None)
+    return bool(device_map and device_map != "balanced")
+
+
+def _save_using_cpu_clone(
+    original: PreTrainedModel,
+    directory: Path,
+    save_kwargs: dict[str, Any],
+) -> None:
+    spec = getattr(original, "_t81_source_spec", None)
+    model_id_or_path = spec and spec.get("model_id_or_path")
+    if not model_id_or_path:
+        raise RuntimeError(
+            "Model was converted from an in-memory instance; rerun `t81-convert` "
+            "with `--force-cpu-device-map` instead of relying on accelerate offloading."
+        )
+    torch_dtype = spec.get("torch_dtype")
+    threshold = spec.get("threshold", 0.45)
+    keep_biases_bf16 = spec.get("keep_biases_bf16", True)
+    cpu_model = _load_model(model_id_or_path, device_map=None, torch_dtype=torch_dtype)
+    _convert_model_instance(cpu_model, threshold, keep_biases_bf16)
+    cpu_save = getattr(type(cpu_model), "__t81_original_save_pretrained__", cpu_model.save_pretrained)
+    cpu_save(cpu_model, directory, **save_kwargs)
+
+
 def _ternary_byte_count(shape: tuple[int, int]) -> int:
     rows, cols = shape
     k_limbs = (cols + 47) // 48
@@ -173,6 +218,7 @@ def convert(
     torch_dtype: torch.dtype | None = None,
     *,
     inplace: bool = False,
+    force_cpu_device_map: bool = False,
 ) -> PreTrainedModel:
     """
     Load a Hugging Face model and swap every ``nn.Linear`` for ``t81.nn.Linear`` so the
@@ -180,14 +226,36 @@ def convert(
     If an existing ``PreTrainedModel`` is passed, set ``inplace=True`` and the instance
     is modified without reloading from disk.
     """
+    effective_device_map = (
+        None if force_cpu_device_map else _normalize_device_map_arg(device_map)
+    )
     if isinstance(model_id_or_path, PreTrainedModel):
         if not inplace:
             raise ValueError("convert() requires inplace=True when passing a PreTrainedModel instance")
         model = model_id_or_path
     else:
-        model = _load_model(model_id_or_path, device_map=device_map, torch_dtype=torch_dtype)
+        model = _load_model(
+            model_id_or_path,
+            device_map=effective_device_map,
+            torch_dtype=torch_dtype,
+        )
     stats = _convert_model_instance(model, threshold, keep_biases_bf16)
     _report_stats(stats, replaced=sum(1 for _ in model.modules() if isinstance(_, TernaryLinear)))
+    source_spec: dict[str, Any] = {
+        "device_map": effective_device_map,
+        "torch_dtype": torch_dtype,
+        "threshold": threshold,
+        "keep_biases_bf16": keep_biases_bf16,
+    }
+    if isinstance(model_id_or_path, str):
+        source_spec["model_id_or_path"] = model_id_or_path
+    elif isinstance(model_id_or_path, Path):
+        source_spec["model_id_or_path"] = str(model_id_or_path)
+    elif isinstance(model_id_or_path, PreTrainedModel):
+        config_path = getattr(model_id_or_path.config, "_name_or_path", None)
+        if config_path is not None:
+            source_spec["model_id_or_path"] = config_path
+    setattr(model, "_t81_source_spec", source_spec)
     return model
 
 
@@ -208,9 +276,33 @@ def save_pretrained_t81(
     directory = Path(save_directory)
     directory.mkdir(parents=True, exist_ok=True)
     if call_save_pretrained:
+        save_kwargs = dict(kwargs)
         original_save = getattr(type(self), "__t81_original_save_pretrained__", None)
         save_callable = save_fn or original_save or self.save_pretrained
-        save_callable(self, directory, **kwargs)
+
+        def _attempt_save(model: PreTrainedModel) -> None:
+            save_callable(model, directory, **save_kwargs)
+
+        try:
+            _attempt_save(self)
+        except NotImplementedError as exc:
+            message = str(exc).lower()
+            if "meta tensor" not in message:
+                raise
+            if _accelerate_dispatch_active():
+                _save_using_cpu_clone(self, directory, save_kwargs)
+            else:
+                try:
+                    self.to("cpu")
+                except RuntimeError:
+                    raise
+                _attempt_save(self)
+        except RuntimeError as runtime_exc:
+            lowered = str(runtime_exc).lower()
+            if _accelerate_dispatch_active() and "offloaded" in lowered:
+                _save_using_cpu_clone(self, directory, save_kwargs)
+            else:
+                raise
     metadata = {
         "threshold": threshold if threshold is not None else getattr(self, "_t81_threshold", 0.45),
         "keep_biases_bf16": keep_biases_bf16
@@ -286,6 +378,12 @@ def main() -> int:
         help="Device map passed to `transformers.PreTrainedModel.from_pretrained`.",
     )
     parser.add_argument(
+        "--force-cpu-device-map",
+        action="store_true",
+        dest="force_cpu_device_map",
+        help="Disable accelerate/auto device_map dispatch so the converted model stays on CPU for saving.",
+    )
+    parser.add_argument(
         "--torch-dtype",
         type=_parse_dtype,
         help="Optional torch dtype for the underlying float copy.",
@@ -306,8 +404,9 @@ def main() -> int:
         args.model_id_or_path,
         threshold=args.threshold,
         keep_biases_bf16=args.keep_biases_bf16,
-        device_map=args.device_map,
+        device_map=_normalize_device_map_arg(args.device_map),
         torch_dtype=args.torch_dtype,
+        force_cpu_device_map=args.force_cpu_device_map,
     )
     model.save_pretrained_t81(args.output_dir)
     if args.output_gguf:

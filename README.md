@@ -186,6 +186,8 @@ y = linear(x)  # weights quantized once; bias remains FP32/BF16
 ./scripts/convert_to_ternary.py Llama-3.2-3B --threshold 0.45
 ```
 
+When you know you'll save the converted model or emit a GGUF file, pass `--force-cpu-device-map` so the weights stay on CPU/disk instead of being dispatched to `meta`. Auto offloading (the default `device_map="auto"` path) can trip over `NotImplementedError: Cannot copy out of meta tensor` while saving, so rerun the command with `--force-cpu-device-map` if you see that error. This is the same knob exposed by `t81-convert`/`t81-gguf` and documented in `docs/references/README.md`.
+
 The script auto-detects `.pt/.pth/.safetensors` formats or Hugging Face repo IDs, preserves activation-friendly thresholds, and keeps every other module untouched so you can deploy converted weights with existing inference tooling.
 
 ## AI use cases
