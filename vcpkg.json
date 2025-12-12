@@ -1,17 +1,23 @@
 {
     "name": "t81lib",
     "version-string": "0.1.1",
-    "description": "Balanced ternary core library exposing limb and bigint primitives plus supporting utilities.",
+    "description":
+        "Balanced ternary core library exposing limb and bigint primitives plus supporting utilities.",
     "homepage": "https://github.com/your-org/t81lib",
     "license": "MIT",
-    "supports": ["windows", "linux", "osx"],
+    "supports": [
+        "windows",
+        "linux",
+        "osx"
+    ],
     "dependencies": [],
     "features": {
         "tests": {
             "description": "Build the unit tests (T81LIB_BUILD_TESTS)."
         },
         "benchmarks": {
-            "description": "Build the benchmarks and pull in Google Benchmark (T81LIB_BUILD_BENCH, T81LIB_USE_GOOGLE_BENCH)."
+            "description":
+                "Build the benchmarks and pull in Google Benchmark (T81LIB_BUILD_BENCH, T81LIB_USE_GOOGLE_BENCH)."
         }
     }
 }

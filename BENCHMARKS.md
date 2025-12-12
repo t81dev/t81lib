@@ -1,6 +1,7 @@
-# Quantization Benchmark Suite
+#Quantization Benchmark Suite
 
-This repository now provides a reproducible benchmark that compares FP32, post-training ternary quantization (PTQ), and quantization-aware training (QAT) through a small Fashion-MNIST classifier. The script is located at `scripts/ternary_quantization_benchmark.py` and is designed to log accuracy, latency, and storage so you can understand the benefits of moving from float32 weights to ternary-trained representations.
+This repository now provides a reproducible benchmark that compares FP32,
+    post - training ternary quantization(PTQ), and quantization - aware training(QAT) through a small Fashion-MNIST classifier. The script is located at `scripts/ternary_quantization_benchmark.py` and is designed to log accuracy, latency, and storage so you can understand the benefits of moving from float32 weights to ternary-trained representations.
 
 ## Script overview
 

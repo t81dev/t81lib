@@ -9,7 +9,7 @@
 
 int main() {
     bool all_good = true;
-    const auto expect = [&](bool condition, const char* message) {
+    const auto expect = [&](bool condition, const char *message) {
         if (!condition) {
             all_good = false;
             std::cerr << "limit float/hash test failure: " << message << '\n';
@@ -27,15 +27,15 @@ int main() {
     const limb c = limb::from_long_double(0.0L);
     expect(c.is_zero(), "from_long_double should accept zero");
 
-    expect(a.to_double() == static_cast<double>(a.to_value()), "to_double must match integer value");
+    expect(a.to_double() == static_cast<double>(a.to_value()),
+           "to_double must match integer value");
     expect(static_cast<double>(b) == -7.0, "operator double must expose the value");
 
     bool overflowed = false;
     try {
-        const long double too_large =
-            static_cast<long double>(limb::max().to_value()) + 1000.0L;
+        const long double too_large = static_cast<long double>(limb::max().to_value()) + 1000.0L;
         (void)limb::from_long_double(too_large);
-    } catch (const std::overflow_error&) {
+    } catch (const std::overflow_error &) {
         overflowed = true;
     }
     expect(overflowed, "floating-point overflow must throw");
@@ -43,7 +43,7 @@ int main() {
     bool invalid = false;
     try {
         (void)limb::from_double(std::numeric_limits<double>::infinity());
-    } catch (const std::invalid_argument&) {
+    } catch (const std::invalid_argument &) {
         invalid = true;
     }
     expect(invalid, "inf must be rejected");
@@ -51,7 +51,7 @@ int main() {
     bool nan_rejected = false;
     try {
         (void)limb::from_double(std::numeric_limits<double>::quiet_NaN());
-    } catch (const std::invalid_argument&) {
+    } catch (const std::invalid_argument &) {
         nan_rejected = true;
     }
     expect(nan_rejected, "NaN must be rejected");
@@ -67,8 +67,7 @@ int main() {
     auto mutated_bytes = a.to_bytes();
     mutated_bytes[0] = static_cast<limb::tryte_t>((mutated_bytes[0] + 1) % 27);
     const limb mutated = limb::from_bytes(mutated_bytes);
-    expect(std::hash<limb>{}(mutated) != hash_value,
-           "Changing a byte should change the hash");
+    expect(std::hash<limb>{}(mutated) != hash_value, "Changing a byte should change the hash");
 
     if (!all_good) {
         std::cerr << "limb float/hash tests failed\n";

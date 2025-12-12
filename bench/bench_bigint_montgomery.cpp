@@ -9,25 +9,24 @@
 
 namespace {
 
-inline t81::core::bigint random_bigint(std::mt19937_64& rng, std::size_t limbs) {
-    return t81::util::random_bigint(rng, limbs, true);
-}
+    inline t81::core::bigint random_bigint(std::mt19937_64 &rng, std::size_t limbs) {
+        return t81::util::random_bigint(rng, limbs, true);
+    }
 
-inline t81::core::bigint random_positive_bigint(std::mt19937_64& rng,
-                                                 std::size_t limbs) {
-    auto value = random_bigint(rng, limbs);
-    if (value.is_negative()) {
-        value = -value;
+    inline t81::core::bigint random_positive_bigint(std::mt19937_64 &rng, std::size_t limbs) {
+        auto value = random_bigint(rng, limbs);
+        if (value.is_negative()) {
+            value = -value;
+        }
+        if (value.is_zero()) {
+            value = t81::core::bigint::one();
+        }
+        return value;
     }
-    if (value.is_zero()) {
-        value = t81::core::bigint::one();
-    }
-    return value;
-}
 
 } // namespace
 
-static void bench_bigint_div_mod(benchmark::State& state) {
+static void bench_bigint_div_mod(benchmark::State &state) {
     std::mt19937_64 rng(0x5eedf00d + static_cast<int>(state.thread_index()));
     while (state.KeepRunning()) {
         const auto dividend = random_bigint(rng, 3);
@@ -40,7 +39,7 @@ static void bench_bigint_div_mod(benchmark::State& state) {
     }
 }
 
-static void bench_montgomery_mul(benchmark::State& state) {
+static void bench_montgomery_mul(benchmark::State &state) {
     std::mt19937_64 rng(0x5eedf00d + static_cast<int>(state.thread_index()) + 0x10);
     static const t81::core::bigint modulus = t81::core::bigint(197);
     static const t81::core::MontgomeryContext<t81::core::bigint> context(modulus);
@@ -54,7 +53,7 @@ static void bench_montgomery_mul(benchmark::State& state) {
     }
 }
 
-static void bench_montgomery_pow(benchmark::State& state) {
+static void bench_montgomery_pow(benchmark::State &state) {
     std::mt19937_64 rng(0x5eedf00d + static_cast<int>(state.thread_index()) + 0x20);
     static const t81::core::bigint modulus = t81::core::bigint(197);
     static const t81::core::MontgomeryContext<t81::core::bigint> context(modulus);

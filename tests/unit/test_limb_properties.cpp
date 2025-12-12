@@ -11,37 +11,37 @@
 
 namespace {
 
-using t81::core::limb;
-namespace core_detail = t81::core::detail;
+    using t81::core::limb;
+    namespace core_detail = t81::core::detail;
 
-limb random_limb(std::mt19937_64& rng) {
-    std::uniform_int_distribution<int> dist(0, 26);
-    std::array<limb::tryte_t, limb::TRYTES> trytes{};
-    for (auto& entry : trytes) {
-        entry = static_cast<limb::tryte_t>(dist(rng));
+    limb random_limb(std::mt19937_64 &rng) {
+        std::uniform_int_distribution<int> dist(0, 26);
+        std::array<limb::tryte_t, limb::TRYTES> trytes{};
+        for (auto &entry : trytes) {
+            entry = static_cast<limb::tryte_t>(dist(rng));
+        }
+        return limb::from_bytes(trytes);
     }
-    return limb::from_bytes(trytes);
-}
 
-std::size_t manual_canonical_hash(const limb& value) {
-    constexpr std::uint64_t FNV_OFFSET = 1469598103934665603ULL;
-    constexpr std::uint64_t FNV_PRIME = 1099511628211ULL;
-    std::uint64_t hash = FNV_OFFSET;
-    for (auto byte : value.to_bytes()) {
-        hash ^= byte;
-        hash *= FNV_PRIME;
+    std::size_t manual_canonical_hash(const limb &value) {
+        constexpr std::uint64_t FNV_OFFSET = 1469598103934665603ULL;
+        constexpr std::uint64_t FNV_PRIME = 1099511628211ULL;
+        std::uint64_t hash = FNV_OFFSET;
+        for (auto byte : value.to_bytes()) {
+            hash ^= byte;
+            hash *= FNV_PRIME;
+        }
+        if constexpr (sizeof(std::size_t) >= 8) {
+            return static_cast<std::size_t>(hash);
+        }
+        return static_cast<std::size_t>((hash >> 32) ^ (hash & 0xFFFFFFFFULL));
     }
-    if constexpr (sizeof(std::size_t) >= 8) {
-        return static_cast<std::size_t>(hash);
-    }
-    return static_cast<std::size_t>((hash >> 32) ^ (hash & 0xFFFFFFFFULL));
-}
 
 } // namespace
 
 int main() {
     bool all_good = true;
-    const auto expect = [&](bool condition, const char* message) {
+    const auto expect = [&](bool condition, const char *message) {
         if (!condition) {
             all_good = false;
             std::cerr << "limb property test failed: " << message << '\n';
@@ -84,7 +84,7 @@ int main() {
                 continue;
             }
             expect(converted.to_value() == expected, "float conversion must truncate toward zero");
-        } catch (const std::overflow_error&) {
+        } catch (const std::overflow_error &) {
             const core_detail::limb_int128 expected =
                 static_cast<core_detail::limb_int128>(truncated);
             expect(expected < core_detail::MIN_VALUE || expected > core_detail::MAX_VALUE,
@@ -92,13 +92,13 @@ int main() {
         }
     }
 
-    for (const auto special : {std::numeric_limits<double>::infinity(),
-                              -std::numeric_limits<double>::infinity(),
-                              std::numeric_limits<double>::quiet_NaN()}) {
+    for (const auto special :
+         {std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity(),
+          std::numeric_limits<double>::quiet_NaN()}) {
         try {
             (void)limb::from_double(special);
             expect(false, "infinity/NaN must throw invalid_argument");
-        } catch (const std::invalid_argument&) {
+        } catch (const std::invalid_argument &) {
             // expected
         }
     }
