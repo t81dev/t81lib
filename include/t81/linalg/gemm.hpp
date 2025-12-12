@@ -24,12 +24,13 @@ namespace t81::linalg {
 #endif
         }
 
-        inline constexpr auto build_tryte_contributions()
-            -> std::array<std::array<double, 27>, core::limb::TRYTES> {
+        inline constexpr auto build_tryte_contributions() -> 
+            std::array<std::array<double, 27>, core::limb::TRYTES> {
             std::array<std::array<double, 27>, core::limb::TRYTES> table{};
             double weight = 1.0;
             for (std::size_t position = 0; position < core::limb::TRYTES; ++position) {
-                for (std::size_t tryte = 0; tryte < core::detail::TRYTE_TO_TRITS.size(); ++tryte) {
+                for (std::size_t tryte = 0; tryte < core::detail::TRYTE_TO_TRITS.size(); 
+                    ++tryte) {
                     const auto triple = core::detail::TRYTE_TO_TRITS[tryte];
                     table[position][tryte] =
                         triple[0] * weight + triple[1] * weight * 3.0 + triple[2] * weight * 9.0;
