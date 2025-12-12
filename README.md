@@ -100,7 +100,7 @@ target_link_libraries(... t81::t81lib)
 
 ## GPU backends
 
-Optional CUDA/ROCm backends can be enabled with `-DUSE_CUDA=ON` / `-DUSE_ROCM=ON` so the Python bindings link against the GPU kernels. `t81lib` exposes a compact `TensorMetadata` ABI that carries device, dtype, shape, and stride info, allowing `where`, `clamp`, `lerp`, and `addcmul` to work directly on NumPy arrays or Torch tensors. See [docs/gpu.md](docs/gpu.md) for build flags, device routing, and tensor metadata details.
+Optional CUDA/ROCm backends can be enabled with `-DUSE_CUDA=ON` / `-DUSE_ROCM=ON` so the Python bindings link against the GPU kernels. `t81lib` exposes a compact `TensorMetadata` ABI that carries device, dtype, shape, and stride info, allowing `where`, `clamp`, `lerp`, and `addcmul` to work directly on NumPy arrays or Torch tensors. See [docs/gpu.md](docs/gpu.md) and [docs/torch.md](docs/torch.md) for build flags, device routing, supported ops, and lifetime details.
 
 ## CLI helpers
 
@@ -122,6 +122,7 @@ See [examples/README.md](examples/README.md) for the canonical scripts/notebooks
 ## Why ternary?
 
 - Balanced ternary offers ≈1.58 bits of entropy per digit with symmetric overflow semantics and deterministic hashing for `t81::Int`.
+- Balanced ternary trades representational symmetry for determinism and composability, making it easy to reason about ternary algebra while keeping model state portable.
 - Refer to [BENCHMARKS.md](BENCHMARKS.md) for the 15–22× storage/latency wins versus FP16 and [docs/hardware.md](docs/hardware.md) for AVX/NEON/AVX-512 kernel sketches.
 
 ## Numeric building blocks
