@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 from t81.cli_progress import CLIProgress
+from t81.cli_validator import validate_gguf_file
 
 
 def _handle_missing_dependency(exc: ImportError) -> None:
@@ -96,6 +97,11 @@ def main() -> int:
         action="store_false",
         help="Force all biases to float32.",
     )
+    parser.add_argument(
+        "--validate",
+        action="store_true",
+        help="After exporting the GGUF bundle, run llama.cpp's validator (or the Python reader) against it.",
+    )
     args = parser.parse_args()
 
     if bool(args.from_hf) == bool(args.from_t81):
@@ -120,5 +126,7 @@ def main() -> int:
         threshold=args.threshold,
     )
     progress.step("wrote GGUF bundle")
+    if args.validate:
+        validate_gguf_file(Path(args.output))
 
     return 0

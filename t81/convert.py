@@ -23,6 +23,7 @@ from transformers import (
 from .nn import Linear as TernaryLinear
 from . import gguf
 from .cli_progress import CLIProgress
+from .cli_validator import validate_gguf_file
 
 _METADATA_FILENAME = "t81_metadata.json"
 
@@ -399,6 +400,11 @@ def main() -> int:
         default="TQ1_0",
         help="GGUF quantization format to emit.",
     )
+    parser.add_argument(
+        "--validate",
+        action="store_true",
+        help="After writing a GGUF bundle, run llama.cpp's validator (or the Python reader) against it.",
+    )
     args = parser.parse_args()
     total_steps = 2 + (1 if args.output_gguf else 0)
     progress = CLIProgress("t81-convert", total_steps=total_steps)
@@ -424,6 +430,8 @@ def main() -> int:
             threshold=args.threshold,
         )
         progress.step("wrote GGUF bundle")
+        if args.validate:
+            validate_gguf_file(Path(args.output_gguf))
     return 0
 
 
