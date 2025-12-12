@@ -1,6 +1,6 @@
 # API overview
 
-This page captures the high-level helpers exposed by the umbrella header so you can understand the building blocks without diving into every header.
+This page captures the high-level helpers exposed by the umbrella header so you can understand the building blocks without diving into every header. Review the [core architecture diagram](diagrams/core-architecture.mermaid.md) for an inheritance/data-flow sketch of the same helpers.
 
 ## Core numerics
 

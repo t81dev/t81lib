@@ -19,4 +19,4 @@ These scripts and notebooks mirror the CLI workflows while keeping you inside Py
 
 ## Additional references
 
-Mentioned demos also appear in `docs/index.md` and `docs/references/cli-usage.md` so you can toggle between CLI helpers and Python stories without guessing.
+Mentioned demos also appear in `docs/index.md` and `docs/references/cli-usage.md` so you can toggle between CLI helpers and Python stories without guessing. The [quantization workflow diagram](docs/diagrams/quantization-workflow.mermaid.md) ties the PyTorch conversion path to the CLI export/inference steps above.

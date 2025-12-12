@@ -9,3 +9,5 @@ Highlights include:
 - `simulate_torch_forward()` plus power-tracing hooks that tally trit flips, emulate hybrid forward passes, and let you compare ternary energy to binary energy budgets.
 
 See `examples/ternary_hardware_sim_demo.ipynb` for a guided walkthrough that builds a ternary adder, runs a small inference, records virtual power/latency metrics, and highlights how balanced ternary drops switching energy for drones or tiny neuromorphic chips.
+
+The [hardware kernel sketch](docs/diagrams/hardware-kernels.mermaid.md) summarizes the tryte packing → multiply → accumulate flow used by the AVX/NEON GEMM paths.

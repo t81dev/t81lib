@@ -41,6 +41,7 @@ to understand the balanced ternary engine without digging through specs immediat
 - **GPU backends** — [`docs/gpu.md`](gpu.md) explains the CUDA/ROCm build flags and tensor metadata routing.
 - **API overview** — [`docs/api-overview.md`](api-overview.md) summarizes the numeric containers and helpers exposed via `<t81/t81lib.hpp>`.
 - **Tests & benchmarks** — [`tests/`](../tests/) documents the unit/property coverage while [`bench/`](../bench/) shows throughput patterns.
+- **Docs sitemap** — the [`docs/diagrams/docs-sitemap.mermaid.md`](diagrams/docs-sitemap.mermaid.md) mind map visualizes the content hierarchy referenced on this page.
 
 ## Stay aligned
 
