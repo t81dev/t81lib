@@ -13,3 +13,11 @@ build-full/
 pipx_home/
 pipx_logs/
 t81lib.egg-info/
+
+# Python runtime artifacts
+__pycache__/
+*.py[cod]
+
+# Benchmark outputs & downloads
+data/
+benchmarks/

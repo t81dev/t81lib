@@ -5,13 +5,85 @@ on:
   pull_request:
 
 jobs:
-  build-and-test:
+  format-and-lint:
+    name: Format & Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install formatting tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+          python3 -m pip install --upgrade pip
+          python3 -m pip install black ruff
+      - name: Clang-format check
+        run: |
+          set -euo pipefail
+          files=$(git ls-files '*.h' '*.hpp' '*.c' '*.cpp' '*.cc')
+          if [ -n "$files" ]; then
+            clang-format --dry-run --Werror $files
+          fi
+      - name: Black check
+        run: black --check python t81 tests scripts
+      - name: Ruff check
+        run: ruff check python t81 tests scripts
+
+  build-and-test:
+    name: Matrix build & tests
+    needs: format-and-lint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - name: gcc
+            c: gcc
+            cxx: g++
+          - name: clang
+            c: clang
+            cxx: clang++
+        configuration:
+          - name: minimal
+            python_bindings: OFF
+          - name: python
+            python_bindings: ON
+        avx:
+          - name: avx
+            flags: "-mavx512f"
+          - name: scalar
+            flags: "-mno-avx"
+    env:
+      BUILD_DIR: build-${{ matrix.compiler.name }}-${{ matrix.configuration.name }}-${{ matrix.avx.name }}
+      ARTIFACT_LABEL: ci-${{ matrix.compiler.name }}-${{ matrix.configuration.name }}-${{ matrix.avx.name }}
+    steps:
+      - uses: actions/checkout@v4
       - name: Configure
-        run: cmake -S . -B build -DT81LIB_BUILD_TESTS=ON
+        run: |
+          cmake -S . -B "$BUILD_DIR" \
+            -DT81LIB_BUILD_TESTS=ON \
+            -DT81LIB_BUILD_PYTHON_BINDINGS=${{ matrix.configuration.python_bindings }} \
+            -DCMAKE_C_COMPILER=${{ matrix.compiler.c }} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }} \
+            -DCMAKE_C_FLAGS="${{ matrix.avx.flags }}" \
+            -DCMAKE_CXX_FLAGS="${{ matrix.avx.flags }}"
       - name: Build
-        run: cmake --build build -j 4
+        run: cmake --build "$BUILD_DIR" --parallel
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir "$BUILD_DIR" --output-on-failure
+      - name: Python binding tests
+        if: matrix.configuration.name == 'python'
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          PYTHONPATH="$BUILD_DIR" python3 tests/python/test_bindings.py 2>&1 | tee artifacts/${BUILD_DIR}-python-tests.log
+      - name: Collect test logs
+        run: |
+          mkdir -p artifacts
+          if [ -f "$BUILD_DIR/Testing/Temporary/LastTest.log" ]; then
+            cp "$BUILD_DIR/Testing/Temporary/LastTest.log" "artifacts/${BUILD_DIR}-ctest.log"
+          fi
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_LABEL }}
+          path: artifacts

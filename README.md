@@ -32,6 +32,7 @@ packed ternary GEMM kernels, Python bindings, and helpers for ternary quantizati
   [ARCHITECTURE.md](ARCHITECTURE.md) walkthrough and a docs portal at [docs/index.md](docs/index.md).
 - **Examples & proofs**: `examples/` shows runnable use cases while `tests/` and
   `bench/` capture behavioral regression suites and throughput gauges.
+- **Benchmarks**: `BENCHMARKS.md` describes how `scripts/ternary_quantization_benchmark.py` trains a toy Fashion-MNIST classifier, measures FP32/PTQ/QAT accuracy, latency, and storage, and logs the results for easy comparisons.
 
 ## Quick start
 
