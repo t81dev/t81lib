@@ -1,7 +1,7 @@
 // examples/example_basic.cpp — Basic usage example demonstrating the core bigint APIs.
 
-#include <t81/t81lib.hpp>
 #include <iostream>
+#include <t81/t81lib.hpp>
 
 int main() {
     t81::core::bigint x;

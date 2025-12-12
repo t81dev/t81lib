@@ -3,8 +3,8 @@
 #include <iostream>
 #include <stdexcept>
 
-#include <t81/t81lib.hpp>
 #include <t81/core/montgomery_helpers.hpp>
+#include <t81/t81lib.hpp>
 
 int main() {
     using t81::core::bigint;
@@ -17,19 +17,17 @@ int main() {
     const limb a = limb::from_value(3);
     const limb b = limb::from_value(5);
     const auto product = modular_multiply(ctx, a, b);
-    std::cout << "limb modular multiply 3·5 mod 17 = "
-              << t81::io::to_string(product) << "\n";
+    std::cout << "limb modular multiply 3·5 mod 17 = " << t81::io::to_string(product) << "\n";
 
     const auto power = modular_pow(ctx, a, limb::from_value(4));
-    std::cout << "limb modular exponentiation 3^4 mod 17 = "
-              << t81::io::to_string(power) << "\n";
+    std::cout << "limb modular exponentiation 3^4 mod 17 = " << t81::io::to_string(power) << "\n";
 
     MontgomeryConstTimeGuard<limb> guard(ctx, 6);
     const auto guarded_pow = guard.pow(a, limb::from_value(4));
     std::cout << "guarded pow = " << t81::io::to_string(guarded_pow) << "\n";
     try {
         guard.require(limb::from_value(1) << static_cast<int>(guard.max_bits()));
-    } catch (const std::domain_error& err) {
+    } catch (const std::domain_error &err) {
         std::cout << "guard blocked large exponent: " << err.what() << "\n";
     }
 

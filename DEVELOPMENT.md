@@ -1,4 +1,4 @@
-# Developer Onboarding Guide
+#Developer Onboarding Guide
 
 This project already boasts extensive documentation (`README.md`, `docs/index.md`, `AGENTS.md`, `docs/ROADMAP.md`), but this guide focuses on the concrete steps a new contributor needs to take so they can build, test, and iterate quickly.
 

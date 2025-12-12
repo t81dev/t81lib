@@ -1,18 +1,9 @@
-site_name: t81lib docs
-site_description: Balanced ternary library docs with Python API automation.
-docs_dir: docs
-nav:
-  - Home: index.md
-  - Python:
-    - API Reference: python-api.md
-    - Cookbook: python-cookbook.md
-  - CLI Reference: references/cli-usage.md
-  - Hardware Reference: references/hardware-emulation.md
-  - Roadmap: ROADMAP.md
-plugins:
-  - search
-  - mkdocstrings:
-      handlers:
-        python:
-          setup_commands:
-            - pip install -e .
+site_name : t81lib docs site_description
+    : Balanced ternary library docs with Python API automation.docs_dir : docs nav : -Home
+    : index.md -
+    Python : -API Reference
+    : python -
+      api.md - Cookbook : python - cookbook.md - CLI Reference : references / cli - usage.md -
+                          Hardware Reference : references / hardware - emulation.md -
+                          Roadmap : ROADMAP.md plugins : -search -
+                          mkdocstrings : handlers : python : setup_commands : -pip install - e.
