@@ -19,6 +19,8 @@ to understand the balanced ternary engine without digging through specs immediat
 - **PyTorch bridge** — `t81.torch`/`t81.nn` expose the custom `t81.trit` dtype, `TernaryTensor`,
   and GEMM-backed helpers; see `examples/demo_llama_conversion.py`, `examples/scaling_laws_ternary.py`, and
   `examples/ternary_sparse_preview.py` for runnable workflows.
+- **CLI reference** — `docs/references/cli-usage.md` lists the `t81-convert`, `t81-gguf`, and `t81-qat` helpers
+  plus the common flags for exporting GGUF bundles and running QAT.
 - **Tests & benchmarks** — `tests/` documents the unit/property coverage while `bench/` shows throughput patterns.
 
 ## Stay aligned
