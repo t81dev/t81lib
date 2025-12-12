@@ -9,6 +9,8 @@ import importlib
 import sys
 from pathlib import Path
 
+from t81.cli_progress import CLIProgress
+
 
 def _handle_missing_dependency(exc: ImportError) -> None:
     names = getattr(exc, "name", None)
@@ -100,6 +102,7 @@ def main() -> int:
         parser.error("provide exactly one of --from-hf or --from-t81")
 
     source = args.from_hf or args.from_t81 or ""
+    progress = CLIProgress("t81-gguf", total_steps=2)
     model = convert.convert(
         source,
         threshold=args.threshold,
@@ -108,6 +111,7 @@ def main() -> int:
         torch_dtype=args.torch_dtype,
         force_cpu_device_map=args.force_cpu_device_map,
     )
+    progress.step("converted ternary model")
 
     gguf.write_gguf(
         model,
@@ -115,5 +119,6 @@ def main() -> int:
         quant=args.quant,
         threshold=args.threshold,
     )
+    progress.step("wrote GGUF bundle")
 
     return 0

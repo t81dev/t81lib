@@ -22,6 +22,7 @@ from transformers import (
 
 from .nn import Linear as TernaryLinear
 from . import gguf
+from .cli_progress import CLIProgress
 
 _METADATA_FILENAME = "t81_metadata.json"
 
@@ -399,6 +400,8 @@ def main() -> int:
         help="GGUF quantization format to emit.",
     )
     args = parser.parse_args()
+    total_steps = 2 + (1 if args.output_gguf else 0)
+    progress = CLIProgress("t81-convert", total_steps=total_steps)
 
     model = convert(
         args.model_id_or_path,
@@ -408,7 +411,11 @@ def main() -> int:
         torch_dtype=args.torch_dtype,
         force_cpu_device_map=args.force_cpu_device_map,
     )
+    progress.step("converted HF checkpoint")
+
     model.save_pretrained_t81(args.output_dir)
+    progress.step("saved ternary checkpoint")
+
     if args.output_gguf:
         gguf.write_gguf(
             model,
@@ -416,6 +423,7 @@ def main() -> int:
             quant=args.gguf_quant,
             threshold=args.threshold,
         )
+        progress.step("wrote GGUF bundle")
     return 0
 
 

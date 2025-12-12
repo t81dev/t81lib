@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
+from t81.cli_progress import CLIProgress
 from t81.trainer import TernaryTrainer, TernaryTrainingArguments
 
 if TYPE_CHECKING:
@@ -71,6 +72,7 @@ def main() -> int:
             "install them via 'pipx inject t81lib torch transformers accelerate'"
         ) from exc
 
+    progress = CLIProgress("t81-qat", total_steps=3)
     dataset = datasets.load_dataset(
         args.dataset_name,
         args.dataset_config_name,
@@ -104,6 +106,7 @@ def main() -> int:
         batched=True,
         remove_columns=tokenized.column_names,
     )
+    progress.step("prepared dataset")
 
     collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
     model = AutoModelForCausalLM.from_pretrained(
@@ -136,7 +139,9 @@ def main() -> int:
         data_collator=collator,
     )
     trainer.train()
+    progress.step("training complete")
     trainer.save_model(args.output_dir)
+    progress.step("checkpoint saved")
     return 0
 
 
