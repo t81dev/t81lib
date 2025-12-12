@@ -38,6 +38,7 @@ to understand the balanced ternary engine without digging through specs immediat
   from command-line workflows.
 - **Use cases & demos** — [`docs/use-cases.md`](use-cases.md) and [`examples/README.md`](../examples/README.md) capture the canonical scripts, notebooks, and research stories.
 - **Hardware simulation** — [`docs/hardware.md`](hardware.md) details `t81.hardware.TernaryEmulator`, fuzzy helpers, and the visualizer notebook.
+- **GPU backends** — [`docs/gpu.md`](gpu.md) explains the CUDA/ROCm build flags and tensor metadata routing.
 - **API overview** — [`docs/api-overview.md`](api-overview.md) summarizes the numeric containers and helpers exposed via `<t81/t81lib.hpp>`.
 - **Tests & benchmarks** — [`tests/`](../tests/) documents the unit/property coverage while [`bench/`](../bench/) shows throughput patterns.
 

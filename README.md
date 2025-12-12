@@ -18,15 +18,16 @@ AI workflows.
 #include <t81/t81lib.hpp>
 
 int main() {
-  t81::Int sum = t81::Int{1} + t81::Int{2};
-  return sum == 3 ? 0 : 1;
+  using t81::Int;
+  Int sum = Int::from_int(1) + Int::from_int(2);
+  return (sum == Int::from_int(3)) ? 0 : 1;
 }
 ```
 
 ```python
 import t81lib
 
-print(t81lib.Float.from_string("1.5") + t81lib.Float.from_string("1.5"))
+print(t81lib.BigInt(3) * t81lib.BigInt(7))
 ```
 
 ## Who is this for?
@@ -97,9 +98,9 @@ target_link_libraries(... t81::t81lib)
 
 `pip install .[torch]` unlocks the `t81lib`/`t81` namespace, NumPy quantization helpers, and the `t81.torch`/`t81.nn` layers that mix ternary weights with FP32/BF16 biases. Jump deeper via [docs/python-api.md](docs/python-api.md), [docs/python-cookbook.md](docs/python-cookbook.md), and [docs/torch.md](docs/torch.md).
 
-## GPU backends & tensor metadata
+## GPU backends
 
-Enable CUDA/ROCm through the optional `-DUSE_CUDA=ON` and `-DUSE_ROCM=ON` flags during CMake configuration so the Python bindings link against the new GPU kernels (`python/CMakeLists.txt`). Once enabled, `t81lib.where`, `t81lib.clamp`, `t81lib.lerp`, and `t81lib.addcmul` accept either NumPy buffers or PyTorch tensors and route the work directly to CUDA/HIP kernels via the lightweight [`t81::TensorMetadata`](include/t81/tensor_metadata.hpp) ABI. The metadata struct carries device/dtype/shape/stride info plus raw `data_ptr`, letting the dispatcher avoid host copies and keep outputs on-device. When torch is installed, `t81lib` automatically wraps GPU tensors; when only NumPy is available it falls back to CPU buffers. Consult [docs/torch.md](docs/torch.md) and `python/bindings.cpp` for the extraction helpers and lifetime semantics.
+Optional CUDA/ROCm backends can be enabled with `-DUSE_CUDA=ON` / `-DUSE_ROCM=ON` so the Python bindings link against the GPU kernels. `t81lib` exposes a compact `TensorMetadata` ABI that carries device, dtype, shape, and stride info, allowing `where`, `clamp`, `lerp`, and `addcmul` to work directly on NumPy arrays or Torch tensors. See [docs/gpu.md](docs/gpu.md) for build flags, device routing, and tensor metadata details.
 
 ## CLI helpers
 
@@ -130,7 +131,7 @@ See [docs/api-overview.md](docs/api-overview.md) for the full surface described 
 
 ## Stability & compatibility
 
-- Supported toolchains: recent Clang/GCC/MSVC or `pip install`’s compatible CPython builds; CMake config defaults to host SIMD if available (AVX2/AVX-512, NEON) while falling back to portable kernels.
+- Supported toolchains: C++20-capable Clang/GCC/MSVC (or `pip install`’s compatible CPython builds) with CMake ≥ 3.22; the build auto-detects AVX2/AVX-512/NEON and falls back to portable kernels when those SIMD targets are unavailable.
 - We track the ABI/API surface via `include/t81/t81lib.hpp`; expect the core headers to evolve until we reach a stable v1 release and consult [CHANGELOG.md](CHANGELOG.md) for migration notes.
 
 ## Docs & resources
