@@ -21,7 +21,9 @@ namespace t81::io {
           public:
             static constexpr std::uint32_t BASE = 1'000'000'000u;
 
-            DecimalAccumulator() { digits_.push_back(0); }
+            DecimalAccumulator() {
+                digits_.push_back(0);
+            }
 
             void multiply_by_small(std::uint32_t factor) {
                 if (factor == 0) {

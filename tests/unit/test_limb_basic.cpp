@@ -55,7 +55,8 @@ namespace {
 
 } // namespace
 
-limb random_limb(std::mt19937_64 &rng) {
+limb
+random_limb(std::mt19937_64 &rng) {
     std::uniform_int_distribution<int> dist(0, 26);
     std::array<limb::tryte_t, limb::TRYTES> trytes{};
     for (auto &entry : trytes) {
@@ -64,7 +65,8 @@ limb random_limb(std::mt19937_64 &rng) {
     return limb::from_bytes(trytes);
 }
 
-int main() {
+int
+main() {
     std::vector<limb> values = {
         limb::zero(),
         limb::one(),

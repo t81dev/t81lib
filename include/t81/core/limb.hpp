@@ -72,8 +72,8 @@ namespace t81::core {
             return trit >= -1 && trit <= 1;
         }
 
-        inline constexpr std::size_t pack_trit_index(std::int8_t t0, std::int8_t t1,
-                                                     std::int8_t t2) noexcept {
+        inline constexpr std::size_t
+        pack_trit_index(std::int8_t t0, std::int8_t t1, std::int8_t t2) noexcept {
             return static_cast<std::size_t>((t0 + 1) + 3 * (t1 + 1) + 9 * (t2 + 1));
         }
 
@@ -100,19 +100,30 @@ namespace t81::core {
         using tryte_t = std::uint8_t;
         static constexpr int BASE81_DIGITS_PER_LIMB = TRITS / 4;
 
-        constexpr limb() noexcept { trytes_.fill(detail::ZERO_TRYTE); }
+        constexpr limb() noexcept {
+            trytes_.fill(detail::ZERO_TRYTE);
+        }
 
         constexpr limb(const limb &) noexcept = default;
         constexpr limb &operator=(const limb &) noexcept = default;
 
         template <typename Int, typename = std::enable_if_t<std::is_integral_v<Int>>>
         constexpr explicit limb(Int value)
-            : limb(from_value(static_cast<detail::limb_int128>(value))) {}
+            : limb(from_value(static_cast<detail::limb_int128>(value))) {
+        }
 
-        static constexpr limb zero() noexcept { return limb(); }
-        static constexpr limb one() { return from_value(1); }
-        static constexpr limb min() { return from_value(detail::MIN_VALUE); }
-        static constexpr limb max() { return from_value(detail::MAX_VALUE); }
+        static constexpr limb zero() noexcept {
+            return limb();
+        }
+        static constexpr limb one() {
+            return from_value(1);
+        }
+        static constexpr limb min() {
+            return from_value(detail::MIN_VALUE);
+        }
+        static constexpr limb max() {
+            return from_value(detail::MAX_VALUE);
+        }
 
         static constexpr limb from_value(detail::limb_int128 value) {
             if (value < detail::MIN_VALUE || value > detail::MAX_VALUE) {
@@ -165,7 +176,9 @@ namespace t81::core {
             return bytes;
         }
 
-        constexpr std::array<tryte_t, TRYTES> to_trytes() const noexcept { return trytes_; }
+        constexpr std::array<tryte_t, TRYTES> to_trytes() const noexcept {
+            return trytes_;
+        }
 
         constexpr tryte_t get_tryte(std::size_t index) const {
             if (index >= TRYTES) {
@@ -230,9 +243,15 @@ namespace t81::core {
             return total;
         }
 
-        constexpr bool is_zero() const noexcept { return to_value() == 0; }
-        constexpr bool is_negative() const noexcept { return to_value() < 0; }
-        constexpr int signum() const noexcept { return (to_value() > 0) - (to_value() < 0); }
+        constexpr bool is_zero() const noexcept {
+            return to_value() == 0;
+        }
+        constexpr bool is_negative() const noexcept {
+            return to_value() < 0;
+        }
+        constexpr int signum() const noexcept {
+            return (to_value() > 0) - (to_value() < 0);
+        }
 
         template <typename Int, typename = std::enable_if_t<std::is_integral_v<Int>>>
         constexpr Int to_integer() const {
@@ -244,17 +263,27 @@ namespace t81::core {
             return static_cast<Int>(value);
         }
 
-        constexpr float to_float() const noexcept { return static_cast<float>(to_value()); }
+        constexpr float to_float() const noexcept {
+            return static_cast<float>(to_value());
+        }
 
-        constexpr double to_double() const noexcept { return static_cast<double>(to_value()); }
+        constexpr double to_double() const noexcept {
+            return static_cast<double>(to_value());
+        }
 
         constexpr long double to_long_double() const noexcept {
             return static_cast<long double>(to_value());
         }
 
-        explicit constexpr operator float() const noexcept { return to_float(); }
-        explicit constexpr operator double() const noexcept { return to_double(); }
-        explicit constexpr operator long double() const noexcept { return to_long_double(); }
+        explicit constexpr operator float() const noexcept {
+            return to_float();
+        }
+        explicit constexpr operator double() const noexcept {
+            return to_double();
+        }
+        explicit constexpr operator long double() const noexcept {
+            return to_long_double();
+        }
 
         constexpr std::string to_string(int base = 10) const {
             const bool negative = is_negative();
@@ -393,9 +422,15 @@ namespace t81::core {
             return from_value(static_cast<detail::limb_int128>(truncated));
         }
 
-        static limb from_float(float value) { return from_floating(value); }
-        static limb from_double(double value) { return from_floating(value); }
-        static limb from_long_double(long double value) { return from_floating(value); }
+        static limb from_float(float value) {
+            return from_floating(value);
+        }
+        static limb from_double(double value) {
+            return from_floating(value);
+        }
+        static limb from_long_double(long double value) {
+            return from_floating(value);
+        }
 
         constexpr auto operator<=>(const limb &other) const noexcept {
             return to_value() <=> other.to_value();
@@ -405,7 +440,9 @@ namespace t81::core {
             return to_value() == other.to_value();
         }
 
-        limb operator-() const { return from_value(-to_value()); }
+        limb operator-() const {
+            return from_value(-to_value());
+        }
 
         limb operator+(const limb &other) const {
             limb result;
@@ -444,15 +481,29 @@ namespace t81::core {
             return {from_value(quotient), from_value(remainder)};
         }
 
-        limb operator/(const limb &other) const { return div_mod(*this, other).first; }
+        limb operator/(const limb &other) const {
+            return div_mod(*this, other).first;
+        }
 
-        limb operator%(const limb &other) const { return div_mod(*this, other).second; }
+        limb operator%(const limb &other) const {
+            return div_mod(*this, other).second;
+        }
 
-        limb &operator+=(const limb &other) { return *this = *this + other; }
-        limb &operator-=(const limb &other) { return *this = *this - other; }
-        limb &operator*=(const limb &other) { return *this = *this * other; }
-        limb &operator/=(const limb &other) { return *this = *this / other; }
-        limb &operator%=(const limb &other) { return *this = *this % other; }
+        limb &operator+=(const limb &other) {
+            return *this = *this + other;
+        }
+        limb &operator-=(const limb &other) {
+            return *this = *this - other;
+        }
+        limb &operator*=(const limb &other) {
+            return *this = *this * other;
+        }
+        limb &operator/=(const limb &other) {
+            return *this = *this / other;
+        }
+        limb &operator%=(const limb &other) {
+            return *this = *this % other;
+        }
 
         static limb pow_mod(const limb &base, const limb &exponent, const limb &modulus) {
             if (modulus.is_zero()) {
@@ -515,13 +566,21 @@ namespace t81::core {
                 *this, [](std::int8_t lhs, std::int8_t) { return static_cast<std::int8_t>(-lhs); });
         }
 
-        limb operator<<(int shift) const { return tryte_shift_left(shift); }
+        limb operator<<(int shift) const {
+            return tryte_shift_left(shift);
+        }
 
-        limb operator>>(int shift) const { return tryte_shift_right(shift); }
+        limb operator>>(int shift) const {
+            return tryte_shift_right(shift);
+        }
 
-        limb rotate_left_tbits(int count) const { return trit_shift_left(count); }
+        limb rotate_left_tbits(int count) const {
+            return trit_shift_left(count);
+        }
 
-        limb rotate_right_tbits(int count) const { return trit_shift_right(count); }
+        limb rotate_right_tbits(int count) const {
+            return trit_shift_right(count);
+        }
 
         limb trit_shift_left(int count) const {
             if (count <= 0) {
@@ -673,15 +732,33 @@ namespace std {
 
         static constexpr bool is_specialized = true;
 
-        static constexpr value_type min() noexcept { return value_type::min(); }
-        static constexpr value_type max() noexcept { return value_type::max(); }
-        static constexpr value_type lowest() noexcept { return value_type::min(); }
-        static constexpr value_type epsilon() noexcept { return value_type::zero(); }
-        static constexpr value_type round_error() noexcept { return value_type::zero(); }
-        static constexpr value_type denorm_min() noexcept { return value_type::zero(); }
-        static constexpr value_type infinity() noexcept { return value_type::zero(); }
-        static constexpr value_type quiet_NaN() noexcept { return value_type::zero(); }
-        static constexpr value_type signaling_NaN() noexcept { return value_type::zero(); }
+        static constexpr value_type min() noexcept {
+            return value_type::min();
+        }
+        static constexpr value_type max() noexcept {
+            return value_type::max();
+        }
+        static constexpr value_type lowest() noexcept {
+            return value_type::min();
+        }
+        static constexpr value_type epsilon() noexcept {
+            return value_type::zero();
+        }
+        static constexpr value_type round_error() noexcept {
+            return value_type::zero();
+        }
+        static constexpr value_type denorm_min() noexcept {
+            return value_type::zero();
+        }
+        static constexpr value_type infinity() noexcept {
+            return value_type::zero();
+        }
+        static constexpr value_type quiet_NaN() noexcept {
+            return value_type::zero();
+        }
+        static constexpr value_type signaling_NaN() noexcept {
+            return value_type::zero();
+        }
 
         static constexpr int digits = value_type::TRITS;
         static constexpr int digits10 =

@@ -20,7 +20,9 @@ namespace t81 {
             pow2_cache_.push_back(core::bigint::one());
         }
 
-        const core::bigint &modulus() const noexcept { return modulus_; }
+        const core::bigint &modulus() const noexcept {
+            return modulus_;
+        }
 
         core::bigint add(const core::bigint &lhs, const core::bigint &rhs) const {
             return xor_bits(lhs, rhs);

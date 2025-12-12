@@ -40,7 +40,8 @@ namespace {
             if (!assert_equal(
                     lhs & rhs,
                     t81::core::expected_bitwise(
-                        lhs, rhs,
+                        lhs,
+                        rhs,
                         [](const t81::core::limb &a, const t81::core::limb &b) { return a & b; }),
                     "fuzz bitwise &")) {
                 return false;
@@ -48,7 +49,8 @@ namespace {
             if (!assert_equal(
                     lhs | rhs,
                     t81::core::expected_bitwise(
-                        lhs, rhs,
+                        lhs,
+                        rhs,
                         [](const t81::core::limb &a, const t81::core::limb &b) { return a | b; }),
                     "fuzz bitwise |")) {
                 return false;
@@ -56,14 +58,16 @@ namespace {
             if (!assert_equal(
                     lhs ^ rhs,
                     t81::core::expected_bitwise(
-                        lhs, rhs,
+                        lhs,
+                        rhs,
                         [](const t81::core::limb &a, const t81::core::limb &b) { return a ^ b; }),
                     "fuzz bitwise ^")) {
                 return false;
             }
             if (!assert_equal(lhs.consensus(rhs),
                               t81::core::expected_bitwise(
-                                  lhs, rhs,
+                                  lhs,
+                                  rhs,
                                   [](const t81::core::limb &a, const t81::core::limb &b) {
                                       return a.consensus(b);
                                   }),
@@ -84,11 +88,13 @@ namespace {
         for (int iteration = 0; iteration < iterations; ++iteration) {
             const auto value = random_bigint(rng, limb_count(rng));
             const int trytes = tryte_count(rng);
-            if (!assert_equal(value << trytes, t81::core::expected_tryte_shift_left(value, trytes),
+            if (!assert_equal(value << trytes,
+                              t81::core::expected_tryte_shift_left(value, trytes),
                               "fuzz tryte shift left")) {
                 return false;
             }
-            if (!assert_equal(value >> trytes, t81::core::expected_tryte_shift_right(value, trytes),
+            if (!assert_equal(value >> trytes,
+                              t81::core::expected_tryte_shift_right(value, trytes),
                               "fuzz tryte shift right")) {
                 return false;
             }
@@ -103,11 +109,13 @@ namespace {
                               "fuzz trit shift right")) {
                 return false;
             }
-            if (!assert_equal(value.rotate_left_tbits(trits), value.trit_shift_left(trits),
+            if (!assert_equal(value.rotate_left_tbits(trits),
+                              value.trit_shift_left(trits),
                               "fuzz rotate left alias")) {
                 return false;
             }
-            if (!assert_equal(value.rotate_right_tbits(trits), value.trit_shift_right(trits),
+            if (!assert_equal(value.rotate_right_tbits(trits),
+                              value.trit_shift_right(trits),
                               "fuzz rotate right alias")) {
                 return false;
             }
@@ -117,7 +125,8 @@ namespace {
 
 } // namespace
 
-int main() {
+int
+main() {
     std::mt19937_64 rng(0xc0ffee123);
     if (!run_bitwise_fuzz(rng, 8000)) {
         return 1;

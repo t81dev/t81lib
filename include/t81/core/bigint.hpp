@@ -73,8 +73,12 @@ namespace t81::core {
             }
         }
 
-        static bigint zero() noexcept { return {}; }
-        static bigint one() { return bigint(limb::one()); }
+        static bigint zero() noexcept {
+            return {};
+        }
+        static bigint one() {
+            return bigint(limb::one());
+        }
 
         static bigint from_limbs(std::vector<limb> limbs, bool negative) {
             bigint result;
@@ -124,15 +128,21 @@ namespace t81::core {
             return digits;
         }
 
-        bool is_zero() const noexcept { return limbs_.empty(); }
-        bool is_negative() const noexcept { return negative_; }
+        bool is_zero() const noexcept {
+            return limbs_.empty();
+        }
+        bool is_negative() const noexcept {
+            return negative_;
+        }
         int signum() const noexcept {
             if (is_zero()) {
                 return 0;
             }
             return negative_ ? -1 : 1;
         }
-        std::size_t limb_count() const noexcept { return limbs_.size(); }
+        std::size_t limb_count() const noexcept {
+            return limbs_.size();
+        }
 
         const limb &limb_at(std::size_t index) const {
             if (index >= limbs_.size()) {
@@ -378,40 +388,56 @@ namespace t81::core {
         }
 
         bigint operator&(const bigint &other) const {
-            return apply_limbwise(*this, other,
-                                  [](const limb &lhs, const limb &rhs) { return lhs & rhs; });
+            return apply_limbwise(
+                *this, other, [](const limb &lhs, const limb &rhs) { return lhs & rhs; });
         }
 
         bigint operator|(const bigint &other) const {
-            return apply_limbwise(*this, other,
-                                  [](const limb &lhs, const limb &rhs) { return lhs | rhs; });
+            return apply_limbwise(
+                *this, other, [](const limb &lhs, const limb &rhs) { return lhs | rhs; });
         }
 
         bigint operator^(const bigint &other) const {
-            return apply_limbwise(*this, other,
-                                  [](const limb &lhs, const limb &rhs) { return lhs ^ rhs; });
+            return apply_limbwise(
+                *this, other, [](const limb &lhs, const limb &rhs) { return lhs ^ rhs; });
         }
 
         bigint bitwise_andnot(const bigint &other) const {
-            return apply_limbwise(*this, other,
-                                  [](const limb &lhs, const limb &rhs) { return lhs & ~rhs; });
+            return apply_limbwise(
+                *this, other, [](const limb &lhs, const limb &rhs) { return lhs & ~rhs; });
         }
 
-        bigint bitwise_nand(const bigint &other) const { return ~(operator&(other)); }
+        bigint bitwise_nand(const bigint &other) const {
+            return ~(operator&(other));
+        }
 
-        bigint bitwise_nor(const bigint &other) const { return ~(operator|(other)); }
+        bigint bitwise_nor(const bigint &other) const {
+            return ~(operator|(other));
+        }
 
-        bigint bitwise_xnor(const bigint &other) const { return ~(operator^(other)); }
+        bigint bitwise_xnor(const bigint &other) const {
+            return ~(operator^(other));
+        }
 
-        bigint operator~() const { return -(*this + bigint::one()); }
+        bigint operator~() const {
+            return -(*this + bigint::one());
+        }
 
-        bigint operator<<(int shift) const { return tryte_shift_left(shift); }
+        bigint operator<<(int shift) const {
+            return tryte_shift_left(shift);
+        }
 
-        bigint operator>>(int shift) const { return tryte_shift_right(shift); }
+        bigint operator>>(int shift) const {
+            return tryte_shift_right(shift);
+        }
 
-        bigint rotate_left_tbits(int count) const { return trit_shift_left(count); }
+        bigint rotate_left_tbits(int count) const {
+            return trit_shift_left(count);
+        }
 
-        bigint rotate_right_tbits(int count) const { return trit_shift_right(count); }
+        bigint rotate_right_tbits(int count) const {
+            return trit_shift_right(count);
+        }
 
         bigint trit_shift_left(int count) const {
             if (count <= 0) {
@@ -871,17 +897,17 @@ namespace t81::core {
             auto z1 = multiply_magnitude(lhs_sum, rhs_sum);
             auto z1_minus_z0 = subtract_magnitude(z1, z0);
             auto z1_final = subtract_magnitude(z1_minus_z0, z2);
-            auto shift_and_add = [&](std::vector<limb> &target, const std::vector<limb> &value,
-                                     std::size_t shift) {
-                if (value.empty()) {
-                    return;
-                }
-                std::vector<limb> shifted;
-                shifted.reserve(value.size() + shift);
-                shifted.insert(shifted.end(), shift, limb::zero());
-                shifted.insert(shifted.end(), value.begin(), value.end());
-                target = add_magnitude(target, shifted);
-            };
+            auto shift_and_add =
+                [&](std::vector<limb> &target, const std::vector<limb> &value, std::size_t shift) {
+                    if (value.empty()) {
+                        return;
+                    }
+                    std::vector<limb> shifted;
+                    shifted.reserve(value.size() + shift);
+                    shifted.insert(shifted.end(), shift, limb::zero());
+                    shifted.insert(shifted.end(), value.begin(), value.end());
+                    target = add_magnitude(target, shifted);
+                };
             std::vector<limb> result = z0;
             shift_and_add(result, z1_final, half);
             shift_and_add(result, z2, half * 2);

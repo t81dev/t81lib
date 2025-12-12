@@ -39,7 +39,8 @@ namespace {
 
 } // namespace
 
-int main() {
+int
+main() {
     bool all_good = true;
     const auto expect = [&](bool condition, const char *message) {
         if (!condition) {
@@ -92,9 +93,9 @@ int main() {
         }
     }
 
-    for (const auto special :
-         {std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity(),
-          std::numeric_limits<double>::quiet_NaN()}) {
+    for (const auto special : {std::numeric_limits<double>::infinity(),
+                               -std::numeric_limits<double>::infinity(),
+                               std::numeric_limits<double>::quiet_NaN()}) {
         try {
             (void)limb::from_double(special);
             expect(false, "infinity/NaN must throw invalid_argument");

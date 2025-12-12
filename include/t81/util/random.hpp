@@ -34,8 +34,8 @@ namespace t81::util {
         return result;
     }
 
-    inline t81::core::bigint random_bigint(std::mt19937_64 &generator, std::size_t limb_count,
-                                           bool allow_negative = true) {
+    inline t81::core::bigint
+    random_bigint(std::mt19937_64 &generator, std::size_t limb_count, bool allow_negative = true) {
         if (limb_count == 0) {
             return t81::core::bigint::zero();
         }

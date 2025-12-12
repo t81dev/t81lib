@@ -65,7 +65,9 @@ namespace t81 {
             normalize();
         }
 
-        static Float zero() noexcept { return {}; }
+        static Float zero() noexcept {
+            return {};
+        }
 
         static Float from_string(std::string_view text) {
             if (text.empty()) {
@@ -247,15 +249,26 @@ namespace t81 {
             return Float(mantissa.to_limb(), exponent);
         }
 
-        core::limb mantissa() const noexcept { return mantissa_; }
-        int exponent() const noexcept { return exponent_; }
-        bool is_zero() const noexcept { return mantissa_.is_zero(); }
+        core::limb mantissa() const noexcept {
+            return mantissa_;
+        }
+        int exponent() const noexcept {
+            return exponent_;
+        }
+        bool is_zero() const noexcept {
+            return mantissa_.is_zero();
+        }
 
-        Float scaled_trits(int trits) const noexcept { return Float(mantissa_, exponent_ + trits); }
+        Float scaled_trits(int trits) const noexcept {
+            return Float(mantissa_, exponent_ + trits);
+        }
 
-        Float scaled_trytes(int trytes) const noexcept { return scaled_trits(trytes * 3); }
+        Float scaled_trytes(int trytes) const noexcept {
+            return scaled_trits(trytes * 3);
+        }
 
-        explicit Float(int value) : Float(core::bigint(value).to_limb()) {}
+        explicit Float(int value) : Float(core::bigint(value).to_limb()) {
+        }
         Float sqrt() const;
 
         friend Float operator+(Float lhs, const Float &rhs);
@@ -482,11 +495,19 @@ namespace t81 {
             normalize();
         }
 
-        static constexpr FloatN zero() noexcept { return {}; }
+        static constexpr FloatN zero() noexcept {
+            return {};
+        }
 
-        constexpr const mantissa_type &mantissa() const noexcept { return mantissa_; }
-        constexpr int exponent() const noexcept { return exponent_; }
-        constexpr bool is_zero() const noexcept { return mantissa_.is_zero(); }
+        constexpr const mantissa_type &mantissa() const noexcept {
+            return mantissa_;
+        }
+        constexpr int exponent() const noexcept {
+            return exponent_;
+        }
+        constexpr bool is_zero() const noexcept {
+            return mantissa_.is_zero();
+        }
 
         constexpr FloatN scaled_trits(int trits) const noexcept {
             return FloatN(mantissa_, exponent_ + trits, true);
@@ -496,9 +517,11 @@ namespace t81 {
             return scaled_trits(trytes * 3);
         }
 
-        explicit FloatN(int value) : FloatN(mantissa_type(core::bigint(value)), 0) {}
+        explicit FloatN(int value) : FloatN(mantissa_type(core::bigint(value)), 0) {
+        }
         explicit FloatN(const Float &value)
-            : FloatN(mantissa_type(core::bigint(value.mantissa())), value.exponent()) {}
+            : FloatN(mantissa_type(core::bigint(value.mantissa())), value.exponent()) {
+        }
         FloatN sqrt() const;
 
         friend FloatN operator+(FloatN lhs, const FloatN &rhs);
@@ -561,15 +584,20 @@ namespace t81 {
     class Ratio {
       public:
         Ratio() noexcept = default;
-        explicit Ratio(core::bigint numerator) : Ratio(std::move(numerator), core::bigint::one()) {}
-        explicit Ratio(core::limb numerator) : Ratio(core::bigint(numerator)) {}
+        explicit Ratio(core::bigint numerator) : Ratio(std::move(numerator), core::bigint::one()) {
+        }
+        explicit Ratio(core::limb numerator) : Ratio(core::bigint(numerator)) {
+        }
         Ratio(core::limb numerator, core::limb denominator)
-            : Ratio(core::bigint(numerator), core::bigint(denominator)) {}
+            : Ratio(core::bigint(numerator), core::bigint(denominator)) {
+        }
         Ratio(core::bigint numerator, core::bigint denominator) {
             normalize(std::move(numerator), std::move(denominator));
         }
 
-        static Ratio zero() noexcept { return Ratio(); }
+        static Ratio zero() noexcept {
+            return Ratio();
+        }
         static Ratio from_float(const Float &value) {
             if (value.is_zero()) {
                 return Ratio::zero();
@@ -584,9 +612,15 @@ namespace t81 {
             return Ratio(std::move(numerator), std::move(denominator));
         }
 
-        const core::bigint &numerator() const noexcept { return numerator_; }
-        const core::bigint &denominator() const noexcept { return denominator_; }
-        bool is_zero() const noexcept { return numerator_.is_zero(); }
+        const core::bigint &numerator() const noexcept {
+            return numerator_;
+        }
+        const core::bigint &denominator() const noexcept {
+            return denominator_;
+        }
+        bool is_zero() const noexcept {
+            return numerator_.is_zero();
+        }
 
         friend Ratio operator+(const Ratio &lhs, const Ratio &rhs) {
             core::bigint numerator =
@@ -727,7 +761,9 @@ namespace t81 {
             }
         }
 
-        Float to_float() const { return static_cast<Float>(*this); }
+        Float to_float() const {
+            return static_cast<Float>(*this);
+        }
 
       private:
         void normalize(core::bigint numerator, core::bigint denominator) {
@@ -828,9 +864,12 @@ namespace t81 {
       public:
         explicit Modulus(core::limb modulus)
             : montgomery_context_(modulus), modulus_(montgomery_context_.modulus()),
-              ternary_base_(core::limb::from_value(3)) {}
+              ternary_base_(core::limb::from_value(3)) {
+        }
 
-        const core::limb &modulus() const noexcept { return modulus_; }
+        const core::limb &modulus() const noexcept {
+            return modulus_;
+        }
         const core::MontgomeryContext<core::limb> &montgomery_context() const noexcept {
             return montgomery_context_;
         }
@@ -872,14 +911,20 @@ namespace t81 {
     class MontgomeryInt {
       public:
         explicit MontgomeryInt(const Modulus &modulus)
-            : modulus_(&modulus), value_(modulus.to_montgomery(core::limb::zero())) {}
+            : modulus_(&modulus), value_(modulus.to_montgomery(core::limb::zero())) {
+        }
 
         MontgomeryInt(const Modulus &modulus, core::limb plain)
-            : modulus_(&modulus), value_(modulus.to_montgomery(reduce(plain))) {}
+            : modulus_(&modulus), value_(modulus.to_montgomery(reduce(plain))) {
+        }
 
-        const Modulus &modulus() const noexcept { return *modulus_; }
+        const Modulus &modulus() const noexcept {
+            return *modulus_;
+        }
 
-        core::limb to_limb() const { return modulus_->from_montgomery(value_); }
+        core::limb to_limb() const {
+            return modulus_->from_montgomery(value_);
+        }
 
         MontgomeryInt &operator+=(const MontgomeryInt &other) {
             ensure_same_modulus(other);
@@ -951,10 +996,15 @@ namespace t81 {
     template <typename Component> class Complex {
       public:
         Complex() noexcept = default;
-        Complex(Component real, Component imag) : real_(real), imag_(imag) {}
+        Complex(Component real, Component imag) : real_(real), imag_(imag) {
+        }
 
-        const Component &real() const noexcept { return real_; }
-        const Component &imag() const noexcept { return imag_; }
+        const Component &real() const noexcept {
+            return real_;
+        }
+        const Component &imag() const noexcept {
+            return imag_;
+        }
 
         Complex &operator+=(const Complex &other) {
             real_ += other.real_;
@@ -1002,18 +1052,33 @@ namespace t81 {
 
         Vector() noexcept = default;
         explicit Vector(std::size_t size, value_type value = value_type{})
-            : elements_(size, value) {}
-        Vector(std::initializer_list<value_type> init) : elements_(init) {}
-        explicit Vector(std::vector<value_type> elements) : elements_(std::move(elements)) {}
+            : elements_(size, value) {
+        }
+        Vector(std::initializer_list<value_type> init) : elements_(init) {
+        }
+        explicit Vector(std::vector<value_type> elements) : elements_(std::move(elements)) {
+        }
 
-        std::size_t size() const noexcept { return elements_.size(); }
-        bool empty() const noexcept { return elements_.empty(); }
+        std::size_t size() const noexcept {
+            return elements_.size();
+        }
+        bool empty() const noexcept {
+            return elements_.empty();
+        }
 
-        value_type &operator[](std::size_t index) { return elements_[index]; }
-        const value_type &operator[](std::size_t index) const { return elements_[index]; }
+        value_type &operator[](std::size_t index) {
+            return elements_[index];
+        }
+        const value_type &operator[](std::size_t index) const {
+            return elements_[index];
+        }
 
-        std::vector<value_type> &data() noexcept { return elements_; }
-        const std::vector<value_type> &data() const noexcept { return elements_; }
+        std::vector<value_type> &data() noexcept {
+            return elements_;
+        }
+        const std::vector<value_type> &data() const noexcept {
+            return elements_;
+        }
 
         Vector &operator+=(const Vector &other) {
             ensure_same_size(other);
@@ -1084,7 +1149,9 @@ namespace t81 {
         using value_type = Element;
 
         Matrix() noexcept = default;
-        explicit Matrix(value_type value) { storage_.fill(value); }
+        explicit Matrix(value_type value) {
+            storage_.fill(value);
+        }
         Matrix(std::initializer_list<value_type> init) {
             if (init.size() != storage_.size()) {
                 throw std::invalid_argument("Matrix initializer size mismatch");
@@ -1100,8 +1167,12 @@ namespace t81 {
             return storage_.at(row * Cols + column);
         }
 
-        std::size_t rows() const noexcept { return Rows; }
-        std::size_t cols() const noexcept { return Cols; }
+        std::size_t rows() const noexcept {
+            return Rows;
+        }
+        std::size_t cols() const noexcept {
+            return Cols;
+        }
 
         Matrix &operator+=(const Matrix &other) {
             for (std::size_t index = 0; index < storage_.size(); ++index) {
@@ -1186,7 +1257,9 @@ namespace t81 {
             normalize();
         }
 
-        static Polynomial zero() noexcept { return Polynomial(); }
+        static Polynomial zero() noexcept {
+            return Polynomial();
+        }
         static Polynomial constant(const Coefficient &value) {
             if (value == Coefficient{}) {
                 return zero();
@@ -1201,7 +1274,9 @@ namespace t81 {
             return coeffs_.size() - 1;
         }
 
-        const std::vector<Coefficient> &coefficients() const noexcept { return coeffs_; }
+        const std::vector<Coefficient> &coefficients() const noexcept {
+            return coeffs_;
+        }
 
         const Coefficient &operator[](std::size_t index) const {
             if (index >= coeffs_.size()) {
@@ -1349,7 +1424,8 @@ namespace t81 {
             return x0.to_limb();
         }
 
-        inline void apply_ternary_ntt(std::vector<MontgomeryInt> &values, const Modulus &modulus,
+        inline void apply_ternary_ntt(std::vector<MontgomeryInt> &values,
+                                      const Modulus &modulus,
                                       const MontgomeryInt &primitive_root) {
             const std::size_t length = values.size();
             if (length <= 1) {
@@ -1433,11 +1509,15 @@ namespace t81 {
         static constexpr int trits = N;
 
         constexpr Fixed() noexcept = default;
-        explicit Fixed(core::bigint value) : trits_(from_bigint(std::move(value))) {}
+        explicit Fixed(core::bigint value) : trits_(from_bigint(std::move(value))) {
+        }
         explicit constexpr Fixed(std::array<std::int8_t, N> trits)
-            : trits_(normalize_trits(std::move(trits))) {}
+            : trits_(normalize_trits(std::move(trits))) {
+        }
 
-        constexpr const std::array<std::int8_t, N> &digits() const noexcept { return trits_; }
+        constexpr const std::array<std::int8_t, N> &digits() const noexcept {
+            return trits_;
+        }
 
         core::bigint to_bigint() const {
             core::bigint result = core::bigint::zero();

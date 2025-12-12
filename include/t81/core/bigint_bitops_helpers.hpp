@@ -82,7 +82,9 @@ namespace t81::core {
         return from_signed_limbs(std::move(result));
     }
 
-    inline bigint expected_not(const bigint &value) { return -(value + bigint::one()); }
+    inline bigint expected_not(const bigint &value) {
+        return -(value + bigint::one());
+    }
 
     inline bigint expected_trit_shift_left(const bigint &value, int count) {
         if (count <= 0) {

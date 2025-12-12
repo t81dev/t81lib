@@ -3,7 +3,8 @@
 #include <iostream>
 #include <t81/t81lib.hpp>
 
-int main() {
+int
+main() {
     t81::core::bigint a;
     t81::core::bigint b;
     if (!(a == b)) {

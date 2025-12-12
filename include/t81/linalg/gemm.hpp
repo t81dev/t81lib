@@ -24,8 +24,8 @@ namespace t81::linalg {
 #endif
         }
 
-        inline constexpr auto build_tryte_contributions() -> std::array<
-            std::array<double, 27>, core::limb::TRYTES> {
+        inline constexpr auto build_tryte_contributions()
+            -> std::array<std::array<double, 27>, core::limb::TRYTES> {
             std::array<std::array<double, 27>, core::limb::TRYTES> table{};
             double weight = 1.0;
             for (std::size_t position = 0; position < core::limb::TRYTES; ++position) {
@@ -36,7 +36,7 @@ namespace t81::linalg {
                 }
                 weight *= 27.0;
             }
-        return table;
+            return table;
         }
 
         inline const auto &tryte_contribution_table() {
@@ -64,8 +64,14 @@ namespace t81::linalg {
 
     } // namespace detail
 
-    inline void gemm_ternary(std::span<const core::limb> A, std::span<const core::limb> B,
-                             std::span<float> C, int M, int N, int K, float alpha, float beta) {
+    inline void gemm_ternary(std::span<const core::limb> A,
+                             std::span<const core::limb> B,
+                             std::span<float> C,
+                             int M,
+                             int N,
+                             int K,
+                             float alpha,
+                             float beta) {
         if (M < 0 || N < 0 || K < 0) {
             throw std::invalid_argument("gemm_ternary dimensions must be non-negative");
         }

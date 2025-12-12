@@ -6,7 +6,8 @@
 #include <t81/core/montgomery_helpers.hpp>
 #include <t81/t81lib.hpp>
 
-int main() {
+int
+main() {
     using t81::core::bigint;
     using t81::core::limb;
     using namespace t81::core::montgomery;

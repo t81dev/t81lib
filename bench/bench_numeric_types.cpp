@@ -8,7 +8,9 @@ namespace {
 
     namespace core = t81::core;
 
-    static core::limb make_limb(int value) { return core::limb::from_value(value); }
+    static core::limb make_limb(int value) {
+        return core::limb::from_value(value);
+    }
 
     static void BM_FloatMultiply(benchmark::State &state) {
         const t81::Float lhs(make_limb(27), 5);

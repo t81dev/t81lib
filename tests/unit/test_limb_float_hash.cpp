@@ -7,7 +7,8 @@
 
 #include <t81/t81lib.hpp>
 
-int main() {
+int
+main() {
     bool all_good = true;
     const auto expect = [&](bool condition, const char *message) {
         if (!condition) {

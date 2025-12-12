@@ -41,7 +41,8 @@ namespace {
     using t81::core::from_signed_limbs;
     using t81::core::signed_limbs;
 
-    bool check_equal(const t81::core::bigint &lhs, const t81::core::bigint &rhs,
+    bool check_equal(const t81::core::bigint &lhs,
+                     const t81::core::bigint &rhs,
                      std::string_view label) {
         if (lhs == rhs) {
             return true;
@@ -157,8 +158,8 @@ namespace {
             dividend += divisor;
         }
         const auto [quotient, remainder] = bigint::div_mod(dividend, divisor);
-        if (!check_equal(quotient * divisor + remainder, dividend,
-                         "divide_magnitude large recomposition")) {
+        if (!check_equal(
+                quotient * divisor + remainder, dividend, "divide_magnitude large recomposition")) {
             return false;
         }
         if (remainder.is_negative()) {
@@ -220,8 +221,8 @@ namespace {
             return false;
         }
         const bigint negative = bigint(-b_value);
-        if (!check_equal(bigint::gcd(a, negative), bigint(expect_value),
-                         "gcd with negative operand")) {
+        if (!check_equal(
+                bigint::gcd(a, negative), bigint(expect_value), "gcd with negative operand")) {
             return false;
         }
         const auto base_common = t81::io::from_string<bigint>("231");
@@ -238,20 +239,23 @@ namespace {
     bool test_mod_pow_cases() {
         using bigint = t81::core::bigint;
         const bigint modulus = bigint(1000);
-        if (!check_equal(bigint::mod_pow(bigint(2), bigint(10), modulus), bigint(24),
-                         "mod_pow small")) {
+        if (!check_equal(
+                bigint::mod_pow(bigint(2), bigint(10), modulus), bigint(24), "mod_pow small")) {
             return false;
         }
-        if (!check_equal(bigint::mod_pow(bigint(5), bigint(0), modulus), bigint(1),
+        if (!check_equal(bigint::mod_pow(bigint(5), bigint(0), modulus),
+                         bigint(1),
                          "mod_pow exponent zero")) {
             return false;
         }
-        if (!check_equal(bigint::mod_pow(bigint(-3), bigint(3), bigint(50)), bigint(23),
+        if (!check_equal(bigint::mod_pow(bigint(-3), bigint(3), bigint(50)),
+                         bigint(23),
                          "mod_pow negative base")) {
             return false;
         }
         const bigint large_mod = t81::io::from_string<bigint>("1000003");
-        if (!check_equal(bigint::mod_pow(bigint(2), bigint(20), large_mod), bigint(48573),
+        if (!check_equal(bigint::mod_pow(bigint(2), bigint(20), large_mod),
+                         bigint(48573),
                          "mod_pow large modulus")) {
             return false;
         }
@@ -293,7 +297,8 @@ namespace {
             if (!check_equal(a ^ b, t81::core::bigint(limb_a ^ limb_b), "bitwise ^")) {
                 return false;
             }
-            if (!check_equal(a.consensus(b), t81::core::bigint(limb_a.consensus(limb_b)),
+            if (!check_equal(a.consensus(b),
+                             t81::core::bigint(limb_a.consensus(limb_b)),
                              "bitwise consensus")) {
                 return false;
             }
@@ -304,21 +309,24 @@ namespace {
             const auto large_a = random_large_bigint(rng);
             const auto large_b = random_large_bigint(rng);
             if (!check_equal(large_a & large_b,
-                             expected_bitwise(large_a, large_b,
+                             expected_bitwise(large_a,
+                                              large_b,
                                               [](const t81::core::limb &lhs,
                                                  const t81::core::limb &rhs) { return lhs & rhs; }),
                              "large bitwise &")) {
                 return false;
             }
             if (!check_equal(large_a | large_b,
-                             expected_bitwise(large_a, large_b,
+                             expected_bitwise(large_a,
+                                              large_b,
                                               [](const t81::core::limb &lhs,
                                                  const t81::core::limb &rhs) { return lhs | rhs; }),
                              "large bitwise |")) {
                 return false;
             }
             if (!check_equal(large_a ^ large_b,
-                             expected_bitwise(large_a, large_b,
+                             expected_bitwise(large_a,
+                                              large_b,
                                               [](const t81::core::limb &lhs,
                                                  const t81::core::limb &rhs) { return lhs ^ rhs; }),
                              "large bitwise ^")) {
@@ -326,7 +334,8 @@ namespace {
             }
             if (!check_equal(
                     large_a.consensus(large_b),
-                    expected_bitwise(large_a, large_b,
+                    expected_bitwise(large_a,
+                                     large_b,
                                      [](const t81::core::limb &lhs, const t81::core::limb &rhs) {
                                          return lhs.consensus(rhs);
                                      }),
@@ -346,18 +355,21 @@ namespace {
         for (int iteration = 0; iteration < 32; ++iteration) {
             const auto value = random_large_bigint(rng);
             for (int count : tryte_shifts) {
-                if (!check_equal(value << count, expected_tryte_shift_left(value, count),
+                if (!check_equal(value << count,
+                                 expected_tryte_shift_left(value, count),
                                  "tryte shift left multi")) {
                     return false;
                 }
-                if (!check_equal(value >> count, expected_tryte_shift_right(value, count),
+                if (!check_equal(value >> count,
+                                 expected_tryte_shift_right(value, count),
                                  "tryte shift right multi")) {
                     return false;
                 }
             }
             for (int count : trit_shifts) {
                 if (!check_equal(value.trit_shift_left(count),
-                                 expected_trit_shift_left(value, count), "trit shift left multi")) {
+                                 expected_trit_shift_left(value, count),
+                                 "trit shift left multi")) {
                     return false;
                 }
                 if (!check_equal(value.trit_shift_right(count),
@@ -365,11 +377,13 @@ namespace {
                                  "trit shift right multi")) {
                     return false;
                 }
-                if (!check_equal(value.rotate_left_tbits(count), value.trit_shift_left(count),
+                if (!check_equal(value.rotate_left_tbits(count),
+                                 value.trit_shift_left(count),
                                  "rotate left alias")) {
                     return false;
                 }
-                if (!check_equal(value.rotate_right_tbits(count), value.trit_shift_right(count),
+                if (!check_equal(value.rotate_right_tbits(count),
+                                 value.trit_shift_right(count),
                                  "rotate right alias")) {
                     return false;
                 }
@@ -425,7 +439,8 @@ namespace {
 
 } // namespace
 
-int main() {
+int
+main() {
     std::mt19937_64 rng(0xc0ffee123);
     if (!test_string_roundtrip(rng)) {
         return 1;

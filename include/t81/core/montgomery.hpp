@@ -100,7 +100,9 @@ namespace t81::core {
             m_prime_ = compute_m_prime();
         }
 
-        const limb &modulus() const noexcept { return modulus_; }
+        const limb &modulus() const noexcept {
+            return modulus_;
+        }
 
         limb to_montgomery(const limb &value) const {
             const limb reduced = detail::reduce_mod(value, modulus_);
@@ -109,14 +111,18 @@ namespace t81::core {
             return result;
         }
 
-        limb from_montgomery(const limb &value) const { return redc(value, limb::zero()); }
+        limb from_montgomery(const limb &value) const {
+            return redc(value, limb::zero());
+        }
 
         limb mul(const limb &lhs, const limb &rhs) const {
             const auto [low, high] = limb::mul_wide(lhs, rhs);
             return redc(low, high);
         }
 
-        limb square(const limb &value) const { return mul(value, value); }
+        limb square(const limb &value) const {
+            return mul(value, value);
+        }
 
         limb pow(const limb &base_bar, const limb &exponent) const {
             auto exp_value = exponent.to_value();
@@ -202,18 +208,26 @@ namespace t81::core {
             m_prime_ = compute_m_prime();
         }
 
-        const bigint &modulus() const noexcept { return modulus_; }
+        const bigint &modulus() const noexcept {
+            return modulus_;
+        }
 
         bigint to_montgomery(const bigint &value) const {
             const auto reduced = reduce(value);
             return redc(reduced * R2_mod_m_);
         }
 
-        bigint from_montgomery(const bigint &value) const { return redc(value); }
+        bigint from_montgomery(const bigint &value) const {
+            return redc(value);
+        }
 
-        bigint mul(const bigint &lhs, const bigint &rhs) const { return redc(lhs * rhs); }
+        bigint mul(const bigint &lhs, const bigint &rhs) const {
+            return redc(lhs * rhs);
+        }
 
-        bigint square(const bigint &value) const { return mul(value, value); }
+        bigint square(const bigint &value) const {
+            return mul(value, value);
+        }
 
         bigint pow(const bigint &base_bar, const bigint &exponent) const {
             if (exponent.is_negative()) {

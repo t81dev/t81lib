@@ -29,7 +29,8 @@
 namespace py = pybind11;
 namespace core = t81::core;
 
-static std::string decimal_string(const core::bigint &value) {
+static std::string
+decimal_string(const core::bigint &value) {
     if (value.is_zero()) {
         return "0";
     }
@@ -50,12 +51,14 @@ static std::string decimal_string(const core::bigint &value) {
     return result;
 }
 
-static py::int_ to_python_int(const core::bigint &value) {
+static py::int_
+to_python_int(const core::bigint &value) {
     const auto builtins = py::module_::import("builtins");
     return builtins.attr("int")(decimal_string(value));
 }
 
-static py::int_ limb_to_python_int(const core::limb &value) {
+static py::int_
+limb_to_python_int(const core::limb &value) {
     return to_python_int(core::bigint(value));
 }
 
@@ -211,7 +214,8 @@ namespace {
     }
 
     py::tuple quantize_row_tq1_0(py::array_t<float, py::array::c_style | py::array::forcecast> row,
-                                 float threshold, float scale) {
+                                 float threshold,
+                                 float scale) {
         const auto info = row.request();
         if (info.ndim != 1) {
             throw py::value_error("quantize_row_tq1_0 requires a 1-D float array");
@@ -228,14 +232,15 @@ namespace {
             actual_scale =
                 t81::core::gguf::compute_scale(static_cast<const float *>(info.ptr), length);
         }
-        t81::core::gguf::quantize_row_tq1_0(static_cast<const float *>(info.ptr), length, threshold,
-                                            actual_scale, dest);
+        t81::core::gguf::quantize_row_tq1_0(
+            static_cast<const float *>(info.ptr), length, threshold, actual_scale, dest);
         return py::make_tuple(actual_scale, std::move(packed));
     }
 
     py::array_t<float>
     dequant_row_tq1_0(py::array_t<std::uint16_t, py::array::c_style | py::array::forcecast> packed,
-                      int cols, float scale) {
+                      int cols,
+                      float scale) {
         if (cols < 0) {
             throw py::value_error("cols must be non-negative");
         }
@@ -249,13 +254,15 @@ namespace {
         py::array_t<float> result(static_cast<py::ssize_t>(cols));
         auto result_info = result.request(true);
         auto *destination = static_cast<float *>(result_info.ptr);
-        t81::core::gguf::dequantize_row_tq1_0(static_cast<const std::uint16_t *>(info.ptr), cols,
-                                              scale, destination);
+        t81::core::gguf::dequantize_row_tq1_0(
+            static_cast<const std::uint16_t *>(info.ptr), cols, scale, destination);
         return result;
     }
 
-    py::array_t<float> dequant_tensor_tq1_impl(py::buffer buffer, std::int64_t rows,
-                                               std::int64_t cols, std::int64_t block_rows,
+    py::array_t<float> dequant_tensor_tq1_impl(py::buffer buffer,
+                                               std::int64_t rows,
+                                               std::int64_t cols,
+                                               std::int64_t block_rows,
                                                bool has_refinements) {
         if (rows < 0 || cols < 0) {
             throw py::value_error("rows and cols must be non-negative");
@@ -288,7 +295,8 @@ namespace {
                 throw py::value_error("buffer truncated while reading scale");
             }
             std::uint16_t scale_bits = 0;
-            std::memcpy(&scale_bits, static_cast<const std::uint8_t *>(info.ptr) + offset,
+            std::memcpy(&scale_bits,
+                        static_cast<const std::uint8_t *>(info.ptr) + offset,
                         sizeof(scale_bits));
             offset += sizeof(std::uint16_t);
             if (has_refinements) {
@@ -308,10 +316,13 @@ namespace {
                 }
                 if (row_bytes > 0) {
                     std::memcpy(row_buffer.data(),
-                                static_cast<const std::uint8_t *>(info.ptr) + offset, row_bytes);
+                                static_cast<const std::uint8_t *>(info.ptr) + offset,
+                                row_bytes);
                 }
                 offset += row_bytes;
-                t81::core::gguf::dequantize_row_tq1_0(row_buffer.data(), cols, scale,
+                t81::core::gguf::dequantize_row_tq1_0(row_buffer.data(),
+                                                      cols,
+                                                      scale,
                                                       destination +
                                                           static_cast<std::size_t>(current_row) *
                                                               static_cast<std::size_t>(cols));
@@ -323,7 +334,8 @@ namespace {
 
     py::array_t<std::int8_t>
     unpack_packed_limbs(py::array_t<std::uint8_t, py::array::c_style | py::array::forcecast> packed,
-                        int rows, int cols) {
+                        int rows,
+                        int cols) {
         if (rows < 0 || cols < 0) {
             throw py::value_error("rows and cols must be non-negative");
         }
@@ -413,15 +425,25 @@ namespace {
         using Context = core::MontgomeryContext<Int>;
         py::class_<Context> cls(module, name, "Montgomery reduction context for modular math");
         cls.def(py::init<const Int &>(), py::arg("modulus"))
-            .def_property_readonly("modulus", &Context::modulus,
-                                   "Modulus used by this Montgomery context")
-            .def("to_montgomery", &Context::to_montgomery, py::arg("value"),
+            .def_property_readonly(
+                "modulus", &Context::modulus, "Modulus used by this Montgomery context")
+            .def("to_montgomery",
+                 &Context::to_montgomery,
+                 py::arg("value"),
                  "Map a value into Montgomery form")
-            .def("from_montgomery", &Context::from_montgomery, py::arg("value"),
+            .def("from_montgomery",
+                 &Context::from_montgomery,
+                 py::arg("value"),
                  "Reduce a Montgomery number back to standard representation")
-            .def("mod_mul", &Context::mul, py::arg("lhs"), py::arg("rhs"),
+            .def("mod_mul",
+                 &Context::mul,
+                 py::arg("lhs"),
+                 py::arg("rhs"),
                  "Perform a Montgomery-aware multiplication")
-            .def("mod_pow", &Context::pow, py::arg("base"), py::arg("exponent"),
+            .def("mod_pow",
+                 &Context::pow,
+                 py::arg("base"),
+                 py::arg("exponent"),
                  "Exponentiate inside the Montgomery domain");
     }
 
@@ -435,8 +457,14 @@ PYBIND11_MODULE(t81lib, module) {
 
     module.def(
         "gemm_ternary",
-        [](py::buffer A_packed, py::buffer B_packed, py::buffer C_buffer, int M, int N, int K,
-           float alpha, float beta) {
+        [](py::buffer A_packed,
+           py::buffer B_packed,
+           py::buffer C_buffer,
+           int M,
+           int N,
+           int K,
+           float alpha,
+           float beta) {
             if (M < 0 || N < 0 || K < 0) {
                 throw py::value_error("gemm_ternary dimensions must be non-negative");
             }
@@ -458,14 +486,28 @@ PYBIND11_MODULE(t81lib, module) {
             auto c_span = make_float_span(c_view, expected_c);
             t81::linalg::gemm_ternary(a_span, b_span, c_span, M, N, K, alpha, beta);
         },
-        py::arg("A"), py::arg("B"), py::arg("C"), py::arg("M"), py::arg("N"), py::arg("K"),
-        py::arg("alpha") = 1.0f, py::arg("beta") = 0.0f, "Packed-limb GEMM using AVX/NEON kernels");
+        py::arg("A"),
+        py::arg("B"),
+        py::arg("C"),
+        py::arg("M"),
+        py::arg("N"),
+        py::arg("K"),
+        py::arg("alpha") = 1.0f,
+        py::arg("beta") = 0.0f,
+        "Packed-limb GEMM using AVX/NEON kernels");
 
     module.def(
         "spmm_simple",
-        [](const std::vector<long long> &values, const std::vector<int32_t> &row_indices,
-           const std::vector<int32_t> &col_indices, int rows, int cols, py::buffer B_buffer,
-           py::buffer C_buffer, int N, float alpha, float beta) {
+        [](const std::vector<long long> &values,
+           const std::vector<int32_t> &row_indices,
+           const std::vector<int32_t> &col_indices,
+           int rows,
+           int cols,
+           py::buffer B_buffer,
+           py::buffer C_buffer,
+           int N,
+           float alpha,
+           float beta) {
             if (values.size() != row_indices.size() || values.size() != col_indices.size()) {
                 throw py::value_error("Values and indices lengths must match");
             }
@@ -496,36 +538,59 @@ PYBIND11_MODULE(t81lib, module) {
 
             t81::sparse::spmm_simple(matrix, b_span, c_span, N, alpha, beta);
         },
-        py::arg("values"), py::arg("row_indices"), py::arg("col_indices"), py::arg("rows"),
-        py::arg("cols"), py::arg("B"), py::arg("C"), py::arg("N"), py::arg("alpha") = 1.0f,
-        py::arg("beta") = 0.0f, "COO sparse × dense multiply over ternary weights");
+        py::arg("values"),
+        py::arg("row_indices"),
+        py::arg("col_indices"),
+        py::arg("rows"),
+        py::arg("cols"),
+        py::arg("B"),
+        py::arg("C"),
+        py::arg("N"),
+        py::arg("alpha") = 1.0f,
+        py::arg("beta") = 0.0f,
+        "COO sparse × dense multiply over ternary weights");
 
-    module.def("quantize_to_trits", &quantize_to_trits, py::arg("values"),
+    module.def("quantize_to_trits",
+               &quantize_to_trits,
+               py::arg("values"),
                py::arg("threshold") = 0.5f,
                "Convert float arrays into {-1,0,1} trit tensors (works with NumPy or "
                "buffer-compatible tensors)");
 
-    module.def("dequantize_trits", &dequantize_trits, py::arg("trits"),
+    module.def("dequantize_trits",
+               &dequantize_trits,
+               py::arg("trits"),
                "Turn a trit tensor into its float32 representation for debugging or re-projection");
 
-    module.def("pack_dense_matrix", &pack_dense_matrix, py::arg("matrix"),
+    module.def("pack_dense_matrix",
+               &pack_dense_matrix,
+               py::arg("matrix"),
                py::arg("threshold") = 0.5f,
                "Quantize a 2D float array to balanced ternary and return packed limb bytes in a "
                "(rows, limbs, bytes) view");
 
-    module.def("quantize_row_tq1_0", &quantize_row_tq1_0, py::arg("row"),
-               py::arg("threshold") = 0.45f, py::arg("scale") = 0.0f,
+    module.def("quantize_row_tq1_0",
+               &quantize_row_tq1_0,
+               py::arg("row"),
+               py::arg("threshold") = 0.45f,
+               py::arg("scale") = 0.0f,
                "Pack a single row of floats into TQ1_0 blocks and return (scale, packed blocks)");
 
-    module.def("dequant_row_tq1_0", &dequant_row_tq1_0, py::arg("blocks"), py::arg("cols"),
-               py::arg("scale"), "Dequantize a single TQ1_0 row back to float32");
+    module.def("dequant_row_tq1_0",
+               &dequant_row_tq1_0,
+               py::arg("blocks"),
+               py::arg("cols"),
+               py::arg("scale"),
+               "Dequantize a single TQ1_0 row back to float32");
 
     module.def(
         "dequant_tq1_0",
         [](py::buffer buffer, int64_t rows, int64_t cols, int64_t block_rows) {
             return dequant_tensor_tq1_impl(buffer, rows, cols, block_rows, false);
         },
-        py::arg("buffer"), py::arg("rows"), py::arg("cols"),
+        py::arg("buffer"),
+        py::arg("rows"),
+        py::arg("cols"),
         py::arg("block_rows") = static_cast<int64_t>(t81::core::gguf::TQ1_BLOCK_ROWS),
         "Dequantize an entire TQ1_0 tensor payload");
 
@@ -534,11 +599,16 @@ PYBIND11_MODULE(t81lib, module) {
         [](py::buffer buffer, int64_t rows, int64_t cols, int64_t block_rows) {
             return dequant_tensor_tq1_impl(buffer, rows, cols, block_rows, true);
         },
-        py::arg("buffer"), py::arg("rows"), py::arg("cols"),
+        py::arg("buffer"),
+        py::arg("rows"),
+        py::arg("cols"),
         py::arg("block_rows") = static_cast<int64_t>(t81::core::gguf::TQ1_BLOCK_ROWS),
         "Dequantize an entire TQ2_0 tensor payload (refinements ignored for now)");
 
-    module.def("unpack_packed_limbs", &unpack_packed_limbs, py::arg("packed"), py::arg("rows"),
+    module.def("unpack_packed_limbs",
+               &unpack_packed_limbs,
+               py::arg("packed"),
+               py::arg("rows"),
                py::arg("cols"),
                "Recover the quantized trits stored in a (rows, limbs, bytes) packed buffer");
 
@@ -557,16 +627,24 @@ PYBIND11_MODULE(t81lib, module) {
             std::memcpy(bytes.data(), info.ptr, core::limb::BYTES);
             return core::limb::from_bytes(bytes);
         },
-        py::arg("buffer"), "Decode a single limb from its raw 16 byte representation");
+        py::arg("buffer"),
+        "Decode a single limb from its raw 16 byte representation");
 
-    module.def("bigint_gcd", &core::bigint::gcd, py::arg("lhs"), py::arg("rhs"),
+    module.def("bigint_gcd",
+               &core::bigint::gcd,
+               py::arg("lhs"),
+               py::arg("rhs"),
                "Compute the greatest common divisor of two bigints");
 
-    module.def("bigint_mod_pow", &core::bigint::mod_pow, py::arg("base"), py::arg("exponent"),
-               py::arg("modulus"), "Modular exponentiation using repeated squaring");
+    module.def("bigint_mod_pow",
+               &core::bigint::mod_pow,
+               py::arg("base"),
+               py::arg("exponent"),
+               py::arg("modulus"),
+               "Modular exponentiation using repeated squaring");
 
-    py::class_<core::limb> py_limb(module, "Limb",
-                                   "A 48-trit balanced ternary limb for packing data");
+    py::class_<core::limb> py_limb(
+        module, "Limb", "A 48-trit balanced ternary limb for packing data");
     py_limb.def(py::init<>())
         .def(py::init<long long>(), py::arg("value"))
         .def_static("zero", &core::limb::zero)
@@ -604,7 +682,10 @@ PYBIND11_MODULE(t81lib, module) {
                  return py::bytes(reinterpret_cast<const char *>(bytes.data()), bytes.size());
              })
         .def("consensus", &core::limb::consensus)
-        .def_static("pow_mod", &core::limb::pow_mod, py::arg("base"), py::arg("exponent"),
+        .def_static("pow_mod",
+                    &core::limb::pow_mod,
+                    py::arg("base"),
+                    py::arg("exponent"),
                     py::arg("modulus"))
         .def("__add__", [](const core::limb &a, const core::limb &b) { return a + b; })
         .def("__sub__", [](const core::limb &a, const core::limb &b) { return a - b; })
@@ -632,8 +713,8 @@ PYBIND11_MODULE(t81lib, module) {
              [](const core::limb &self) { return "<t81lib.Limb " + self.to_string() + ">"; })
         .def("__str__", &core::limb::to_string);
 
-    py::class_<core::bigint> py_bigint(module, "BigInt",
-                                       "Arbitrary precision bigint with balanced ternary limbs");
+    py::class_<core::bigint> py_bigint(
+        module, "BigInt", "Arbitrary precision bigint with balanced ternary limbs");
     py_bigint.def(py::init<>())
         .def(py::init<long long>(), py::arg("value"))
         .def_static("from_limbs", &core::bigint::from_limbs, py::arg("limbs"), py::arg("negative"))
@@ -653,7 +734,8 @@ PYBIND11_MODULE(t81lib, module) {
         .def_static(
             "from_string",
             [](const std::string &text, int base) { return parse_bigint_string(text, base); },
-            py::arg("text"), py::arg("base") = 10)
+            py::arg("text"),
+            py::arg("base") = 10)
         .def("__int__", &to_python_int)
         .def("__str__", [](const core::bigint &value) { return decimal_string(value); })
         .def("__repr__",
@@ -667,15 +749,16 @@ PYBIND11_MODULE(t81lib, module) {
              [](const core::bigint &self) {
                  const auto trits = core::signed_trits(self);
                  py::array_t<std::int8_t> output(static_cast<std::size_t>(trits.size()));
-                 std::memcpy(output.request().ptr, trits.data(),
-                             trits.size() * sizeof(std::int8_t));
+                 std::memcpy(
+                     output.request().ptr, trits.data(), trits.size() * sizeof(std::int8_t));
                  return output;
              })
         .def("to_limb", &core::bigint::to_limb)
         .def(
             "karatsuba_multiply",
             [](const core::bigint &lhs, const core::bigint &rhs) { return lhs * rhs; },
-            py::arg("other"), "Scale up to large operands using the built-in Karatsuba path")
+            py::arg("other"),
+            "Scale up to large operands using the built-in Karatsuba path")
         .def("__add__", [](const core::bigint &a, const core::bigint &b) { return a + b; })
         .def("__sub__", [](const core::bigint &a, const core::bigint &b) { return a - b; })
         .def("__mul__", [](const core::bigint &a, const core::bigint &b) { return a * b; })
@@ -693,17 +776,21 @@ PYBIND11_MODULE(t81lib, module) {
         .def("bitwise_or", &core::bigint::operator|, py::arg("other"))
         .def("bitwise_xor", &core::bigint::operator^, py::arg("other"))
         .def("bitwise_andnot", &core::bigint::bitwise_andnot, py::arg("other"))
-        .def_static("mod_pow", &core::bigint::mod_pow, py::arg("base"), py::arg("exponent"),
+        .def_static("mod_pow",
+                    &core::bigint::mod_pow,
+                    py::arg("base"),
+                    py::arg("exponent"),
                     py::arg("modulus"));
 
-    py::class_<t81::Ratio> py_ratio(module, "Ratio",
-                                    "Exact ratio built from t81bigint numerators/denominators");
+    py::class_<t81::Ratio> py_ratio(
+        module, "Ratio", "Exact ratio built from t81bigint numerators/denominators");
     py_ratio.def(py::init<>())
         .def(py::init([](long long numerator, long long denominator) {
                  return t81::Ratio(core::limb::from_value(numerator),
                                    core::limb::from_value(denominator));
              }),
-             py::arg("numerator") = 0, py::arg("denominator") = 1)
+             py::arg("numerator") = 0,
+             py::arg("denominator") = 1)
         .def("numerator", [](const t81::Ratio &value) { return value.numerator(); })
         .def("denominator", [](const t81::Ratio &value) { return value.denominator(); })
         .def("is_zero", &t81::Ratio::is_zero)

@@ -90,29 +90,49 @@ namespace {
 
 } // namespace
 
-BENCHMARK_CAPTURE(bench_limb_operation<false>, add_ternary, Operation::Add,
+BENCHMARK_CAPTURE(bench_limb_operation<false>,
+                  add_ternary,
+                  Operation::Add,
                   seed_offset(Operation::Add, false));
-BENCHMARK_CAPTURE(bench_limb_operation<true>, add_binary, Operation::Add,
+BENCHMARK_CAPTURE(bench_limb_operation<true>,
+                  add_binary,
+                  Operation::Add,
                   seed_offset(Operation::Add, true));
 
-BENCHMARK_CAPTURE(bench_limb_operation<false>, subtract_ternary, Operation::Subtract,
+BENCHMARK_CAPTURE(bench_limb_operation<false>,
+                  subtract_ternary,
+                  Operation::Subtract,
                   seed_offset(Operation::Subtract, false));
-BENCHMARK_CAPTURE(bench_limb_operation<true>, subtract_binary, Operation::Subtract,
+BENCHMARK_CAPTURE(bench_limb_operation<true>,
+                  subtract_binary,
+                  Operation::Subtract,
                   seed_offset(Operation::Subtract, true));
 
-BENCHMARK_CAPTURE(bench_limb_operation<false>, multiply_ternary, Operation::Multiply,
+BENCHMARK_CAPTURE(bench_limb_operation<false>,
+                  multiply_ternary,
+                  Operation::Multiply,
                   seed_offset(Operation::Multiply, false));
-BENCHMARK_CAPTURE(bench_limb_operation<true>, multiply_binary, Operation::Multiply,
+BENCHMARK_CAPTURE(bench_limb_operation<true>,
+                  multiply_binary,
+                  Operation::Multiply,
                   seed_offset(Operation::Multiply, true));
 
-BENCHMARK_CAPTURE(bench_limb_operation<false>, divide_ternary, Operation::Divide,
+BENCHMARK_CAPTURE(bench_limb_operation<false>,
+                  divide_ternary,
+                  Operation::Divide,
                   seed_offset(Operation::Divide, false));
-BENCHMARK_CAPTURE(bench_limb_operation<true>, divide_binary, Operation::Divide,
+BENCHMARK_CAPTURE(bench_limb_operation<true>,
+                  divide_binary,
+                  Operation::Divide,
                   seed_offset(Operation::Divide, true));
 
-BENCHMARK_CAPTURE(bench_limb_operation<false>, modulo_ternary, Operation::Modulo,
+BENCHMARK_CAPTURE(bench_limb_operation<false>,
+                  modulo_ternary,
+                  Operation::Modulo,
                   seed_offset(Operation::Modulo, false));
-BENCHMARK_CAPTURE(bench_limb_operation<true>, modulo_binary, Operation::Modulo,
+BENCHMARK_CAPTURE(bench_limb_operation<true>,
+                  modulo_binary,
+                  Operation::Modulo,
                   seed_offset(Operation::Modulo, true));
 
 BENCHMARK_MAIN();

@@ -41,7 +41,8 @@ namespace t81::core::detail {
     }
 
 #if defined(__ARM_NEON) || defined(__ARM_NEON__)
-    inline bool gather_packed_additions_neon(const limb &lhs, const limb &rhs,
+    inline bool gather_packed_additions_neon(const limb &lhs,
+                                             const limb &rhs,
                                              std::array<std::uint32_t, limb::TRYTES> &packed) {
         const auto lhs_bytes = lhs.to_bytes();
         const auto rhs_bytes = rhs.to_bytes();
@@ -102,7 +103,8 @@ namespace t81::core::detail {
 #endif
 
 #if defined(__AVX512F__)
-    inline bool gather_packed_additions_avx512(const limb &lhs, const limb &rhs,
+    inline bool gather_packed_additions_avx512(const limb &lhs,
+                                               const limb &rhs,
                                                std::array<std::uint32_t, limb::TRYTES> &packed) {
         const auto lhs_bytes = lhs.to_bytes();
         const auto rhs_bytes = rhs.to_bytes();
@@ -122,7 +124,8 @@ namespace t81::core::detail {
 #endif
 
 #if defined(__AVX2__)
-    inline bool gather_packed_additions_avx2(const limb &lhs, const limb &rhs,
+    inline bool gather_packed_additions_avx2(const limb &lhs,
+                                             const limb &rhs,
                                              std::array<std::uint32_t, limb::TRYTES> &packed) {
         const auto lhs_bytes = lhs.to_bytes();
         const auto rhs_bytes = rhs.to_bytes();
