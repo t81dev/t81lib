@@ -53,6 +53,21 @@ inline constexpr limb_int128 RADIX = POW3[TRITS - 1] * 3;
 inline constexpr limb_int128 MAX_VALUE = (RADIX - 1) / 2;
 inline constexpr limb_int128 MIN_VALUE = -MAX_VALUE;
 
+inline constexpr int decimal_digit_count(limb_int128 value) noexcept {
+    if (value == 0) {
+        return 1;
+    }
+    if (value < 0) {
+        value = -value;
+    }
+    int digits = 0;
+    while (value != 0) {
+        value /= 10;
+        ++digits;
+    }
+    return digits;
+}
+
 inline constexpr bool valid_trit(std::int8_t trit) noexcept {
     return trit >= -1 && trit <= 1;
 }
@@ -671,6 +686,50 @@ inline std::size_t canonical_hash(const limb& value) noexcept {
 } // namespace t81::core
 
 namespace std {
+
+template <>
+class numeric_limits<t81::core::limb> {
+public:
+    using value_type = t81::core::limb;
+
+    static constexpr bool is_specialized = true;
+
+    static constexpr value_type min() noexcept { return value_type::min(); }
+    static constexpr value_type max() noexcept { return value_type::max(); }
+    static constexpr value_type lowest() noexcept { return value_type::min(); }
+    static constexpr value_type epsilon() noexcept { return value_type::zero(); }
+    static constexpr value_type round_error() noexcept { return value_type::zero(); }
+    static constexpr value_type denorm_min() noexcept { return value_type::zero(); }
+    static constexpr value_type infinity() noexcept { return value_type::zero(); }
+    static constexpr value_type quiet_NaN() noexcept { return value_type::zero(); }
+    static constexpr value_type signaling_NaN() noexcept { return value_type::zero(); }
+
+    static constexpr int digits = value_type::TRITS;
+    static constexpr int digits10 =
+        t81::core::detail::decimal_digit_count(t81::core::detail::MAX_VALUE);
+    static constexpr int max_digits10 = digits10;
+    static constexpr int radix = 3;
+    static constexpr int min_exponent = 0;
+    static constexpr int max_exponent = 0;
+    static constexpr int min_exponent10 = 0;
+    static constexpr int max_exponent10 = 0;
+
+    static constexpr bool is_signed = true;
+    static constexpr bool is_integer = true;
+    static constexpr bool is_exact = true;
+    static constexpr bool has_infinity = false;
+    static constexpr bool has_quiet_NaN = false;
+    static constexpr bool has_signaling_NaN = false;
+    static constexpr bool has_denorm = false;
+    static constexpr bool has_denorm_loss = false;
+    static constexpr bool is_bounded = true;
+    static constexpr bool is_modulo = false;
+    static constexpr bool traps = true;
+    static constexpr bool tinyness_before = false;
+    static constexpr bool tinyness_after = false;
+    static constexpr float_round_style round_style = round_toward_zero;
+    static constexpr bool is_iec559 = false;
+};
 
 template <>
 struct hash<t81::core::limb> {

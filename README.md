@@ -199,6 +199,17 @@ When you know you'll save the converted model or emit a GGUF file, pass `--force
 
 The script auto-detects `.pt/.pth/.safetensors` formats or Hugging Face repo IDs, preserves activation-friendly thresholds, and keeps every other module untouched so you can deploy converted weights with existing inference tooling.
 
+## Python demos
+
+Focus on the PyTorch helpers above when you need quick, reproducible quantization stories. These scripts/notebooks mirror the CLI workflows while keeping you inside Python so you can iterate on thresholds, datasets, or schedulers:
+
+- `examples/demo_llama_conversion.py` walks through converting a Hugging Face Llama checkpoint, swapping `torch.nn.Linear` → `t81.nn.Linear`, and inspecting the ternary cache.
+- `examples/scaling_laws_ternary.py` compares ternary vs float scaling-law experiments (RMSNorm, RoPE, ternary softmax) so you can see the accuracy/throughput trade-offs.
+- `examples/ternary_sparse_preview.py`, `examples/ternary_quantization_demo.ipynb`, and `examples/ternary_transformer_demo.ipynb` explore hybrid sparsity, GEMM packing, and quantized transformer inference in notebook-friendly form.
+- `examples/ternary_qat_inference_comparison.py` is a new lightweight script that runs a miniature QAT loop via `t81.trainer.TernaryTrainer`, prints the warming ternary threshold schedule, and then compares latency between `torch.matmul` and the cached `t81.torch.TernaryTensor`/`t81lib.gemm_ternary` path so you can measure the pragmatic payoff before touching the CLI.
+
+Mention these demos in `docs/index.md` and `docs/references/cli-usage.md` so teammates can jump between the CLI helpers and the Python stories without guessing.
+
 ## AI use cases
 
 `t81lib` is already powering ternary-aware workflows that push the performance envelope in real-world AI systems. For rapid experimentation, the Python bindings let you swap a dense floating-point tensor for a `TernaryTensor`, quantize activations on the fly, and keep GEMMs on the host using the AVX/NEON-packed kernels. The demos above show how to:

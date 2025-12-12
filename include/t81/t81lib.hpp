@@ -1696,19 +1696,4 @@ struct formatter<t81::FloatN<N>, char> : std::formatter<std::string_view, char> 
     }
 };
 
-template <>
-struct hash<t81::core::bigint> {
-    size_t operator()(const t81::core::bigint& value) const noexcept {
-        size_t seed = std::hash<int>{}(value.signum());
-        const auto limb_hasher = std::hash<std::uint64_t>{};
-        for (std::size_t index = 0; index < value.limb_count(); ++index) {
-            const std::uint64_t limb_hash_input =
-                static_cast<std::uint64_t>(value.limb_at(index).to_value());
-            const size_t limb_hash = limb_hasher(limb_hash_input);
-            seed ^= limb_hash + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
-        }
-        return seed;
-    }
-};
-
 } // namespace std

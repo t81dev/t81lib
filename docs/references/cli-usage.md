@@ -65,3 +65,27 @@ t81-qat gpt2 --dataset-name wikitext --output-dir ternary-gpt2 \
 - When re-using an existing converted directory, `t81-gguf` preserves `t81_metadata.json`, so converting a new HF checkpoint isn’t required if you only need a GGUF bundle.
 
 For advanced control (custom thresholds, bias strategies, or dtype hooks) the same APIs are available programmatically via `t81.convert.convert`, `t81.convert.save_pretrained_t81`, and `t81.gguf.write_gguf`.
+
+## Python ↔ CLI crosswalk
+
+- `t81-qat` mirrors `t81.trainer.TernaryTrainer` + `t81.nn.Linear`. The new `examples/ternary_qat_inference_comparison.py` script shows a mini QAT loop, logs the warmup threshold schedule, and exercises the cached ternary GEMM path so you can experiment interactively before hitting the CLI.
+- `t81-convert` wraps `t81.convert.convert`/`t81.convert.save_pretrained_t81`. Use the same threshold, dtype, bias, and device-map knobs if you need fine-grained control while scripting.
+- `t81-gguf` delegates to `t81.gguf.write_gguf`; reuse the same quantization/device map knobs when you need GGUF bundles for llama.cpp, Ollama, or LM Studio.
+
+## Serialization hooks
+
+When you persist checkpoints for AI workloads, `t81::core::bigint::to_bytes()`/`from_bytes()` already emit a compact payload (negative flag + limb count header + canonical limb bytes) that plays nicely with binary formats. The new `docs/references/serialization.md` describes FlatBuffers/msgpack/JSON adapters, shows how to treat the byte blob as a `std::span<const std::uint8_t>`, and keeps the `std::hash<t81::core::bigint>` compatibility guarantees intact so you can sanity-check round-trips after deserializing from custom containers.
+
+## Benchmark notes
+
+Before deploying ternary checkpoints, collect a few reference metrics and record them alongside your CLI metadata:
+
+- **Serialization round-trip** — measure `bigint::to_bytes()`/`from_bytes()` latency + blob size so you can catalog how long a FlatBuffers/msgpack/JSON adapter will take to persist or reload a checkpoint.
+- **GEMM throughput** — compare `t81lib.gemm_ternary` (or the cached `t81.torch.TernaryTensor` path) against `torch.matmul` on representative layer shapes; note bytes per second and latency per call so you can quote the speedup in your deployment notes.
+- **QAT convergence schedule** — log the warmup threshold curve from `t81.trainer.TernaryTrainer` (or scripts like `examples/ternary_qat_inference_comparison.py`) plus loss/accuracy over the first few epochs so you can validate the threshold ramps that `t81-qat` mirrors.
+
+Link these benchmarks back to the CLI workflows (e.g., mention the dataset/model used for `t81-qat` runs and the limb size for GEMM measurements) so AI teams can cite the numbers when proposing ternary deployments.
+
+Consider extending `docs/diagrams/cli-workflows-mermaid.md` (or adding a complementary diagram) that overlays these targets/metrics on the `t81-convert`, `t81-gguf`, and `t81-qat` workflows so researchers can visualize where to insert serialization and GEMM benchmarks in their pipelines.
+
+These crosswalk notes make it easy to prototype in Python (with the t81.torch/t81.nn stack) and later translate the workflow to the CLI scripts once you validate accuracy/latency trade-offs.
