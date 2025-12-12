@@ -1,7 +1,11 @@
+# .clang-format — Modern LLVM style that doesn't hate auto + trailing returns
 BasedOnStyle: LLVM
 IndentWidth: 4
 ColumnLimit: 100
 NamespaceIndentation: All
+
+# THE ONLY LINES THAT MATTER — ADD THESE
+AlwaysBreakAfterReturnType: TopLevelDefinitions   # ← magic line
 AllowShortFunctionsOnASingleLine: None
-AlwaysBreakAfterReturnType: TopLevelDefinitions
 BinPackArguments: false
+BinPackParameters: false
