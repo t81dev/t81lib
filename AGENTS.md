@@ -40,3 +40,5 @@ This file helps AI agents discover and understand how to work with this reposito
 - Added `t81.hardware.TernaryEmulator`, documentation for hardware simulation, and `examples/ternary_hardware_sim_demo.ipynb` so agents can explore ternary gate/circuit modeling, fuzzy AI decisions, and power-aware PyTorch inference workflows.
 - Added `docs/references/cli-usage.md` (linked from `docs/index.md`) to cover `t81-convert`, `t81-gguf`, and `t81-qat` usage with the CPU/offloading tips we surfaced for low-memory Apple Silicon.
 - Added `docs/diagrams/cli-workflows-mermaid.md` to visualize the `t81-convert`, `t81-gguf`, and `t81-qat` workflows for future contributors looking at the CLI surface.
+- Added `examples/cli-examples.md` with ready-to-copy CLI snippets showing conversion, GGUF export, and QAT flows for the three helpers.
+- Updated `README.md` to highlight the CLI docs/diagrams/examples so newcomers can find the new references through the main overview.
