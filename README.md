@@ -102,7 +102,7 @@ target_link_libraries(... t81::t81lib)
 
 ## GPU backends
 
-Optional CUDA/ROCm backends can be enabled with `-DUSE_CUDA=ON` / `-DUSE_ROCM=ON` so the Python bindings link against the GPU kernels. `t81lib` exposes a compact `TensorMetadata` ABI that carries device, dtype, shape, and stride info, allowing `where`, `clamp`, `lerp`, and `addcmul` to work directly on NumPy arrays or Torch tensors. See [docs/gpu.md](docs/gpu.md) and [docs/torch.md](docs/torch.md) for build flags, device routing, supported ops, and lifetime details.
+Optional CUDA/ROCm backends can be enabled with `-DUSE_CUDA=ON` / `-DUSE_ROCM=ON` so the Python bindings link against the GPU kernels. `t81lib` exposes a compact `TensorMetadata` ABI that carries device, dtype, shape, and stride info, allowing `where`, `clamp`, `lerp`, and `addcmul` to work directly on NumPy arrays or Torch tensors. See [docs/gpu.md](docs/gpu.md), [docs/torch.md](docs/torch.md), and the [GPU dispatch diagram](docs/diagrams/gpu-dispatch.mermaid.md) for build flags, device routing, supported ops, and lifetime details.
 
 ## CLI helpers
 

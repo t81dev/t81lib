@@ -17,4 +17,4 @@ This file is the canonical list of runnable scripts and notebooks maintained und
 - `examples/ternary_hardware_sim_demo.ipynb` — Build a ternary adder, trace virtual power/latency, and compare energy vs binary hardware using `t81.hardware.TernaryEmulator`.
 - `examples/cli-examples.md` — Copy/paste-ready snippets for `t81-convert`, `t81-gguf`, and `t81-qat` workflows.
 
-Refer to [docs/use-cases.md](docs/use-cases.md) for details on how these examples tie into broader quantization, scaling-law, and hardware experiments.
+Refer to [docs/use-cases.md](docs/use-cases.md) for details on how these examples tie into broader quantization, scaling-law, and hardware experiments, and consult the [quantization workflow diagram](../docs/diagrams/quantization-workflow.mermaid.md) for the PyTorch → CLI → inference path.

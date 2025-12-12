@@ -43,6 +43,10 @@ Each row contains:
 
 Use this CSV to plot accuracy vs. storage or compare latency across the three modes.
 
+## Diagrams
+
+View the [benchmark comparison diagram](docs/diagrams/benchmarks.mermaid.md) for a quick latency/storage summary that highlights the 15–22× wins.
+
 ## Results sharing
 
 When opening a pull request, add the latest benchmark rows (or a summary table) to this file or reference the CSV as part of your performance discussion so reviewers can reproduce the numbers.
