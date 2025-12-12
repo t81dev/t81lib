@@ -22,6 +22,8 @@ t81-convert meta-llama/Llama-3.2-3B-Instruct path/to/converted --quant TQ1_0 --t
 
 `t81-convert` outputs a lightweight progress line (bar + percentage) for conversion, checkpointing, and optional GGUF export so you can monitor long-lived runs without missing other stderr logs.
 
+After you emit a GGUF bundle with `--output-gguf`, the new `--validate` flag reads the file via `gguf.read_gguf` and, if llama.cpp’s `gguf_validate`/`gguf_to_gguf` is installed, passes the file through that tool to ensure compatibility before the command exits.
+
 Key flags:
 
 - `--threshold`: the ternary cutoff (default `0.45`). Adjust this to trade sparsity vs. activation range.
@@ -30,6 +32,7 @@ Key flags:
 - `--keep-biases-bf16` / `--no-keep-biases-bf16`: control whether bias tensors stay in BF16 or are promoted to FP32.
 - `--torch-dtype`: optional dtype for the floating-point buffer used during quantization.
 - `--output-gguf`: pipe the converted model straight into `gguf.write_gguf` (see `t81-gguf` below) with a `--gguf-quant` choice of `TQ1_0` or `TQ2_0`.
+- `--validate`: after writing the GGUF bundle, run llama.cpp’s GGUF validator (or the Python reader) so you can detect incompatible exports before the command succeeds.
 
 The command rewrites every `nn.Linear` into `t81.nn.Linear`, stores metadata in `t81_metadata.json`, and emits compression stats so you can see how much VRAM you save.
 
@@ -48,6 +51,8 @@ t81-gguf out.3.t81.gguf --from-t81 path/to/converted
 ```
 
 `t81-gguf` also prints a brief progress line tied to its conversion and GGUF serialization stages.
+
+Pass `--validate` when you want the fresh GGUF bundle checked by both the Python reader and llama.cpp’s validator so incompatibilities are caught before you ship the file.
 
 Use the same `--threshold`, `--device-map`, `--torch-dtype`, and `--force-cpu-device-map` knobs as `t81-convert` because `t81-gguf` delegates to that CLI internally.
 
