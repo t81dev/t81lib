@@ -1681,7 +1681,7 @@ namespace std {
 template <>
 struct formatter<t81::Float, char> : std::formatter<std::string_view, char> {
     template <typename FormatContext>
-    auto format(const t81::Float& value, FormatContext& ctx) {
+    auto format(const t81::Float& value, FormatContext& ctx) const {
         const std::string text = t81::to_string(value);
         return std::formatter<std::string_view, char>::format(text, ctx);
     }
@@ -1690,7 +1690,7 @@ struct formatter<t81::Float, char> : std::formatter<std::string_view, char> {
 template <int N>
 struct formatter<t81::FloatN<N>, char> : std::formatter<std::string_view, char> {
     template <typename FormatContext>
-    auto format(const t81::FloatN<N>& value, FormatContext& ctx) {
+    auto format(const t81::FloatN<N>& value, FormatContext& ctx) const {
         const std::string text = t81::to_string(value);
         return std::formatter<std::string_view, char>::format(text, ctx);
     }

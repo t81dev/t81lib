@@ -40,5 +40,13 @@ This file helps AI agents discover and understand how to work with this reposito
 - Added `t81.hardware.TernaryEmulator`, documentation for hardware simulation, and `examples/ternary_hardware_sim_demo.ipynb` so agents can explore ternary gate/circuit modeling, fuzzy AI decisions, and power-aware PyTorch inference workflows.
 - Added `docs/references/cli-usage.md` (linked from `docs/index.md`) to cover `t81-convert`, `t81-gguf`, and `t81-qat` usage with the CPU/offloading tips we surfaced for low-memory Apple Silicon.
 - Added `docs/diagrams/cli-workflows-mermaid.md` to visualize the `t81-convert`, `t81-gguf`, and `t81-qat` workflows for future contributors looking at the CLI surface.
+- Extended `examples/ternary_qat_inference_comparison.py` so it now runs train + validation loops, logs compression ratios + per-step losses, and correlates the ternary threshold history with measured GEMM latencies.
+- Added `scripts/quantize_measure.py`, which chains `t81-convert` → `AutoModel.from_pretrained_t81` → latency/compression stats so you can automate quantize→measure in other pipelines.
+- Added `docs/references/hardware-emulation.md` to explain how `t81.hardware.TernaryEmulator`, the Python quantization helpers, and the CLI automation fit together for energy-aware AI reasoning.
+- Added `scripts/quantize_energy_benchmark.py` to orchestrate quantize→latency+energy benchmarks, logging compression, timing, and emulator energy stats into CSV/JSON outputs for reuse in reports.
+- Added `examples/quantization_config_report.py` so you can sweep synthetic datasets (dims, thresholds, sizes) and capture accuracy, latency, and storage comparisons for multi-module configs before quantizing real models.
+- Added `tests/test_cli_flags.py` so the CI can exercise `t81-convert`/`t81-gguf` with `--device-map none`, `--torch-dtype float16`, and `--force-cpu-device-map`, ensuring metadata/GGUF outputs survive the flag combinations.
+- Added `t81/cli_progress.py` plus progress logging to `t81-convert`, `t81-gguf`, and `t81-qat` so the CLIs print bar/percentage updates while converting, exporting, or fine-tuning checkpoints.
+- Documented the automation scripts (`scripts/quantize_measure.py`, `scripts/quantize_energy_benchmark.py`) plus the CLI telemetry/progress experience so future agents can quickly measure quantization impact, latency, and hardware energy from the console.
 - Added `examples/cli-examples.md` with ready-to-copy CLI snippets showing conversion, GGUF export, and QAT flows for the three helpers.
 - Updated `README.md` to highlight the CLI docs/diagrams/examples so newcomers can find the new references through the main overview.

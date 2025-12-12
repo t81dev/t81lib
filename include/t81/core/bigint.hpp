@@ -1056,7 +1056,7 @@ inline std::string to_decimal_string(const bigint& value) {
     bigint current = value.abs();
     const bigint divisor{10};
     while (!current.is_zero()) {
-        const auto [quotient, remainder] = div_mod(current, divisor);
+        const auto [quotient, remainder] = bigint::div_mod(current, divisor);
         const int digit = static_cast<int>(remainder.to_limb().to_value());
         output.push_back(static_cast<char>('0' + digit));
         current = quotient;
@@ -1077,7 +1077,7 @@ inline std::string to_ternary_string(const bigint& value) {
     bigint cursor = value;
     const bigint three{3};
     while (!cursor.is_zero()) {
-        auto [quotient, remainder] = div_mod(cursor, three);
+        auto [quotient, remainder] = bigint::div_mod(cursor, three);
         int digit = static_cast<int>(remainder.to_limb().to_value());
         if (digit > 1) {
             digit -= 3;
@@ -1137,7 +1137,7 @@ struct formatter<t81::core::bigint> {
     auto format(const t81::core::bigint& value, FormatContext& ctx) const {
         const std::string text =
             ternary ? t81::core::to_ternary_string(value) : t81::core::to_decimal_string(value);
-        return std::formatter<std::string_view, char>::format(text, ctx);
+        return std::formatter<std::string_view, char>{}.format(text, ctx);
     }
 };
 

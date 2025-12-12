@@ -20,6 +20,8 @@ Convert any Hugging Face checkpoint into the ternary-aware runtime that powers `
 t81-convert meta-llama/Llama-3.2-3B-Instruct path/to/converted --quant TQ1_0 --torch-dtype bfloat16
 ```
 
+`t81-convert` outputs a lightweight progress line (bar + percentage) for conversion, checkpointing, and optional GGUF export so you can monitor long-lived runs without missing other stderr logs.
+
 Key flags:
 
 - `--threshold`: the ternary cutoff (default `0.45`). Adjust this to trade sparsity vs. activation range.
@@ -45,6 +47,8 @@ Alternately, re-export an existing t81-converted directory:
 t81-gguf out.3.t81.gguf --from-t81 path/to/converted
 ```
 
+`t81-gguf` also prints a brief progress line tied to its conversion and GGUF serialization stages.
+
 Use the same `--threshold`, `--device-map`, `--torch-dtype`, and `--force-cpu-device-map` knobs as `t81-convert` because `t81-gguf` delegates to that CLI internally.
 
 ## `t81-qat`
@@ -68,7 +72,7 @@ For advanced control (custom thresholds, bias strategies, or dtype hooks) the sa
 
 ## Python ↔ CLI crosswalk
 
-- `t81-qat` mirrors `t81.trainer.TernaryTrainer` + `t81.nn.Linear`. The new `examples/ternary_qat_inference_comparison.py` script shows a mini QAT loop, logs the warmup threshold schedule, and exercises the cached ternary GEMM path so you can experiment interactively before hitting the CLI.
+- `t81-qat` mirrors `t81.trainer.TernaryTrainer` + `t81.nn.Linear`. The new `examples/ternary_qat_inference_comparison.py` script shows a mini QAT loop, logs the warmup threshold schedule, and exercises the cached ternary GEMM path so you can experiment interactively before hitting the CLI; the CLI now prints a three-stage progress line (`dataset prepared`, `training complete`, `checkpoint saved`) to highlight where dataset prep or saving waits occur.
 - `t81-convert` wraps `t81.convert.convert`/`t81.convert.save_pretrained_t81`. Use the same threshold, dtype, bias, and device-map knobs if you need fine-grained control while scripting.
 - `t81-gguf` delegates to `t81.gguf.write_gguf`; reuse the same quantization/device map knobs when you need GGUF bundles for llama.cpp, Ollama, or LM Studio.
 
@@ -89,3 +93,8 @@ Link these benchmarks back to the CLI workflows (e.g., mention the dataset/model
 Consider extending `docs/diagrams/cli-workflows-mermaid.md` (or adding a complementary diagram) that overlays these targets/metrics on the `t81-convert`, `t81-gguf`, and `t81-qat` workflows so researchers can visualize where to insert serialization and GEMM benchmarks in their pipelines.
 
 These crosswalk notes make it easy to prototype in Python (with the t81.torch/t81.nn stack) and later translate the workflow to the CLI scripts once you validate accuracy/latency trade-offs.
+
+## Regression coverage
+
+- `tests/test_cli_flags.py` now runs `t81-convert` and `t81-gguf` against a tiny saved Hugging Face classifier, exercising `--device-map none`, `--torch-dtype float16`, and `--force-cpu-device-map` so changes to the conversion/gguf code paths trigger a test failure before the CLI hits CI.
+- When you adjust device maps or dtype logic, rerun the new test to make sure the metadata (`t81_metadata.json`) still exists, and the GGUF bundle writes without triggering `NotImplementedError: Cannot copy out of meta tensor`.

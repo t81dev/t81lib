@@ -217,6 +217,7 @@ Mention these demos in `docs/index.md` and `docs/references/cli-usage.md` so tea
 1. Convert an existing large language model to ternary weights while preserving `torch.nn.Module` semantics (`examples/demo_llama_conversion.py`).
 2. Study scaling-law behavior in ternary networks, comparing sparsity, precision, and model size trade-offs using `examples/scaling_laws_ternary.py`.
 3. Preview ternary-sparse transformers with custom `SparseTriangular` layers and quantized attention using `examples/ternary_sparse_preview.py`.
+4. Run `examples/quantization_config_report.py` to enumerate synthetic configs (dim/threshold/samples) that produce accuracy, latency, and storage reports so you can compare multi-module boards before touching real checkpoints.
 
 For more advanced pipelines, the `t81.nn` helpers expose RMSNorm, softmax, and RoPE in exact rational or fixed-width representations so you can build ternary-friendly training/inference loops without re-implementing numerics. When performance matters, point profiling tools at `t81::linalg::gemm_ternary` (or `t81lib.gemm_ternary` in Python) to compare packed ternary GEMMs against baseline `torch.matmul` runs; the alpha/beta semantics make it easy to blend ternary updates with FP32 accumulators for mixed-precision schedules.
 
