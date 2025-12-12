@@ -2,7 +2,9 @@
 README.md — Visitor-facing overview, focused onboarding, and first-steps guidance.
 -->
 
-# t81lib — Balanced ternary quantization & core numerics
+# t81 — Balanced Ternary for AI & Numerics
+
+
 
 ![CI](https://github.com/t81dev/t81lib/actions/workflows/ci.yml/badge.svg)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
