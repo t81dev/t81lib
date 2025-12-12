@@ -24,6 +24,7 @@
 #include <t81/io/format.hpp>
 #include <t81/linalg/gemm.hpp>
 #include <t81/linalg/gemm_gpu.hpp>
+#include <t81/tensor_metadata.hpp>
 #include <t81/sparse/simple.hpp>
 #include <t81/t81lib.hpp>
 
@@ -149,6 +150,164 @@ namespace {
 
     std::size_t buffer_element_count(const py::buffer_info &info) {
         return static_cast<std::size_t>(std::max<py::ssize_t>(info.size, 0));
+    }
+
+    struct PyTensorHandle {
+        TensorMetadata meta;
+        py::object owner;
+        bool is_torch = false;
+    };
+
+    py::object get_torch_module() {
+        static py::object module = []() -> py::object {
+            try {
+                return py::module_::import("torch");
+            } catch (const py::error_already_set &) {
+                py::gil_scoped_release release;
+                return py::object();
+            }
+        }();
+        return module;
+    }
+
+    bool torch_is_available() {
+        return static_cast<bool>(get_torch_module());
+    }
+
+    bool is_torch_tensor(const py::object &candidate) {
+        if (!torch_is_available()) {
+            return false;
+        }
+        const auto torch = get_torch_module();
+        const auto tensor_type = torch.attr("Tensor");
+        return py::isinstance(candidate, tensor_type);
+    }
+
+    std::vector<int64_t> shape_to_int64(const py::iterable &iterable) {
+        std::vector<int64_t> result;
+        for (const py::handle value : iterable) {
+            result.push_back(static_cast<int64_t>(value.cast<py::ssize_t>()));
+        }
+        return result;
+    }
+
+    std::vector<int64_t> buffer_shape(const py::buffer_info &info) {
+        std::vector<int64_t> result;
+        result.reserve(info.shape.size());
+        for (const auto value : info.shape) {
+            result.push_back(static_cast<int64_t>(value));
+        }
+        return result;
+    }
+
+    std::vector<int64_t> buffer_strides(const py::buffer_info &info) {
+        std::vector<int64_t> result;
+        result.reserve(info.strides.size());
+        for (const auto value : info.strides) {
+            result.push_back(static_cast<int64_t>(value / info.itemsize));
+        }
+        return result;
+    }
+
+    TensorMetadata metadata_from_buffer_info(const py::buffer_info &info) {
+        if (info.size < 0 || info.itemsize <= 0) {
+            throw py::value_error("buffer has invalid dimensions or element size");
+        }
+        if (info.format != "f" && info.itemsize != static_cast<py::ssize_t>(sizeof(float))) {
+            throw py::value_error("buffer must hold float32 elements");
+        }
+        if (!buffer_is_c_contiguous(info)) {
+            throw py::value_error("buffer must be C-contiguous");
+        }
+        TensorMetadata metadata;
+        metadata.device_type = DeviceType::CPU;
+        metadata.dtype = ScalarType::Float;
+        metadata.data_ptr = info.ptr;
+        metadata.sizes = buffer_shape(info);
+        metadata.strides = buffer_strides(info);
+        metadata.storage_offset = 0;
+        metadata.owns_memory = false;
+        metadata.requires_sync = false;
+        return metadata;
+    }
+
+    PyTensorHandle metadata_from_buffer(const py::object &obj) {
+        py::buffer buffer(obj);
+        const auto info = buffer.request(true);
+        TensorMetadata metadata = metadata_from_buffer_info(info);
+        PyTensorHandle handle;
+        handle.meta = std::move(metadata);
+        handle.owner = obj;
+        return handle;
+    }
+
+    ScalarType scalar_type_from_torch(const py::object &dtype) {
+        if (dtype.equal(get_torch_module().attr("float32"))) {
+            return ScalarType::Float;
+        }
+        if (dtype.equal(get_torch_module().attr("float16"))) {
+            return ScalarType::Half;
+        }
+        return ScalarType::Undefined;
+    }
+
+    PyTensorHandle metadata_from_torch(const py::object &tensor) {
+        PyTensorHandle handle;
+        handle.owner = tensor;
+        handle.is_torch = true;
+        TensorMetadata metadata;
+        const auto device_obj = tensor.attr("device");
+        const auto type = device_obj.attr("type").cast<std::string>();
+        if (type == "cuda") {
+            metadata.device_type = DeviceType::CUDA;
+        } else {
+            metadata.device_type = DeviceType::CPU;
+        }
+        if (!device_obj.attr("index").is_none()) {
+            metadata.device_index = device_obj.attr("index").cast<int32_t>();
+        }
+        const auto ptr_value = tensor.attr("data_ptr")().cast<std::uintptr_t>();
+        metadata.data_ptr = reinterpret_cast<void *>(ptr_value);
+        metadata.dtype = scalar_type_from_torch(tensor.attr("dtype"));
+        metadata.sizes = shape_to_int64(tensor.attr("size")());
+        metadata.strides = shape_to_int64(tensor.attr("stride")());
+        metadata.storage_offset = tensor.attr("storage_offset")().cast<int64_t>();
+        metadata.owns_memory = false;
+        metadata.requires_sync = true;
+        handle.meta = std::move(metadata);
+        return handle;
+    }
+
+    PyTensorHandle extract_tensor_handle(py::object obj) {
+        if (is_torch_tensor(obj)) {
+            return metadata_from_torch(obj);
+        }
+        try {
+            return metadata_from_buffer(obj);
+        } catch (const py::error_already_set &exc) {
+            throw py::value_error(
+                std::string("unsupported tensor type: ") + exc.what());
+        }
+    }
+
+    std::vector<py::ssize_t> to_py_shape(const std::vector<int64_t> &source) {
+        std::vector<py::ssize_t> shape;
+        shape.reserve(source.size());
+        for (const auto value : source) {
+            shape.push_back(static_cast<py::ssize_t>(value));
+        }
+        return shape;
+    }
+
+    PyTensorHandle create_output_like(const PyTensorHandle &prototype) {
+        if (prototype.is_torch && torch_is_available()) {
+            const auto torch = get_torch_module();
+            const auto output = torch.attr("empty_like")(prototype.owner);
+            return extract_tensor_handle(output);
+        }
+        const auto shape = to_py_shape(prototype.meta.sizes);
+        py::array_t<float> output(shape);
+        return extract_tensor_handle(output);
     }
 
     constexpr std::int8_t quantize_trit(float value, float threshold) {
