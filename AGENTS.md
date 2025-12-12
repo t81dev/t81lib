@@ -26,6 +26,7 @@ This file helps AI agents discover and understand how to work with this reposito
 
 ## Recent updates
 
+- Reworked the top-level `CMakeLists.txt`, rewrote `run-tests.sh` to execute configure/build/tests, and reordered `tests/unit/test_limb_basic.cpp` so `t81/t81lib.hpp` is included before the SIMD helpers to keep `limb` defined.
 - Balanced ternary bigint logic in `include/t81/core/bigint.hpp` now normalizes signed limbs more efficiently and fixes `~`/division helpers so later agents can spot the modern bitwise/division flow.
 - `tests/unit/test_numeric_types.cpp` now exercises `Complex`, `Polynomial`, and `F2m` helpers so the umbrella numeric helpers stay locked down.
 - `README.md` now documents the high-level helpers (`Float`, `Ratio`, `Complex`, `Polynomial`, `F2m`, `Fixed<N>`, `Modulus`, and `MontgomeryInt`) plus the `t81::Int` alias exposed through `t81/t81lib.hpp`.
