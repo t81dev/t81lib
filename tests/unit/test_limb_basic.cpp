@@ -5,8 +5,8 @@
 #include <random>
 #include <vector>
 
-#include <t81/core/detail/simd.hpp>
 #include <t81/t81lib.hpp>
+#include <t81/core/detail/simd.hpp>
 
 namespace {
 
