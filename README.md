@@ -34,10 +34,11 @@ It is **not** a drop-in replacement for PyTorch or NumPy, but a focused toolkit 
 
 ## Start here
 
-- **C++ users** → [Quick start → Build & test](#quick-start)
-- **Python users** → [Python & PyTorch (quick overview)](#python--pytorch-quick-overview)
-- **AI workflows** → [CLI helpers](#cli-helpers)
-- **Architecture & theory** → [ARCHITECTURE.md](ARCHITECTURE.md)
+- **C++** → Quick start → *Build & test locally*
+- **Python** → Quick start → *Python install* (pip + docs)
+- **CLI workflows** → [docs/references/cli-usage.md](docs/references/cli-usage.md)
+- **PyTorch integration** → [docs/torch.md](docs/torch.md)
+- **Architecture & specs** → [ARCHITECTURE.md](ARCHITECTURE.md) & [docs/index.md](docs/index.md)
 
 ## Quick start
 
@@ -53,20 +54,21 @@ ctest --test-dir build --output-on-failure
 ### 2. Install for Python consumers
 
 ```bash
-pip install .          # installs the Python bindings
-pip install .[torch]   # optional torch/transformers helpers
+pip install .[torch]
 ```
 
-Alternatively, use `pipx` for isolated CLI helpers:
+`pip install` builds the Python bindings, exposes `t81lib`/`t81`, and pulls the optional `torch` helpers when you request `[torch]`.
+See [docs/python-install.md](docs/python-install.md) for pipx, CLI helpers, and verification scripts.
+
+### 3. Build the Python bindings (optional)
 
 ```bash
-pipx install .[torch]
-pipx ensurepath
+cmake -S . -B build -DT81LIB_BUILD_TESTS=ON -DT81LIB_BUILD_PYTHON_BINDINGS=ON
+cmake --build build -j
+PYTHONPATH=build python tests/python/test_bindings.py
 ```
 
-`pipx install` exposes `t81-convert`, `t81-gguf`, and `t81-qat` in `~/.local/bin`.
-
-### 3. Consume as a subproject
+### 4. Consume as a subproject
 
 ```cmake
 add_subdirectory(external/t81lib)
@@ -79,7 +81,7 @@ Include the umbrella header in your sources:
 #include <t81/t81lib.hpp>
 ```
 
-### 4. Use through vcpkg
+### 5. Use through vcpkg
 
 ```bash
 vcpkg install t81lib[tests,benchmarks]:x64-windows
@@ -88,8 +90,6 @@ target_link_libraries(... t81::t81lib)
 ```
 
 ## Python & PyTorch (quick overview)
-
-Install the bindings via `pip install .[torch]` (or `pipx install .[torch]` for CLI helpers). Import the fast path from the repo root:
 
 ```python
 import torch
@@ -101,8 +101,9 @@ outputs = weights.matmul_input(torch.randn(32, 128))
 packed = t81lib.pack_dense_matrix(weights, threshold=0.45)
 ```
 
-For more Python recipes and API reference, see [docs/python-api.md](docs/python-api.md)
-and [docs/python-cookbook.md](docs/python-cookbook.md).
+The same handlers power the `t81.nn` layers that keep biases in FP32/BF16 while quantizing weights.
+See [docs/python-api.md](docs/python-api.md), [docs/python-cookbook.md](docs/python-cookbook.md), [docs/python-install.md](docs/python-install.md), and
+[docs/torch.md](docs/torch.md) for the full story.
 
 ## CLI helpers
 
@@ -113,12 +114,16 @@ See [docs/references/cli-usage.md](docs/references/cli-usage.md),
 
 ## Use cases (see docs)
 
-- Ternary LLM weight quantization and GGUF exports for Hugging Face + llama.cpp runtimes.
-- Packed ternary GEMMs for CPU inference and comparison studies versus `torch.matmul`.
+- Ternary LLM weight quantization and GGUF exports for Hugging Face + `llama.cpp`.
+- Packed ternary GEMMs for CPU inference and `torch.matmul` comparisons.
 - Deterministic numerics and research-grade arithmetic built atop the same core.
-- Ternary hardware simulation and energy modeling (see `docs/hardware.md`).
+- Ternary hardware simulation and energy modeling (see [docs/hardware.md](docs/hardware.md)).
 
-See [docs/use-cases.md](docs/use-cases.md) for the demos, notebooks, and experiments that spotlight the workflows above.
+See [docs/use-cases.md](docs/use-cases.md) for demos, notebooks, and experiments that spotlight these flows.
+
+## Examples
+
+See [examples/README.md](examples/README.md) for the canonical scripts/notebooks (LLM conversion, GEMM packing, quantization demos, hardware previews, etc.).
 
 ## Numeric building blocks
 
@@ -130,18 +135,19 @@ See [docs/api-overview.md](docs/api-overview.md) for the full surface described 
 - [docs/index.md](docs/index.md) — Docs portal (great for GitHub Pages).
 - [docs/t81lib-spec-v1.0.0.md](docs/t81lib-spec-v1.0.0.md) — Normative contract for consumers.
 - [docs/design/](docs/design/) — Deep dives on `limb`, `bigint`, and `montgomery` internals.
+- [docs/python-install.md](docs/python-install.md) — Detailed install flow for Python, pipx, and CLI helpers.
 - [docs/python-api.md](docs/python-api.md) & [docs/python-cookbook.md](docs/python-cookbook.md).
+- [docs/torch.md](docs/torch.md) — PyTorch integration, `t81.torch`, and `t81.nn`.
 - [docs/use-cases.md](docs/use-cases.md), [docs/hardware.md](docs/hardware.md), [docs/api-overview.md](docs/api-overview.md).
-- [examples/](examples/) — Runnable demos.
+- [examples/README.md](examples/README.md) — Canonical scripts/notebooks.
 - [tests/](tests/) & [bench/](bench/) — Regression suites and throughput gauges.
 - [CONTRIBUTING.md](CONTRIBUTING.md) & [CHANGELOG.md](CHANGELOG.md).
 
-## Testing & benchmarks
+## Benchmarks
+
+See [BENCHMARKS.md](BENCHMARKS.md) for the Fashion-MNIST FP32/PTQ/QAT comparison.
 
 ```bash
-cmake -S . -B build -DT81LIB_BUILD_TESTS=ON
-cmake --build build -j
-ctest --test-dir build --output-on-failure
 cmake -S . -B build -DT81LIB_BUILD_BENCH=ON -DT81LIB_USE_GOOGLE_BENCH=ON
 cmake --build build -j
 ./build/bench/*
