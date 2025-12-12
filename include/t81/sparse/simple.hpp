@@ -34,8 +34,12 @@ namespace t81::sparse {
 
     } // namespace detail
 
-    inline void spmm_simple(const SimpleSparseTernary &A, std::span<const float> B,
-                            std::span<float> C, int N, float alpha = 1.0f, float beta = 0.0f) {
+    inline void spmm_simple(const SimpleSparseTernary &A,
+                            std::span<const float> B,
+                            std::span<float> C,
+                            int N,
+                            float alpha = 1.0f,
+                            float beta = 0.0f) {
         if (N < 0) {
             throw std::invalid_argument("spmm_simple requires N >= 0");
         }

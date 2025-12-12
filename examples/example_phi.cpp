@@ -5,7 +5,8 @@
 
 using namespace t81::literals;
 
-int main() {
+int
+main() {
     const std::string_view phi_literal(" 1.011011011101 ");
     const auto phi = t81::Float::from_string(t81::trim(phi_literal));
     const auto phi_square = phi * phi;

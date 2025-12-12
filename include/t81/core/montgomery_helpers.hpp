@@ -18,31 +18,31 @@ namespace t81::core::montgomery {
         return MontgomeryContext<bigint>(modulus);
     }
 
-    inline limb modular_multiply(const MontgomeryContext<limb> &ctx, const limb &lhs,
-                                 const limb &rhs) {
+    inline limb
+    modular_multiply(const MontgomeryContext<limb> &ctx, const limb &lhs, const limb &rhs) {
         const auto lhs_bar = ctx.to_montgomery(lhs);
         const auto rhs_bar = ctx.to_montgomery(rhs);
         const auto product = ctx.mul(lhs_bar, rhs_bar);
         return ctx.from_montgomery(product);
     }
 
-    inline bigint modular_multiply(const MontgomeryContext<bigint> &ctx, const bigint &lhs,
-                                   const bigint &rhs) {
+    inline bigint
+    modular_multiply(const MontgomeryContext<bigint> &ctx, const bigint &lhs, const bigint &rhs) {
         const auto lhs_bar = ctx.to_montgomery(lhs);
         const auto rhs_bar = ctx.to_montgomery(rhs);
         const auto product = ctx.mul(lhs_bar, rhs_bar);
         return ctx.from_montgomery(product);
     }
 
-    inline limb modular_pow(const MontgomeryContext<limb> &ctx, const limb &base,
-                            const limb &exponent) {
+    inline limb
+    modular_pow(const MontgomeryContext<limb> &ctx, const limb &base, const limb &exponent) {
         const auto base_bar = ctx.to_montgomery(base);
         const auto power = ctx.pow(base_bar, exponent);
         return ctx.from_montgomery(power);
     }
 
-    inline bigint modular_pow(const MontgomeryContext<bigint> &ctx, const bigint &base,
-                              const bigint &exponent) {
+    inline bigint
+    modular_pow(const MontgomeryContext<bigint> &ctx, const bigint &base, const bigint &exponent) {
         const auto base_bar = ctx.to_montgomery(base);
         const auto power = ctx.pow(base_bar, exponent);
         return ctx.from_montgomery(power);
@@ -55,9 +55,12 @@ namespace t81::core::montgomery {
         using context_type = MontgomeryContext<limb>;
 
         MontgomeryConstTimeGuard(const context_type &ctx, std::size_t max_bits)
-            : ctx_(ctx), max_bits_(max_bits) {}
+            : ctx_(ctx), max_bits_(max_bits) {
+        }
 
-        std::size_t max_bits() const noexcept { return max_bits_; }
+        std::size_t max_bits() const noexcept {
+            return max_bits_;
+        }
 
         bool allows(const limb &exponent) const {
             if (exponent.is_negative()) {
@@ -101,9 +104,12 @@ namespace t81::core::montgomery {
         using context_type = MontgomeryContext<bigint>;
 
         MontgomeryConstTimeGuard(const context_type &ctx, std::size_t max_bits)
-            : ctx_(ctx), max_bits_(max_bits) {}
+            : ctx_(ctx), max_bits_(max_bits) {
+        }
 
-        std::size_t max_bits() const noexcept { return max_bits_; }
+        std::size_t max_bits() const noexcept {
+            return max_bits_;
+        }
 
         bool allows(const bigint &exponent) const {
             if (exponent.is_negative()) {

@@ -70,8 +70,8 @@ namespace {
     constexpr std::size_t kCacheSize = 64;
 
     template <typename Int>
-    std::vector<Int> create_random_cache(std::mt19937_64 &rng, std::size_t limbs, std::size_t count,
-                                         bool nonzero) {
+    std::vector<Int>
+    create_random_cache(std::mt19937_64 &rng, std::size_t limbs, std::size_t count, bool nonzero) {
         std::vector<Int> cache;
         cache.reserve(count);
         while (cache.size() < count) {
@@ -173,7 +173,8 @@ namespace {
 
     template <>
     t81::core::limb apply_operation<t81::core::limb>(const t81::core::limb &lhs,
-                                                     const t81::core::limb &rhs, ArithmeticOp op) {
+                                                     const t81::core::limb &rhs,
+                                                     ArithmeticOp op) {
         switch (op) {
         case ArithmeticOp::Add:
             return lhs + rhs;
@@ -227,7 +228,8 @@ namespace {
     template <typename Int> bool apply_compare(const Int &lhs, const Int &rhs, CompareOp op);
 
     template <>
-    bool apply_compare<t81::core::limb>(const t81::core::limb &lhs, const t81::core::limb &rhs,
+    bool apply_compare<t81::core::limb>(const t81::core::limb &lhs,
+                                        const t81::core::limb &rhs,
                                         CompareOp op) {
         switch (op) {
         case CompareOp::Equal:
@@ -248,7 +250,8 @@ namespace {
 
     template <>
     bool apply_compare<t81::core::bigint>(const t81::core::bigint &lhs,
-                                          const t81::core::bigint &rhs, CompareOp op) {
+                                          const t81::core::bigint &rhs,
+                                          CompareOp op) {
         switch (op) {
         case CompareOp::Equal:
             return lhs == rhs;
@@ -267,8 +270,8 @@ namespace {
     }
 
     template <typename Int>
-    void bench_compare(benchmark::State &state, CompareOp op, std::uint64_t seed,
-                       std::size_t limbs) {
+    void
+    bench_compare(benchmark::State &state, CompareOp op, std::uint64_t seed, std::size_t limbs) {
         std::mt19937_64 rng(seed + static_cast<std::uint64_t>(state.thread_index()));
         const auto lhs_cache = create_random_cache<Int>(rng, limbs, kCacheSize, false);
         const auto rhs_cache = create_random_cache<Int>(rng, limbs, kCacheSize, false);
@@ -283,7 +286,9 @@ namespace {
     }
 
     template <typename Int>
-    void bench_arithmetic(benchmark::State &state, ArithmeticOp op, std::uint64_t seed,
+    void bench_arithmetic(benchmark::State &state,
+                          ArithmeticOp op,
+                          std::uint64_t seed,
                           std::size_t limbs) {
         std::mt19937_64 rng(seed + static_cast<std::uint64_t>(state.thread_index()));
         const auto lhs_cache = create_random_cache<Int>(rng, limbs, kCacheSize, false);
@@ -312,8 +317,8 @@ namespace {
     }
 
     template <bool Left>
-    void bench_bigint_shift(benchmark::State &state, std::uint64_t seed, std::size_t limbs,
-                            int shift) {
+    void
+    bench_bigint_shift(benchmark::State &state, std::uint64_t seed, std::size_t limbs, int shift) {
         std::mt19937_64 rng(seed + static_cast<std::uint64_t>(state.thread_index()));
         const auto cache = create_random_cache<t81::core::bigint>(rng, limbs, kCacheSize, false);
         std::size_t index = 0;
@@ -352,8 +357,8 @@ namespace {
         }
     }
 
-    void bench_bigint_multiply_large(benchmark::State &state, std::uint64_t seed,
-                                     std::size_t limbs) {
+    void
+    bench_bigint_multiply_large(benchmark::State &state, std::uint64_t seed, std::size_t limbs) {
         std::mt19937_64 rng(seed + static_cast<std::uint64_t>(state.thread_index()));
         const auto lhs_cache =
             create_random_cache<t81::core::bigint>(rng, limbs, kCacheSize, false);
@@ -369,7 +374,9 @@ namespace {
         }
     }
 
-    void bench_bigint_pow(benchmark::State &state, std::uint64_t seed, std::size_t limbs,
+    void bench_bigint_pow(benchmark::State &state,
+                          std::uint64_t seed,
+                          std::size_t limbs,
                           std::uint64_t exponent) {
         std::mt19937_64 rng(seed + static_cast<std::uint64_t>(state.thread_index()));
         const auto cache = create_random_cache<t81::core::bigint>(rng, limbs, kCacheSize, false);
@@ -381,7 +388,9 @@ namespace {
         }
     }
 
-    void bench_bigint_pow_large(benchmark::State &state, std::uint64_t seed, std::size_t limbs,
+    void bench_bigint_pow_large(benchmark::State &state,
+                                std::uint64_t seed,
+                                std::size_t limbs,
                                 std::uint64_t exponent) {
         std::mt19937_64 rng(seed + static_cast<std::uint64_t>(state.thread_index()));
         const auto cache = create_random_cache<t81::core::bigint>(rng, limbs, kCacheSize, false);
@@ -417,8 +426,8 @@ namespace {
         }
     }
 
-    void bench_bigint_serialization(benchmark::State &state, std::uint64_t seed,
-                                    std::size_t limbs) {
+    void
+    bench_bigint_serialization(benchmark::State &state, std::uint64_t seed, std::size_t limbs) {
         std::mt19937_64 rng(seed + static_cast<std::uint64_t>(state.thread_index()));
         const auto cache = create_random_cache<t81::core::bigint>(rng, limbs, kCacheSize, false);
         std::size_t index = 0;
@@ -438,7 +447,8 @@ namespace {
         }
     }
 
-    void bench_montgomery_mul(benchmark::State &state, std::uint64_t seed,
+    void bench_montgomery_mul(benchmark::State &state,
+                              std::uint64_t seed,
                               const t81::core::bigint &modulus) {
         std::mt19937_64 rng(seed + static_cast<std::uint64_t>(state.thread_index()));
         const auto context = t81::core::MontgomeryContext<t81::core::bigint>(modulus);
@@ -460,7 +470,8 @@ namespace {
         }
     }
 
-    void bench_montgomery_mul_large(benchmark::State &state, std::uint64_t seed,
+    void bench_montgomery_mul_large(benchmark::State &state,
+                                    std::uint64_t seed,
                                     const t81::core::bigint &modulus) {
         std::mt19937_64 rng(seed + static_cast<std::uint64_t>(state.thread_index()));
         const auto context = t81::core::MontgomeryContext<t81::core::bigint>(modulus);
@@ -486,59 +497,129 @@ namespace {
 
 } // namespace
 
-BENCHMARK_CAPTURE(bench_arithmetic<t81::core::limb>, limb_add, ArithmeticOp::Add,
-                  seed_offset(ArithmeticOp::Add, false), 0);
-BENCHMARK_CAPTURE(bench_arithmetic<t81::core::limb>, limb_subtract, ArithmeticOp::Subtract,
-                  seed_offset(ArithmeticOp::Subtract, false), 0);
-BENCHMARK_CAPTURE(bench_arithmetic<t81::core::limb>, limb_multiply, ArithmeticOp::Multiply,
-                  seed_offset(ArithmeticOp::Multiply, false), 0);
-BENCHMARK_CAPTURE(bench_arithmetic<t81::core::limb>, limb_divide, ArithmeticOp::Divide,
-                  seed_offset(ArithmeticOp::Divide, false), 0);
-BENCHMARK_CAPTURE(bench_arithmetic<t81::core::limb>, limb_modulo, ArithmeticOp::Modulo,
-                  seed_offset(ArithmeticOp::Modulo, false), 0);
+BENCHMARK_CAPTURE(bench_arithmetic<t81::core::limb>,
+                  limb_add,
+                  ArithmeticOp::Add,
+                  seed_offset(ArithmeticOp::Add, false),
+                  0);
+BENCHMARK_CAPTURE(bench_arithmetic<t81::core::limb>,
+                  limb_subtract,
+                  ArithmeticOp::Subtract,
+                  seed_offset(ArithmeticOp::Subtract, false),
+                  0);
+BENCHMARK_CAPTURE(bench_arithmetic<t81::core::limb>,
+                  limb_multiply,
+                  ArithmeticOp::Multiply,
+                  seed_offset(ArithmeticOp::Multiply, false),
+                  0);
+BENCHMARK_CAPTURE(bench_arithmetic<t81::core::limb>,
+                  limb_divide,
+                  ArithmeticOp::Divide,
+                  seed_offset(ArithmeticOp::Divide, false),
+                  0);
+BENCHMARK_CAPTURE(bench_arithmetic<t81::core::limb>,
+                  limb_modulo,
+                  ArithmeticOp::Modulo,
+                  seed_offset(ArithmeticOp::Modulo, false),
+                  0);
 
-BENCHMARK_CAPTURE(bench_arithmetic<t81::core::bigint>, bigint_add, ArithmeticOp::Add,
-                  seed_offset(ArithmeticOp::Add, true), kBigintLimbs);
-BENCHMARK_CAPTURE(bench_arithmetic<t81::core::bigint>, bigint_subtract, ArithmeticOp::Subtract,
-                  seed_offset(ArithmeticOp::Subtract, true), kBigintLimbs);
-BENCHMARK_CAPTURE(bench_arithmetic<t81::core::bigint>, bigint_multiply, ArithmeticOp::Multiply,
-                  seed_offset(ArithmeticOp::Multiply, true), kBigintLimbs);
-BENCHMARK_CAPTURE(bench_arithmetic<t81::core::bigint>, bigint_divide, ArithmeticOp::Divide,
-                  seed_offset(ArithmeticOp::Divide, true), kBigintLimbs);
-BENCHMARK_CAPTURE(bench_arithmetic<t81::core::bigint>, bigint_modulo, ArithmeticOp::Modulo,
-                  seed_offset(ArithmeticOp::Modulo, true), kBigintLimbs);
-BENCHMARK_CAPTURE(bench_bigint_multiply_large, bigint_multiply_large, 0xfeedc0d5,
+BENCHMARK_CAPTURE(bench_arithmetic<t81::core::bigint>,
+                  bigint_add,
+                  ArithmeticOp::Add,
+                  seed_offset(ArithmeticOp::Add, true),
+                  kBigintLimbs);
+BENCHMARK_CAPTURE(bench_arithmetic<t81::core::bigint>,
+                  bigint_subtract,
+                  ArithmeticOp::Subtract,
+                  seed_offset(ArithmeticOp::Subtract, true),
+                  kBigintLimbs);
+BENCHMARK_CAPTURE(bench_arithmetic<t81::core::bigint>,
+                  bigint_multiply,
+                  ArithmeticOp::Multiply,
+                  seed_offset(ArithmeticOp::Multiply, true),
+                  kBigintLimbs);
+BENCHMARK_CAPTURE(bench_arithmetic<t81::core::bigint>,
+                  bigint_divide,
+                  ArithmeticOp::Divide,
+                  seed_offset(ArithmeticOp::Divide, true),
+                  kBigintLimbs);
+BENCHMARK_CAPTURE(bench_arithmetic<t81::core::bigint>,
+                  bigint_modulo,
+                  ArithmeticOp::Modulo,
+                  seed_offset(ArithmeticOp::Modulo, true),
+                  kBigintLimbs);
+BENCHMARK_CAPTURE(bench_bigint_multiply_large,
+                  bigint_multiply_large,
+                  0xfeedc0d5,
                   kLargeBigintLimbs);
 
 BENCHMARK_CAPTURE(bench_negation<t81::core::limb>, limb_negate, negation_seed(false), 0);
-BENCHMARK_CAPTURE(bench_negation<t81::core::bigint>, bigint_negate, negation_seed(true),
+BENCHMARK_CAPTURE(bench_negation<t81::core::bigint>,
+                  bigint_negate,
+                  negation_seed(true),
                   kBigintLimbs);
 
-BENCHMARK_CAPTURE(bench_compare<t81::core::limb>, limb_equal, CompareOp::Equal,
-                  seed_offset(CompareOp::Equal, false), 0);
-BENCHMARK_CAPTURE(bench_compare<t81::core::limb>, limb_not_equal, CompareOp::NotEqual,
-                  seed_offset(CompareOp::NotEqual, false), 0);
-BENCHMARK_CAPTURE(bench_compare<t81::core::limb>, limb_less, CompareOp::Less,
-                  seed_offset(CompareOp::Less, false), 0);
-BENCHMARK_CAPTURE(bench_compare<t81::core::limb>, limb_less_equal, CompareOp::LessEqual,
-                  seed_offset(CompareOp::LessEqual, false), 0);
-BENCHMARK_CAPTURE(bench_compare<t81::core::limb>, limb_greater, CompareOp::Greater,
-                  seed_offset(CompareOp::Greater, false), 0);
-BENCHMARK_CAPTURE(bench_compare<t81::core::limb>, limb_greater_equal, CompareOp::GreaterEqual,
-                  seed_offset(CompareOp::GreaterEqual, false), 0);
+BENCHMARK_CAPTURE(bench_compare<t81::core::limb>,
+                  limb_equal,
+                  CompareOp::Equal,
+                  seed_offset(CompareOp::Equal, false),
+                  0);
+BENCHMARK_CAPTURE(bench_compare<t81::core::limb>,
+                  limb_not_equal,
+                  CompareOp::NotEqual,
+                  seed_offset(CompareOp::NotEqual, false),
+                  0);
+BENCHMARK_CAPTURE(bench_compare<t81::core::limb>,
+                  limb_less,
+                  CompareOp::Less,
+                  seed_offset(CompareOp::Less, false),
+                  0);
+BENCHMARK_CAPTURE(bench_compare<t81::core::limb>,
+                  limb_less_equal,
+                  CompareOp::LessEqual,
+                  seed_offset(CompareOp::LessEqual, false),
+                  0);
+BENCHMARK_CAPTURE(bench_compare<t81::core::limb>,
+                  limb_greater,
+                  CompareOp::Greater,
+                  seed_offset(CompareOp::Greater, false),
+                  0);
+BENCHMARK_CAPTURE(bench_compare<t81::core::limb>,
+                  limb_greater_equal,
+                  CompareOp::GreaterEqual,
+                  seed_offset(CompareOp::GreaterEqual, false),
+                  0);
 
-BENCHMARK_CAPTURE(bench_compare<t81::core::bigint>, bigint_equal, CompareOp::Equal,
-                  seed_offset(CompareOp::Equal, true), kBigintLimbs);
-BENCHMARK_CAPTURE(bench_compare<t81::core::bigint>, bigint_not_equal, CompareOp::NotEqual,
-                  seed_offset(CompareOp::NotEqual, true), kBigintLimbs);
-BENCHMARK_CAPTURE(bench_compare<t81::core::bigint>, bigint_less, CompareOp::Less,
-                  seed_offset(CompareOp::Less, true), kBigintLimbs);
-BENCHMARK_CAPTURE(bench_compare<t81::core::bigint>, bigint_less_equal, CompareOp::LessEqual,
-                  seed_offset(CompareOp::LessEqual, true), kBigintLimbs);
-BENCHMARK_CAPTURE(bench_compare<t81::core::bigint>, bigint_greater, CompareOp::Greater,
-                  seed_offset(CompareOp::Greater, true), kBigintLimbs);
-BENCHMARK_CAPTURE(bench_compare<t81::core::bigint>, bigint_greater_equal, CompareOp::GreaterEqual,
-                  seed_offset(CompareOp::GreaterEqual, true), kBigintLimbs);
+BENCHMARK_CAPTURE(bench_compare<t81::core::bigint>,
+                  bigint_equal,
+                  CompareOp::Equal,
+                  seed_offset(CompareOp::Equal, true),
+                  kBigintLimbs);
+BENCHMARK_CAPTURE(bench_compare<t81::core::bigint>,
+                  bigint_not_equal,
+                  CompareOp::NotEqual,
+                  seed_offset(CompareOp::NotEqual, true),
+                  kBigintLimbs);
+BENCHMARK_CAPTURE(bench_compare<t81::core::bigint>,
+                  bigint_less,
+                  CompareOp::Less,
+                  seed_offset(CompareOp::Less, true),
+                  kBigintLimbs);
+BENCHMARK_CAPTURE(bench_compare<t81::core::bigint>,
+                  bigint_less_equal,
+                  CompareOp::LessEqual,
+                  seed_offset(CompareOp::LessEqual, true),
+                  kBigintLimbs);
+BENCHMARK_CAPTURE(bench_compare<t81::core::bigint>,
+                  bigint_greater,
+                  CompareOp::Greater,
+                  seed_offset(CompareOp::Greater, true),
+                  kBigintLimbs);
+BENCHMARK_CAPTURE(bench_compare<t81::core::bigint>,
+                  bigint_greater_equal,
+                  CompareOp::GreaterEqual,
+                  seed_offset(CompareOp::GreaterEqual, true),
+                  kBigintLimbs);
 
 const auto decimal_100_text = decimal_string(100);
 const auto decimal_1000_text = decimal_string(1000);
@@ -570,8 +651,8 @@ BENCHMARK_CAPTURE(bench_bigint_base81_from_string, base81_from_string_256, base8
 
 BENCHMARK_CAPTURE(bench_bigint_pow, bigint_pow_128, 0xfeedc0de, kBigintLimbs, 128);
 BENCHMARK_CAPTURE(bench_bigint_pow, bigint_pow_512, 0xfeedc0df, kBigintLimbs, 512);
-BENCHMARK_CAPTURE(bench_bigint_pow_large, bigint_pow_large, 0xfeedc0d2, kLargeBigintLimbs,
-                  kLargePowExponent);
+BENCHMARK_CAPTURE(
+    bench_bigint_pow_large, bigint_pow_large, 0xfeedc0d2, kLargeBigintLimbs, kLargePowExponent);
 
 BENCHMARK_CAPTURE(bench_bigint_gcd, bigint_gcd_small, 0xc0deba5e, kBigintLimbs);
 BENCHMARK_CAPTURE(bench_bigint_gcd_large, bigint_gcd_large, 0xc0deba5f, kLargeBigintLimbs);

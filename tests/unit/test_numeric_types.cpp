@@ -12,7 +12,9 @@ namespace {
     using Limb = t81::core::limb;
     using BigInt = t81::core::bigint;
 
-    Limb limb_from(int value) { return Limb::from_value(value); }
+    Limb limb_from(int value) {
+        return Limb::from_value(value);
+    }
 
     bool test_float() {
         std::cerr << "test_float start" << std::endl;
@@ -221,7 +223,8 @@ namespace {
 
 } // namespace
 
-int main() {
+int
+main() {
     if (!test_float())
         return 1;
     if (!test_ratio())

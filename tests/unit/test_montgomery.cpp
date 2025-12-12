@@ -178,7 +178,8 @@ namespace {
 
 } // namespace
 
-int main() {
+int
+main() {
     const limb modulus = limb::from_value(17);
     const MontgomeryContext<limb> limb_ctx(modulus);
     if (!check_limb_modular(limb_ctx)) {

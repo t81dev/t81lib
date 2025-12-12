@@ -9,9 +9,25 @@
 
 namespace t81::core::detail {
 
-    constexpr std::array<char, 19> BASE81_PUNCTUATION = {'!', '#', '$', '%', '&', '(', ')',
-                                                         '*', '+', '-', ',', '.', '/', ';',
-                                                         ':', '<', '=', '>', '?'};
+    constexpr std::array<char, 19> BASE81_PUNCTUATION = {'!',
+                                                         '#',
+                                                         '$',
+                                                         '%',
+                                                         '&',
+                                                         '(',
+                                                         ')',
+                                                         '*',
+                                                         '+',
+                                                         '-',
+                                                         ',',
+                                                         '.',
+                                                         '/',
+                                                         ';',
+                                                         ':',
+                                                         '<',
+                                                         '=',
+                                                         '>',
+                                                         '?'};
 
     constexpr std::array<char, 81> make_base81_digits() {
         std::array<char, 81> digits{};
@@ -33,13 +49,17 @@ namespace t81::core::detail {
 
     constexpr std::array<char, 81> BASE81_DIGITS = make_base81_digits();
 
-    constexpr int base81_max_base() noexcept { return static_cast<int>(BASE81_DIGITS.size()); }
+    constexpr int base81_max_base() noexcept {
+        return static_cast<int>(BASE81_DIGITS.size());
+    }
 
     constexpr bool base81_supports_base(int base) noexcept {
         return base >= 2 && base <= base81_max_base();
     }
 
-    inline char base81_digit_char(int digit) noexcept { return BASE81_DIGITS[digit]; }
+    inline char base81_digit_char(int digit) noexcept {
+        return BASE81_DIGITS[digit];
+    }
 
     inline int punctuation_index(char ch) noexcept {
         for (std::size_t index = 0; index < BASE81_PUNCTUATION.size(); ++index) {
@@ -90,7 +110,8 @@ namespace t81::core::detail {
                     for (int t3 = -1; t3 <= 1; ++t3) {
                         const int sum = t0 + 3 * t1 + 9 * t2 + 27 * t3;
                         const int digit = normalize_base81_sum(sum);
-                        result[digit] = {static_cast<std::int8_t>(t0), static_cast<std::int8_t>(t1),
+                        result[digit] = {static_cast<std::int8_t>(t0),
+                                         static_cast<std::int8_t>(t1),
                                          static_cast<std::int8_t>(t2),
                                          static_cast<std::int8_t>(t3)};
                     }

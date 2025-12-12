@@ -89,7 +89,9 @@ namespace t81::core::detail {
     inline constexpr std::array<std::array<int, 27>, 27> TRYTE_PRODUCT =
         build_tryte_product_table();
 
-    inline constexpr int tryte_value(std::uint8_t tryte) noexcept { return TRYTE_VALUES[tryte]; }
+    inline constexpr int tryte_value(std::uint8_t tryte) noexcept {
+        return TRYTE_VALUES[tryte];
+    }
 
     inline constexpr const AddEntry &add_entry(std::uint8_t lhs, std::uint8_t rhs) noexcept {
         return ADD_TABLE[lhs][rhs];

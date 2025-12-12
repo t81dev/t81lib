@@ -9,11 +9,14 @@
 
 namespace {
 
-    inline t81::core::limb random_limb(std::mt19937_64 &rng) { return t81::util::random_limb(rng); }
+    inline t81::core::limb random_limb(std::mt19937_64 &rng) {
+        return t81::util::random_limb(rng);
+    }
 
 } // namespace
 
-static void bench_limb_add(benchmark::State &state) {
+static void
+bench_limb_add(benchmark::State &state) {
     std::mt19937_64 rng(0x5eedc0de + static_cast<int>(state.thread_index()));
     while (state.KeepRunning()) {
         const auto lhs = random_limb(rng);
@@ -23,7 +26,8 @@ static void bench_limb_add(benchmark::State &state) {
     }
 }
 
-static void bench_limb_mul(benchmark::State &state) {
+static void
+bench_limb_mul(benchmark::State &state) {
     std::mt19937_64 rng(0x5eedc0de + static_cast<int>(state.thread_index()) + 0x10);
     while (state.KeepRunning()) {
         const auto lhs = random_limb(rng);
