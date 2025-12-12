@@ -10,7 +10,7 @@ to understand the balanced ternary engine without digging through specs immediat
 ## Core resources
 
 - **Landing & Quick Start** — `README.md` contains the hero content, badges, and a comprehensive quick
-  start section for builds, subprojects, and vcpkg consumers.
+  start section for builds, subprojects, pip/pipx consumers, CLI helpers, and the new “Start here” router.
 - **Architecture guide** — `ARCHITECTURE.md` walks through the component layers and data flow.
 - **Normative spec** — `docs/t81lib-spec-v1.0.0.md` defines the API guarantees for `limb`, `bigint`, and helpers.
 - **Design notes** — `docs/design/limb-design.md`, `.../bigint-design.md`, `.../montgomery-design.md` explain internal
@@ -22,6 +22,8 @@ to understand the balanced ternary engine without digging through specs immediat
   `examples/ternary_sparse_preview.py` for runnable workflows.
 - **Python API reference** — `docs/python-api.md` lays out how MkDocs plus `mkdocstrings` auto-generate the binding reference.
 - **Python cookbook** — `docs/python-cookbook.md` gathers recipes that mix `t81lib.pack_dense_matrix`, `t81.torch.TernaryTensor`, and the CLI helpers.
+- **Python install paths** — `docs/python-install.md` explains pip/pipx builds, validation tips, and CLI helper installs.
+- **PyTorch how-to** — `docs/torch.md` walks through `t81.torch`, `t81.nn`, conversion helpers, and how the CLI scripts mirror the Python flows.
 - **CLI reference** — `docs/references/cli-usage.md` lists the `t81-convert`, `t81-gguf`, and `t81-qat` helpers
   plus the common flags for exporting GGUF bundles and running QAT.
 - **Hardware & energy reference** — `docs/references/hardware-emulation.md` connects `t81.hardware.TernaryEmulator`
@@ -34,6 +36,9 @@ to understand the balanced ternary engine without digging through specs immediat
 - **CLI automation & energy benchmarking** — `scripts/quantize_measure.py` and `scripts/quantize_energy_benchmark.py`
   chain `t81-convert`/`t81-gguf` runs with latency/energy measurement so you can report quantization impact directly
   from command-line workflows.
+- **Use cases & demos** — `docs/use-cases.md` and `examples/README.md` capture the canonical scripts, notebooks, and research stories.
+- **Hardware simulation** — `docs/hardware.md` details `t81.hardware.TernaryEmulator`, fuzzy helpers, and the visualizer notebook.
+- **API overview** — `docs/api-overview.md` summarizes the numeric containers and helpers exposed via `<t81/t81lib.hpp>`.
 - **Tests & benchmarks** — `tests/` documents the unit/property coverage while `bench/` shows throughput patterns.
 
 ## Stay aligned
