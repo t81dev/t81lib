@@ -3,7 +3,9 @@
 #include <t81/t81lib.hpp>
 
 #include <compare>
+#include <format>
 #include <iostream>
+#include <limits>
 #include <vector>
 namespace {
 
@@ -180,6 +182,43 @@ bool test_f2m() {
     return true;
 }
 
+bool test_numeric_limits() {
+    const auto digits = std::numeric_limits<Limb>::digits;
+    if (digits != Limb::TRITS) {
+        std::cerr << "numeric_limits digits mismatch" << std::endl;
+        return false;
+    }
+    if (!std::numeric_limits<Limb>::is_signed) {
+        std::cerr << "numeric_limits signed flag" << std::endl;
+        return false;
+    }
+    if (std::numeric_limits<Limb>::radix != 3) {
+        std::cerr << "numeric_limits radix" << std::endl;
+        return false;
+    }
+    return true;
+}
+
+bool test_formatters() {
+    const BigInt value(5);
+    const std::string decimal = std::format("{}", value);
+    if (decimal != "5") {
+        std::cerr << "bigint decimal format" << std::endl;
+        return false;
+    }
+    const std::string ternary = std::format("{:T}", BigInt(-4));
+    if (ternary.empty() || (ternary.front() != '+' && ternary.front() != '-' && ternary.front() != '0')) {
+        std::cerr << "bigint ternary format" << std::endl;
+        return false;
+    }
+    const std::string float_str = std::format("{}", t81::Float(limb_from(3), 0));
+    if (float_str.empty()) {
+        std::cerr << "float format" << std::endl;
+        return false;
+    }
+    return true;
+}
+
 } // namespace
 
 int main() {
@@ -190,5 +229,7 @@ int main() {
     if (!test_complex()) return 1;
     if (!test_polynomial()) return 1;
     if (!test_f2m()) return 1;
+    if (!test_numeric_limits()) return 1;
+    if (!test_formatters()) return 1;
     return 0;
 }

@@ -21,6 +21,10 @@ to understand the balanced ternary engine without digging through specs immediat
   `examples/ternary_sparse_preview.py` for runnable workflows.
 - **CLI reference** — `docs/references/cli-usage.md` lists the `t81-convert`, `t81-gguf`, and `t81-qat` helpers
   plus the common flags for exporting GGUF bundles and running QAT.
+- **Python demos** — the `examples/` scripts/notebooks track `t81.torch` + `t81.nn` workflows; add
+  `examples/ternary_qat_inference_comparison.py` to kick off a mini `t81.trainer` QAT loop, print the ternary
+  threshold schedule, and compare `torch.matmul` vs. `t81lib.gemm_ternary` latency so you can prototype
+  entirely inside Python before launching the CLI helpers.
 - **Tests & benchmarks** — `tests/` documents the unit/property coverage while `bench/` shows throughput patterns.
 
 ## Stay aligned

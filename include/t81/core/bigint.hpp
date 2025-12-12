@@ -12,6 +12,10 @@
 #include <utility>
 #include <vector>
 #include <limits>
+#include <functional>
+#include <format>
+#include <span>
+#include <string>
 
 #include <t81/core/limb.hpp>
 
@@ -151,6 +155,9 @@ public:
         }
         return value;
     }
+
+    std::vector<std::uint8_t> to_bytes() const;
+    static bigint from_bytes(std::span<const std::uint8_t> data);
 
     template <typename Int,
               typename = std::enable_if_t<std::is_integral_v<Int>>>
@@ -960,8 +967,178 @@ private:
         }
     }
 
+    static constexpr std::size_t BITS_PER_BYTE =
+        std::numeric_limits<unsigned char>::digits;
+    static_assert(BITS_PER_BYTE > 0, "unsigned char must represent at least one bit");
+    static_assert(BITS_PER_BYTE <= std::numeric_limits<std::uint32_t>::digits,
+                  "byte width must not exceed limb count bits");
+    static constexpr std::size_t LIMB_COUNT_BYTES =
+        std::numeric_limits<std::uint32_t>::digits / BITS_PER_BYTE;
+    static_assert(LIMB_COUNT_BYTES * BITS_PER_BYTE ==
+                  std::numeric_limits<std::uint32_t>::digits);
+    static constexpr std::uint32_t COUNT_BYTE_MASK =
+        (static_cast<std::uint32_t>(1) << BITS_PER_BYTE) - 1;
+
     std::vector<limb> limbs_;
     bool negative_ = false;
 };
 
+inline std::vector<std::uint8_t> bigint::to_bytes() const {
+    if (limbs_.size() > std::numeric_limits<std::uint32_t>::max()) {
+        throw std::overflow_error("bigint serialization exceeds header limit");
+    }
+    constexpr std::size_t header_size = 1 + bigint::LIMB_COUNT_BYTES;
+    std::vector<std::uint8_t> buffer;
+    buffer.reserve(header_size + limbs_.size() * limb::BYTES);
+    buffer.push_back(negative_ ? 1 : 0);
+    const std::uint32_t limb_count = static_cast<std::uint32_t>(limbs_.size());
+    // Store the limb count using the fixed-width header derived from numeric_limits so protocols stay endianness-agnostic.
+    for (std::size_t index = 0; index < bigint::LIMB_COUNT_BYTES; ++index) {
+        const std::size_t shift = index * bigint::BITS_PER_BYTE;
+        const std::uint32_t chunk = (limb_count >> shift) & bigint::COUNT_BYTE_MASK;
+        buffer.push_back(static_cast<std::uint8_t>(chunk));
+    }
+    // Append each balanced-ternary limb (3^48) in its canonical byte form so downstream serializers can treat the blob as base-3^48 chunks.
+    for (const auto& limb_value : limbs_) {
+        const auto limb_bytes = limb_value.to_bytes();
+        buffer.insert(buffer.end(), limb_bytes.begin(), limb_bytes.end());
+    }
+    return buffer;
+}
+
+inline bigint bigint::from_bytes(std::span<const std::uint8_t> data) {
+    // Accept a span so callers can deserialize from std::vector, flatbuffers, or memory-mapped blobs.
+    constexpr std::size_t header_size = 1 + bigint::LIMB_COUNT_BYTES;
+    if (data.size() < header_size) {
+        throw std::invalid_argument("bigint serialization header is too short");
+    }
+    const bool negative = data[0] != 0;
+    std::uint32_t limb_count = 0;
+    for (std::size_t index = 0; index < bigint::LIMB_COUNT_BYTES; ++index) {
+        const std::size_t shift = index * bigint::BITS_PER_BYTE;
+        const std::uint32_t chunk = data[1 + index];
+        limb_count |= (chunk & bigint::COUNT_BYTE_MASK) << shift;
+    }
+    const std::size_t expected_size =
+        header_size + static_cast<std::size_t>(limb_count) * limb::BYTES;
+    if (data.size() != expected_size) {
+        throw std::invalid_argument("bigint serialization size mismatch");
+    }
+    std::vector<limb> limbs;
+    limbs.reserve(limb_count);
+    std::size_t offset = header_size;
+    for (std::size_t index = 0; index < limb_count; ++index) {
+        std::array<std::uint8_t, limb::BYTES> limb_bytes{};
+        for (std::size_t byte_index = 0; byte_index < limb::BYTES; ++byte_index) {
+            limb_bytes[byte_index] = data[offset + byte_index];
+        }
+        offset += limb::BYTES;
+        limbs.push_back(limb::from_bytes(limb_bytes));
+    }
+    return from_limbs(std::move(limbs), negative);
+}
+
+inline std::size_t estimate_decimal_capacity(const bigint& value) noexcept {
+    const std::size_t limb_count = value.limb_count();
+    if (limb_count == 0) {
+        return 1;
+    }
+    const int digits_per_limb = detail::decimal_digit_count(detail::MAX_VALUE);
+    return static_cast<std::size_t>(digits_per_limb) * limb_count + 1;
+}
+
+inline std::string to_decimal_string(const bigint& value) {
+    if (value.is_zero()) {
+        return "0";
+    }
+    std::string output;
+    output.reserve(estimate_decimal_capacity(value) + 1);
+    bigint current = value.abs();
+    const bigint divisor{10};
+    while (!current.is_zero()) {
+        const auto [quotient, remainder] = div_mod(current, divisor);
+        const int digit = static_cast<int>(remainder.to_limb().to_value());
+        output.push_back(static_cast<char>('0' + digit));
+        current = quotient;
+    }
+    if (value.is_negative()) {
+        output.push_back('-');
+    }
+    std::reverse(output.begin(), output.end());
+    return output;
+}
+
+inline std::string to_ternary_string(const bigint& value) {
+    if (value.is_zero()) {
+        return "0";
+    }
+    std::vector<int> digits;
+    digits.reserve(value.limb_count() * 2 + 1);
+    bigint cursor = value;
+    const bigint three{3};
+    while (!cursor.is_zero()) {
+        auto [quotient, remainder] = div_mod(cursor, three);
+        int digit = static_cast<int>(remainder.to_limb().to_value());
+        if (digit > 1) {
+            digit -= 3;
+            quotient += bigint::one();
+        } else if (digit < -1) {
+            digit += 3;
+            quotient -= bigint::one();
+        }
+        digits.push_back(digit);
+        cursor = std::move(quotient);
+    }
+    while (digits.size() > 1 && digits.back() == 0) {
+        digits.pop_back();
+    }
+    std::string output;
+    output.reserve(digits.size());
+    for (auto it = digits.rbegin(); it != digits.rend(); ++it) {
+        const int digit = *it;
+        char symbol = (digit == 1) ? '+' : (digit == -1 ? '-' : '0');
+        output.push_back(symbol);
+    }
+    return output;
+}
+
 } // namespace t81::core
+
+namespace std {
+
+template <>
+struct hash<t81::core::bigint> {
+    std::size_t operator()(const t81::core::bigint& value) const noexcept {
+        size_t seed = std::hash<int>{}(value.signum());
+        const auto limb_hasher = std::hash<t81::core::limb>{};
+        for (std::size_t index = 0; index < value.limb_count(); ++index) {
+            const size_t limb_hash = limb_hasher(value.limb_at(index));
+            seed ^= limb_hash + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+        }
+        return seed;
+    }
+};
+
+template <>
+struct formatter<t81::core::bigint> {
+    bool ternary = false;
+
+    template <typename ParseContext>
+    constexpr auto parse(ParseContext& ctx) {
+        auto it = ctx.begin();
+        if (it != ctx.end() && (*it == 'T' || *it == 't')) {
+            ternary = true;
+            ++it;
+        }
+        return it;
+    }
+
+    template <typename FormatContext>
+    auto format(const t81::core::bigint& value, FormatContext& ctx) const {
+        const std::string text =
+            ternary ? t81::core::to_ternary_string(value) : t81::core::to_decimal_string(value);
+        return std::formatter<std::string_view, char>::format(text, ctx);
+    }
+};
+
+} // namespace std
