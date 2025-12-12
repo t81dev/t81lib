@@ -54,3 +54,4 @@ This file helps AI agents discover and understand how to work with this reposito
 - Added `mkdocs.yml`, `docs/python-api.md`, and `docs/python-cookbook.md` so MkDocs + mkdocstrings can publish the Python API reference and cookbook, and linked them from `docs/index.md`.
 - Expanded `python/t81/__init__.py` so the higher-level `t81` package re-exports the compiled binding helpers (`t81lib`, `BigInt`, `Limb`, `gemm_ternary`, etc.) while staying import-safe when the extension is unavailable.
 - Added `scripts/ternary_quantization_benchmark.py` plus `BENCHMARKS.md` so contributors can reproduce a Fashion-MNIST FP32/PTQ/QAT benchmark and log accuracy/latency/storage for each mode; README now links the benchmark doc.
+- Rewrote `pyproject.toml` with valid TOML sections so editable installs (and `pip install -e '.[torch]'`) can parse the metadata cleanly before building the extension.
