@@ -80,9 +80,14 @@ class TernaryTrainer(Trainer):
             module.ternary_threshold = threshold
             module.configure_qat(stochastic_rounding=stochastic)
 
-    def training_step(self, model, inputs: dict[str, Any]) -> torch.Tensor:  # type: ignore[override]
+    def training_step(
+        self,
+        model,
+        inputs: dict[str, Any],
+        num_items_in_batch: torch.Tensor | None = None,
+    ) -> torch.Tensor:  # type: ignore[override]
         self._apply_qat_config()
-        return super().training_step(model, inputs)
+        return super().training_step(model, inputs, num_items_in_batch)
 
     def save_model(self, output_dir: str | None = None, state_dict: dict[str, Any] | None = None) -> None:
         directory = output_dir or self.args.output_dir

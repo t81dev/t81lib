@@ -50,3 +50,7 @@ This file helps AI agents discover and understand how to work with this reposito
 - Documented the automation scripts (`scripts/quantize_measure.py`, `scripts/quantize_energy_benchmark.py`) plus the CLI telemetry/progress experience so future agents can quickly measure quantization impact, latency, and hardware energy from the console.
 - Added `examples/cli-examples.md` with ready-to-copy CLI snippets showing conversion, GGUF export, and QAT flows for the three helpers.
 - Updated `README.md` to highlight the CLI docs/diagrams/examples so newcomers can find the new references through the main overview.
+- Added `docs/ROADMAP.md` to capture an executive summary, analysis, and next-step recommendations for steering t81lib toward wider adoption and smoother contributions.
+- Added `mkdocs.yml`, `docs/python-api.md`, and `docs/python-cookbook.md` so MkDocs + mkdocstrings can publish the Python API reference and cookbook, and linked them from `docs/index.md`.
+- Expanded `python/t81/__init__.py` so the higher-level `t81` package re-exports the compiled binding helpers (`t81lib`, `BigInt`, `Limb`, `gemm_ternary`, etc.) while staying import-safe when the extension is unavailable.
+- Added `scripts/ternary_quantization_benchmark.py` plus `BENCHMARKS.md` so contributors can reproduce a Fashion-MNIST FP32/PTQ/QAT benchmark and log accuracy/latency/storage for each mode; README now links the benchmark doc.

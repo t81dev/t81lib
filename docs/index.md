@@ -20,6 +20,8 @@ to understand the balanced ternary engine without digging through specs immediat
 - **PyTorch bridge** — `t81.torch`/`t81.nn` expose the custom `t81.trit` dtype, `TernaryTensor`,
   and GEMM-backed helpers; see `examples/demo_llama_conversion.py`, `examples/scaling_laws_ternary.py`, and
   `examples/ternary_sparse_preview.py` for runnable workflows.
+- **Python API reference** — `docs/python-api.md` lays out how MkDocs plus `mkdocstrings` auto-generate the binding reference.
+- **Python cookbook** — `docs/python-cookbook.md` gathers recipes that mix `t81lib.pack_dense_matrix`, `t81.torch.TernaryTensor`, and the CLI helpers.
 - **CLI reference** — `docs/references/cli-usage.md` lists the `t81-convert`, `t81-gguf`, and `t81-qat` helpers
   plus the common flags for exporting GGUF bundles and running QAT.
 - **Hardware & energy reference** — `docs/references/hardware-emulation.md` connects `t81.hardware.TernaryEmulator`

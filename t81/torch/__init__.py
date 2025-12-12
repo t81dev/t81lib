@@ -177,7 +177,7 @@ class TernaryTensor(torch.Tensor):
         threshold: float = 0.5,
     ) -> "TernaryTensor":
         storage = torch.empty(shape, dtype=torch.float32, device="cpu")
-        tensor = torch.Tensor._make_subclass(cls, storage, shape)
+        tensor = torch.Tensor._make_subclass(cls, storage, False)
         tensor._packed = packed
         tensor._packed_view = packed.view(np.uint8).reshape(-1, 16)
         tensor._rows = shape[0]
