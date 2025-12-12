@@ -7,13 +7,27 @@ README.md — Visitor-facing overview, focused onboarding, and first-steps guida
 ![CI](https://github.com/t81dev/t81lib/actions/workflows/ci.yml/badge.svg)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
 ![Docs](https://img.shields.io/badge/docs-via%20GitHub%20Pages-brightgreen)
-![≈1.58-bit but balanced ternary](https://img.shields.io/badge/%E2%89%A51.58-bit%20but%20balanced%20ternary-purple)
-![15–22× smaller than FP16](https://img.shields.io/badge/15%E2%80%9322%C3%97%20smaller%20than%20FP16-orange)
-![AVX-512 ternary GEMM](https://img.shields.io/badge/AVX-512%20ternary%20GEMM-lightgrey)
 
 `t81lib` is a modern, header-first C++20 and Python library that brings balanced ternary arithmetic,
 packed ternary GEMMs, Python bindings, and quantization helpers to deterministic numerics and ternary-aware
 AI workflows.
+
+## Minimum viable success
+
+```cpp
+#include <t81/t81lib.hpp>
+
+int main() {
+  t81::Int sum = t81::Int{1} + t81::Int{2};
+  return sum == 3 ? 0 : 1;
+}
+```
+
+```python
+import t81lib
+
+print(t81lib.Float.from_string("1.5") + t81lib.Float.from_string("1.5"))
+```
 
 ## Who is this for?
 
@@ -25,20 +39,18 @@ AI workflows.
 
 It is **not** a drop-in replacement for PyTorch or NumPy, but a focused toolkit for ternary-aware systems.
 
+## Choose your path
+
+- **C++ limb/bigint & numerics** — build locally, include `<t81/t81lib.hpp>`, and verify the `tests/unit/` suite. Starts: [Quick start](#quick-start) & [docs/api-overview.md](docs/api-overview.md).
+- **Python quantization & helpers** — `pip install .[torch]` unlocks `t81lib`/`t81`, NumPy wrappers, and `t81.torch`/`t81.nn`. See [docs/python-install.md](docs/python-install.md) & [docs/python-api.md](docs/python-api.md).
+- **CLI & GGUF/QAT workflows** — `t81-convert`, `t81-gguf`, and `t81-qat` automate quantize→export→train flows. Follow [docs/references/cli-usage.md](docs/references/cli-usage.md).
+
 ## Highlights
 
 - **Balanced-ternary core**: `t81::Int` (an alias for `t81::core::limb`) ships overflow-aware arithmetic, canonical I/O, and deterministic hashing.
 - **Ternary-friendly GEMMs**: `t81::linalg::gemm_ternary` packs balanced ternary matrices into AVX/NEON-accelerated kernels with alpha/beta semantics mirrored in the Python binding.
 - **Python, CLI, and Torch helpers**: Pybind11 bindings expose quantize/dequantize utilities and `t81.torch`/`t81.nn`, while `t81-convert`, `t81-gguf`, and `t81-qat` automate quantize/export/train workflows.
 - **Normative docs & demos**: Architecture notes, CLI references, and runnable demos live under `docs/`, `examples/`, and `bench/`.
-
-## Start here
-
-- **C++** → Quick start → *Build & test locally*
-- **Python** → Quick start → *Python install* (pip + docs)
-- **CLI workflows** → [docs/references/cli-usage.md](docs/references/cli-usage.md)
-- **PyTorch integration** → [docs/torch.md](docs/torch.md)
-- **Architecture & specs** → [ARCHITECTURE.md](ARCHITECTURE.md) & [docs/index.md](docs/index.md)
 
 ## Quick start
 
@@ -51,37 +63,26 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-### 2. Install for Python consumers
+### 2. Install for Python consumers (optional)
 
 ```bash
 pip install .[torch]
 ```
 
-`pip install` builds the Python bindings, exposes `t81lib`/`t81`, and pulls the optional `torch` helpers when you request `[torch]`.
-See [docs/python-install.md](docs/python-install.md) for pipx, CLI helpers, and verification scripts.
+`pip install` builds the Python bindings, exposes `t81lib`/`t81`, and pulls the optional `torch` helpers when you request `[torch]`. See [docs/python-install.md](docs/python-install.md) for pipx, CLI helpers, and verification scripts.
 
-### 3. Build the Python bindings (optional)
-
-```bash
-cmake -S . -B build -DT81LIB_BUILD_TESTS=ON -DT81LIB_BUILD_PYTHON_BINDINGS=ON
-cmake --build build -j
-PYTHONPATH=build python tests/python/test_bindings.py
-```
-
-### 4. Consume as a subproject
+### 3. Consume as a subproject
 
 ```cmake
 add_subdirectory(external/t81lib)
 target_link_libraries(my_app PRIVATE t81::t81lib)
 ```
 
-Include the umbrella header in your sources:
-
 ```cpp
 #include <t81/t81lib.hpp>
 ```
 
-### 5. Use through vcpkg
+### 4. Use through vcpkg
 
 ```bash
 vcpkg install t81lib[tests,benchmarks]:x64-windows
@@ -92,39 +93,15 @@ find_package(t81lib REQUIRED)
 target_link_libraries(... t81::t81lib)
 ```
 
-## Python & PyTorch (quick overview)
+## Python & PyTorch
 
-### Torch path
-
-```python
-import torch
-import t81.torch as t81_torch
-
-w = t81_torch.TernaryTensor.from_float(torch.randn(128, 128))
-y = w.matmul_input(torch.randn(32, 128))
-```
-
-### NumPy helpers
-
-```python
-import numpy as np
-import t81lib
-
-packed = t81lib.pack_dense_matrix(np.random.randn(128, 128).astype("float32"), threshold=0.45)
-```
-
-The same helpers power the `t81.nn` layers that keep biases in FP32/BF16 while quantizing weights.
-See [docs/python-api.md](docs/python-api.md), [docs/python-cookbook.md](docs/python-cookbook.md), [docs/python-install.md](docs/python-install.md), and
-[docs/torch.md](docs/torch.md) for the full story.
+`pip install .[torch]` unlocks the `t81lib`/`t81` namespace, NumPy quantization helpers, and the `t81.torch`/`t81.nn` layers that mix ternary weights with FP32/BF16 biases. Jump deeper via [docs/python-api.md](docs/python-api.md), [docs/python-cookbook.md](docs/python-cookbook.md), and [docs/torch.md](docs/torch.md).
 
 ## CLI helpers
 
-`t81-convert`, `t81-gguf`, and `t81-qat` help you quantize, export GGUF bundles, and run quantization-aware training with alpha/beta controls.
-See [docs/references/cli-usage.md](docs/references/cli-usage.md),
-[docs/diagrams/cli-workflows-mermaid.md](docs/diagrams/cli-workflows-mermaid.md), and
-[examples/cli-examples.md](examples/cli-examples.md) for walkthroughs and ready-to-run snippets.
+`t81-convert`, `t81-gguf`, and `t81-qat` automate quantize→export→train flows with progress reporting and validation hooks. Browse [docs/references/cli-usage.md](docs/references/cli-usage.md), [docs/diagrams/cli-workflows-mermaid.md](docs/diagrams/cli-workflows-mermaid.md), and [examples/cli-examples.md](examples/cli-examples.md) for recipes.
 
-## Use cases (see docs)
+## Use cases
 
 - Ternary LLM weight quantization and GGUF exports for Hugging Face + `llama.cpp`.
 - Packed ternary GEMMs for CPU inference and `torch.matmul` comparisons.
@@ -137,10 +114,20 @@ See [docs/use-cases.md](docs/use-cases.md) for demos, notebooks, and experiments
 
 See [examples/README.md](examples/README.md) for the canonical scripts/notebooks (LLM conversion, GEMM packing, quantization demos, hardware previews, etc.).
 
+## Why ternary?
+
+- Balanced ternary offers ≈1.58 bits of entropy per digit with symmetric overflow semantics and deterministic hashing for `t81::Int`.
+- Refer to [BENCHMARKS.md](BENCHMARKS.md) for the 15–22× storage/latency wins versus FP16 and [docs/hardware.md](docs/hardware.md) for AVX/NEON/AVX-512 kernel sketches.
+
 ## Numeric building blocks
 
 `t81lib` exposes fixed-width ternary integers, big integers, rationals, floats, vectors, and Montgomery helpers that share a single canonical core.
 See [docs/api-overview.md](docs/api-overview.md) for the full surface described in the umbrella header.
+
+## Stability & compatibility
+
+- Supported toolchains: recent Clang/GCC/MSVC or `pip install`’s compatible CPython builds; CMake config defaults to host SIMD if available (AVX2/AVX-512, NEON) while falling back to portable kernels.
+- We track the ABI/API surface via `include/t81/t81lib.hpp`; expect the core headers to evolve until we reach a stable v1 release and consult [CHANGELOG.md](CHANGELOG.md) for migration notes.
 
 ## Docs & resources
 
