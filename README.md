@@ -85,23 +85,35 @@ Include the umbrella header in your sources:
 
 ```bash
 vcpkg install t81lib[tests,benchmarks]:x64-windows
+```
+
+```cmake
 find_package(t81lib REQUIRED)
 target_link_libraries(... t81::t81lib)
 ```
 
 ## Python & PyTorch (quick overview)
 
+### Torch path
+
 ```python
 import torch
 import t81.torch as t81_torch
-import t81lib
 
-weights = t81_torch.TernaryTensor.from_float(torch.randn(128, 128))
-outputs = weights.matmul_input(torch.randn(32, 128))
-packed = t81lib.pack_dense_matrix(weights, threshold=0.45)
+w = t81_torch.TernaryTensor.from_float(torch.randn(128, 128))
+y = w.matmul_input(torch.randn(32, 128))
 ```
 
-The same handlers power the `t81.nn` layers that keep biases in FP32/BF16 while quantizing weights.
+### NumPy helpers
+
+```python
+import numpy as np
+import t81lib
+
+packed = t81lib.pack_dense_matrix(np.random.randn(128, 128).astype("float32"), threshold=0.45)
+```
+
+The same helpers power the `t81.nn` layers that keep biases in FP32/BF16 while quantizing weights.
 See [docs/python-api.md](docs/python-api.md), [docs/python-cookbook.md](docs/python-cookbook.md), [docs/python-install.md](docs/python-install.md), and
 [docs/torch.md](docs/torch.md) for the full story.
 
@@ -132,16 +144,27 @@ See [docs/api-overview.md](docs/api-overview.md) for the full surface described 
 
 ## Docs & resources
 
+### Getting started
+
 - [docs/index.md](docs/index.md) — Docs portal (great for GitHub Pages).
-- [docs/t81lib-spec-v1.0.0.md](docs/t81lib-spec-v1.0.0.md) — Normative contract for consumers.
-- [docs/design/](docs/design/) — Deep dives on `limb`, `bigint`, and `montgomery` internals.
-- [docs/python-install.md](docs/python-install.md) — Detailed install flow for Python, pipx, and CLI helpers.
-- [docs/python-api.md](docs/python-api.md) & [docs/python-cookbook.md](docs/python-cookbook.md).
+- [docs/python-install.md](docs/python-install.md) — Install python bindings, pipx, and CLI helpers.
+- [docs/python-api.md](docs/python-api.md) & [docs/python-cookbook.md](docs/python-cookbook.md) — Python recipes.
 - [docs/torch.md](docs/torch.md) — PyTorch integration, `t81.torch`, and `t81.nn`.
-- [docs/use-cases.md](docs/use-cases.md), [docs/hardware.md](docs/hardware.md), [docs/api-overview.md](docs/api-overview.md).
-- [examples/README.md](examples/README.md) — Canonical scripts/notebooks.
+- [docs/references/cli-usage.md](docs/references/cli-usage.md) — CLI workflows for convert/gguf/qat.
+
+### Specs & design
+
+- [docs/t81lib-spec-v1.0.0.md](docs/t81lib-spec-v1.0.0.md) — Normative contract.
+- [docs/design/](docs/design/) — Deep dives on `limb`, `bigint`, and `montgomery`.
+- [docs/api-overview.md](docs/api-overview.md) — Umbrella helper catalog.
+- [ARCHITECTURE.md](ARCHITECTURE.md) & [docs/index.md](docs/index.md) — Architecture stories and portal.
+
+### Examples & testing
+
+- [examples/README.md](examples/README.md) — Canonical scripts and notebooks.
 - [tests/](tests/) & [bench/](bench/) — Regression suites and throughput gauges.
-- [CONTRIBUTING.md](CONTRIBUTING.md) & [CHANGELOG.md](CHANGELOG.md).
+- [BENCHMARKS.md](BENCHMARKS.md) — Fashion-MNIST FP32/PTQ/QAT comparison.
+- [CONTRIBUTING.md](CONTRIBUTING.md) & [CHANGELOG.md](CHANGELOG.md) — Contribution guidance and history.
 
 ## Benchmarks
 
