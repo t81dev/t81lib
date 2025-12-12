@@ -1,4 +1,10 @@
-### GGUF Export (llama.cpp / Ollama / LM Studio)
+### Reference index
+
+This folder collects lightweight guides for the console scripts and the GGUF
+plugin surface. For a broader overview of the CLI helpers (`t81-convert`,
+`t81-gguf`, and `t81-qat`), see `cli-usage.md`.
+
+### GGUF export (llama.cpp / Ollama / LM Studio)
 
 ```bash
 t81-convert meta-llama/Llama-3.2-3B-Instruct llama3.2-3b-t81.gguf --quant TQ1_0
