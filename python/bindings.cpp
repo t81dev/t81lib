@@ -30,6 +30,9 @@
 
 namespace py = pybind11;
 namespace core = t81::core;
+using t81::DeviceType;
+using t81::ScalarType;
+using t81::TensorMetadata;
 
 static std::string
 decimal_string(const core::bigint &value) {

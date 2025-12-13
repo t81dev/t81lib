@@ -18,6 +18,7 @@ __all__ = [
     "gguf",
     "read_gguf",
     "write_gguf",
+    "dequantize_gguf_to_float",
     "convert",
     "Linear",
     "ternary",
@@ -34,6 +35,7 @@ _LAZY_MODULES: dict[str, str] = {
 _LAZY_MEMBERS: dict[str, tuple[str, str]] = {
     "read_gguf": (".gguf", "read_gguf"),
     "write_gguf": (".gguf", "write_gguf"),
+    "dequantize_gguf_to_float": (".gguf", "dequantize_gguf_to_float"),
     "convert": (".convert", "convert"),
     "Linear": (".nn", "Linear"),
     "ternary": (".qat", "ternary"),
