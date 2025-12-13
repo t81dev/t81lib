@@ -108,6 +108,19 @@ Optional CUDA/ROCm backends can be enabled with `-DUSE_CUDA=ON` / `-DUSE_ROCM=ON
 
 `t81-convert`, `t81-gguf`, and `t81-qat` automate quantize→export→train flows with progress reporting and validation hooks. Browse [docs/references/cli-usage.md](docs/references/cli-usage.md), [docs/diagrams/cli-workflows-mermaid.md](docs/diagrams/cli-workflows-mermaid.md), and [examples/cli-examples.md](examples/cli-examples.md) for recipes.
 
+### Dequantizing for downstream runtimes
+
+Use the new `t81-dequant` helper (backed by `t81.dequantize_gguf_to_float`) to rewrite a TQ1_0/TQ2_0 bundle into float32 before handing it to stock llama.cpp, Ollama, or LM Studio builds that lack ternary support:
+
+```bash
+t81-dequant model-tq1.gguf model-compatible-f16.gguf
+```
+
+That command rewrites the tensors in place while preserving the standard GGUF metadata so the resulting file works with existing loaders. Keep the original `model-tq1.gguf` around for runtimes that already understand TQ tensors, and only run `t81-dequant` when you need immediate compatibility.
+
+For a zero-disk workaround you can also dequantize on the fly (via `t81.dequantize_gguf_to_float` or a small loader patch) before instantiating `llama_cpp.Llama`; see the docs for an example monkey patch if you want to load `model-tq1.gguf` directly without producing an intermediate copy.
+
+
 ## GGUF v4 compliance
 
 t81’s GGUF exports already mirror the llama.cpp conventions; v4’s mandatory `gguf_header` additions are worth calling out for everybody writing their own converter:
