@@ -57,6 +57,10 @@ inline constexpr bool backend_available(Backend backend) noexcept {
     return false;
 }
 
+#if !defined(T81LIB_DOXYGEN)
+Backend get_current_backend() noexcept;
+#endif
+
 #if T81LIB_USE_METAL
 bool metal_available() noexcept;
 #endif
@@ -104,6 +108,15 @@ void addcmul(const TensorMetadata &input,
              float value,
              TensorMetadata &out,
              Backend backend = Backend::Auto);
+
+#if !defined(T81LIB_DOXYGEN)
+void gemm_ternary(const TensorMetadata &A,
+                  const TensorMetadata &B,
+                  TensorMetadata &C,
+                  float alpha,
+                  float beta,
+                  Backend backend = Backend::Auto);
+#endif
 
 #if T81LIB_USE_CUDA
 void cuda_gemm_ternary(std::span<const core::limb> A,
@@ -154,7 +167,7 @@ inline void gemm_ternary_dispatch(std::span<const core::limb> A,
                                   int K,
                                   float alpha,
                                   float beta,
-                                  Backend backend) {
+                                  Backend backend = Backend::Auto) {
     if (M < 0 || N < 0 || K < 0) {
         throw std::invalid_argument("gemm_ternary dimensions must be non-negative");
     }
