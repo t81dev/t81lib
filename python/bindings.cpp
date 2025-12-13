@@ -490,6 +490,8 @@ namespace {
                     throw py::value_error("buffer truncated while skipping refinement bytes");
                 }
                 offset += kRefinementBytes;
+                // Note: has_refinements currently just skips the reserved refinement bytes;
+                // decoding their contents is a future enhancement.
             }
             const float scale = t81::core::gguf::half_to_float(scale_bits);
             const std::size_t rows_in_group =
@@ -643,6 +645,8 @@ PYBIND11_MODULE(t81lib, module) {
         t81::linalg::detail::backend_available(t81::linalg::Backend::CUDA);
     module.attr("HAS_ROCM_BACKEND") =
         t81::linalg::detail::backend_available(t81::linalg::Backend::ROCm);
+    module.attr("TQ1_TRITS_PER_BLOCK") = t81::core::gguf::TQ1_TRITS_PER_BLOCK;
+    module.attr("TQ1_BLOCK_ROWS") = t81::core::gguf::TQ1_BLOCK_ROWS;
 
     module.def(
         "gemm_ternary",

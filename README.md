@@ -110,20 +110,20 @@ Optional CUDA/ROCm backends can be enabled with `-DUSE_CUDA=ON` / `-DUSE_ROCM=ON
 
 ### Dequantizing for downstream runtimes
 
-Use the new `t81-dequant` helper (backed by `t81.dequantize_gguf_to_float`) to rewrite a TQ1_0/TQ2_0 bundle into float32 before handing it to stock llama.cpp, Ollama, or LM Studio builds that lack ternary support:
+Use the new `t81-dequant` helper (backed by `t81.dequantize_gguf_to_float`) to rewrite a TQ1_0 or TQ2_0 bundle into float32 before handing it to stock llama.cpp, Ollama, or LM Studio builds that lack ternary support:
 
 ```bash
 t81-dequant model-tq1.gguf model-compatible-f16.gguf
 ```
 
-That command rewrites the tensors in place while preserving the standard GGUF metadata so the resulting file works with existing loaders. Keep the original `model-tq1.gguf` around for runtimes that already understand TQ tensors, and only run `t81-dequant` when you need immediate compatibility.
+That command rewrites the tensors in place while preserving the standard GGUF metadata so the resulting file works with existing loaders. Keep the original `model-tq1.gguf`/`model-tq2.gguf` around for runtimes that already understand TQ tensors, and only run `t81-dequant` when you need immediate compatibility.
 
-For a zero-disk workaround you can also dequantize on the fly (via `t81.dequantize_gguf_to_float` or a small loader patch) before instantiating `llama_cpp.Llama`; see the docs for an example monkey patch if you want to load `model-tq1.gguf` directly without producing an intermediate copy.
+For a zero-disk workaround you can also dequantize on the fly (via `t81.dequantize_gguf_to_float` or a small loader patch) before instantiating `llama_cpp.Llama`; see the docs for an example monkey patch if you want to load `model-tq1.gguf` or `model-tq2.gguf` directly without producing an intermediate copy.
 
 
 ## GGUF v4 compliance
 
-t81’s GGUF exports already mirror the llama.cpp conventions; v4’s mandatory `gguf_header` additions are worth calling out for everybody writing their own converter:
+t81’s GGUF exports already mirror the llama.cpp conventions; the writer now aligns with llama.cpp’s block layout (32-row groups, per-group f16 scale, optional TQ2 refinement bytes) and includes v4’s mandatory `gguf_header` additions, which are worth calling out for everybody writing their own converter:
 
 - **Header bump** – write `version = 4` instead of 3 so llama.cpp accepts the file and no longer fails with “unsupported version”.
 - **Global alignment metadata** – after `tensor_count`/`kv_count` emit `alignment` (default 32, power-of-two) and `reserved` (0) before the metadata block, and compute tensor padding with `GGML_PAD(size, alignment)` so every tensor data block ends on that boundary.
