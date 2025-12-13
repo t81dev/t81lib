@@ -70,12 +70,15 @@ jobs:
         run: cmake --build "$BUILD_DIR" --parallel
       - name: Test
         run: ctest --test-dir "$BUILD_DIR" --output-on-failure
-      - name: Python binding tests
+      - name: Python binding + GGUF regression tests
         if: matrix.configuration.name == 'python'
         run: |
           set -euo pipefail
           mkdir -p artifacts
+          python3 -m pip install --upgrade pip
+          python3 -m pip install torch transformers pytest
           PYTHONPATH="$BUILD_DIR" python3 tests/python/test_bindings.py 2>&1 | tee artifacts/${BUILD_DIR}-python-tests.log
+          PYTHONPATH="$BUILD_DIR" python3 -m pytest tests/python/test_gguf.py 2>&1 | tee artifacts/${BUILD_DIR}-gguf-tests.log
       - name: Collect test logs
         run: |
           mkdir -p artifacts

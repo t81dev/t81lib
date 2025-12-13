@@ -26,12 +26,10 @@ HEADER_ALIGNMENT = 32
 HEADER_STRUCT = struct.Struct("<4sIQQ")
 HEADER_SIZE = HEADER_STRUCT.size
 
-GGML_TYPE_TQ1_0 = 250
-GGML_TYPE_TQ2_0 = 251
+GGML_TYPE_TQ1_0 = 34
+GGML_TYPE_TQ2_0 = 35
 GGML_TYPE_F32 = 100
 GGML_TYPE_F16 = 101
-
-GGML_TYPE_F32 = 100
 
 GGUF_TYPE_UINT8 = 0
 GGUF_TYPE_INT8 = 1
@@ -47,7 +45,9 @@ GGUF_TYPE_UINT64 = 10
 GGUF_TYPE_INT64 = 11
 GGUF_TYPE_FLOAT64 = 12
 
-GGUF_QUANT_BLOCK_ROWS = 32
+GGUF_QUANT_BLOCK_ROWS = 32  # matches the legacy TQ1_BLOCK_ROWS constant in the C++ helpers
+TQ1_TRITS_PER_BLOCK = 8
+TQ2_TRITS_PER_BYTE = 4
 
 
 @dataclass(frozen=True)
@@ -119,7 +119,7 @@ def _collect_metadata(model: PreTrainedModel, quant: str, threshold: float) -> t
         ("general.file_type", 2),
         ("general.alignment", HEADER_ALIGNMENT),
         ("general.quantized_by", "t81lib"),
-        ("general.quantization_version", 2),
+        ("general.quantization_version", 3 if quant == "TQ2_0" else 2),
         ("quantization.type", quant.lower()),
         ("quantization.block_size", GGUF_QUANT_BLOCK_ROWS),
         ("quantization.threshold", threshold),
@@ -224,21 +224,59 @@ def _float_to_half_bytes(value: float) -> bytes:
     return np.float16(value).tobytes()
 
 
+def _pack_row_tq1(row: np.ndarray, threshold: float, scale: float) -> bytes:
+    _, packed = t81lib.quantize_row_tq1_0(np.asarray(row, dtype=np.float32), threshold, scale)
+    return packed.tobytes(order="C")
+
+
+def _pack_row_tq2(row: np.ndarray, threshold: float, scale: float) -> bytes:
+    """Pack a row into four-trit bytes after thresholded normalization."""
+    if scale == 0.0:
+        normalized = np.zeros_like(row, dtype=np.float32)
+    else:
+        normalized = row.astype(np.float32, copy=False) / float(scale)
+    cols = normalized.shape[0]
+    trits = np.zeros(cols, dtype=np.uint8)
+    mask = np.abs(normalized) >= threshold
+    signs = (normalized[mask] < 0).astype(np.uint8)
+    trits[mask] = 1 + signs
+
+    padded_len = (-cols) % TQ2_TRITS_PER_BYTE
+    if padded_len:
+        padded = np.pad(trits, (0, padded_len), constant_values=0)
+    else:
+        padded = trits
+    reshaped = padded.reshape(-1, TQ2_TRITS_PER_BYTE)
+    packed = (
+        reshaped[:, 0]
+        | (reshaped[:, 1] << 2)
+        | (reshaped[:, 2] << 4)
+        | (reshaped[:, 3] << 6)
+    ).astype(np.uint8)
+    n_bytes = (cols + TQ2_TRITS_PER_BYTE - 1) // TQ2_TRITS_PER_BYTE
+    return packed[:n_bytes].tobytes()
+
+
 def _quantize_tensor(tensor: torch.Tensor, quant: str, threshold: float) -> bytes:
+    """Quantize a 2D tensor into TQ1_0 or TQ2_0 payload bytes."""
     array = tensor.cpu().to(dtype=torch.float32, copy=False).numpy()
+    if array.ndim != 2:
+        raise ValueError(f"Only 2D tensors supported, got shape {array.shape}")
     rows, cols = array.shape
     serialized = bytearray()
+    pack_row = _pack_row_tq1 if quant == "TQ1_0" else _pack_row_tq2
+    include_refinements = quant == "TQ2_0"
     for group_start in range(0, rows, GGUF_QUANT_BLOCK_ROWS):
         group = array[group_start : group_start + GGUF_QUANT_BLOCK_ROWS]
         scale = float(np.max(np.abs(group))) if group.size else 0.0
         serialized.extend(_float_to_half_bytes(scale))
-        if quant == "TQ2_0":
+        if include_refinements:
+            # Reserve 8 bytes per block for future-per-block refinement data (higher-order corrections).
             serialized.extend(b"\x00" * 8)
         for row in group:
             if cols == 0:
                 continue
-            packed = t81lib.quantize_row_tq1_0(np.asarray(row, dtype=np.float32), threshold, scale)[1]
-            serialized.extend(packed.tobytes(order="C"))
+            serialized.extend(pack_row(row, threshold, scale))
     return bytes(serialized)
 
 
@@ -268,6 +306,7 @@ def write_gguf(
     quant = quant.upper()
     if quant not in {"TQ1_0", "TQ2_0"}:
         raise ValueError("quant must be one of 'TQ1_0' or 'TQ2_0'")
+    threshold = float(np.clip(threshold, 0.0, 0.9999))
     entries = _collect_linears(model)
     if not entries:
         raise ValueError("model does not contain any t81.nn.Linear layers")
@@ -376,6 +415,10 @@ def _decode_quant_tensor(
         dtype = np.float32
         data = np.frombuffer(memoryview(chunk), dtype=dtype)
         if shape:
+            expected = int(np.prod(shape))
+            if data.size < expected:
+                raise ValueError("float tensor data truncated")
+            data = data[:expected]
             data = data.reshape(shape)
         return torch.from_numpy(data)
     decoder = t81lib.dequant_tq1_0 if ggml_type == GGML_TYPE_TQ1_0 else t81lib.dequant_tq2_0
@@ -409,10 +452,16 @@ def read_gguf(
     tensor_infos = _parse_tensor_infos(buffer, tensor_infos_offset, num_tensors, alignment)
     sorted_infos = sorted(tensor_infos, key=lambda info: info.offset)
     payload: dict[str, torch.Tensor | bytes] = {}
+    prev_end = 0
     for index, info in enumerate(sorted_infos):
+        if info.offset < prev_end:
+            raise ValueError("tensor data overlaps or is out of order")
         next_offset = (
             sorted_infos[index + 1].offset if index + 1 < len(sorted_infos) else len(buffer)
         )
+        if next_offset > len(buffer):
+            raise ValueError("tensor data extends beyond file length")
+        prev_end = next_offset
         chunk = buffer[info.offset:next_offset]
         if info.ggml_type not in {GGML_TYPE_TQ1_0, GGML_TYPE_TQ2_0, GGML_TYPE_F32}:
             raise ValueError(f"unsupported tensor type {info.ggml_type}")
@@ -448,7 +497,9 @@ def dequantize_gguf(
             numpy_dtype = np.float32
         else:
             raise ValueError(f"unsupported target dtype {dtype}")
-        numpy_array = array.cpu().numpy(dtype=numpy_dtype, copy=False)
+        numpy_array = array.cpu().numpy()
+        if numpy_array.dtype != numpy_dtype:
+            numpy_array = numpy_array.astype(numpy_dtype, copy=False)
         tensor_payloads.append(
             _TensorPayload(
                 name=name,
