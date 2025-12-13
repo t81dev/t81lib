@@ -11,6 +11,7 @@ enum class DeviceType {
     CPU,
     CUDA,
     ROCM,
+    Metal,
     INVALID,
 };
 
@@ -29,6 +30,7 @@ enum class ScalarType {
     ComplexDouble,
     Bool,
     Undefined,
+    TernaryLimb,
 };
 
 struct TensorMetadata {
@@ -74,6 +76,10 @@ struct TensorMetadata {
     bool dtype_is_float32() const {
         return dtype == ScalarType::Float;
     }
+
+    bool dtype_is_ternary_limb() const {
+        return dtype == ScalarType::TernaryLimb;
+    }
 };
 
 inline TensorMetadata make_contiguous_metadata(std::size_t elements, void *pointer) {
@@ -82,6 +88,15 @@ inline TensorMetadata make_contiguous_metadata(std::size_t elements, void *point
     metadata.strides = {1};
     metadata.data_ptr = pointer;
     metadata.dtype = ScalarType::Float;
+    return metadata;
+}
+
+inline TensorMetadata make_contiguous_ternary_metadata(std::size_t elements, void *pointer) {
+    TensorMetadata metadata;
+    metadata.sizes = {static_cast<int64_t>(elements)};
+    metadata.strides = {1};
+    metadata.data_ptr = pointer;
+    metadata.dtype = ScalarType::TernaryLimb;
     return metadata;
 }
 
