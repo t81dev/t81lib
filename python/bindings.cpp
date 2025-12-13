@@ -756,14 +756,19 @@ PYBIND11_MODULE(t81lib, module) {
             const int K_limbs = K / core::limb::TRITS;
             const auto a_handle = handle_for_packed_object(A_obj, M, K_limbs);
             const auto b_handle = handle_for_packed_object(B_obj, K_limbs, N);
-            const auto c_handle = extract_tensor_handle(C_obj);
+            auto c_handle = extract_tensor_handle(C_obj);
             if (static_cast<int>(c_handle.meta.sizes.size()) != 2 ||
                 static_cast<int>(c_handle.meta.sizes[0]) != M ||
                 static_cast<int>(c_handle.meta.sizes[1]) != N) {
                 throw py::value_error("C tensor shape must match (M, N)");
             }
             t81::linalg::detail::gemm_ternary(
-                a_handle.meta, b_handle.meta, c_handle.meta, alpha, beta, Backend::Auto);
+                a_handle.meta,
+                b_handle.meta,
+                c_handle.meta,
+                alpha,
+                beta,
+                t81::linalg::Backend::Auto);
         },
         py::arg("A"),
         py::arg("B"),
