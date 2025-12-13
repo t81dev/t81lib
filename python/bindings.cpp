@@ -243,6 +243,49 @@ namespace {
         return handle;
     }
 
+    TensorMetadata metadata_from_limb_buffer_info(const py::buffer_info &info,
+                                                  int rows,
+                                                  int cols) {
+        if (info.shape.size() != 2) {
+            throw py::value_error("packed limb buffer must be 2D");
+        }
+        if (info.itemsize != static_cast<py::ssize_t>(sizeof(core::limb))) {
+            throw py::value_error("packed limb buffer must store limbs");
+        }
+        if (!buffer_is_c_contiguous(info)) {
+            throw py::value_error("packed limb buffer must use C-style contiguous layout");
+        }
+        const std::size_t total_bytes =
+            static_cast<std::size_t>(std::max<py::ssize_t>(info.size, 0)) *
+            static_cast<std::size_t>(info.itemsize);
+        const std::size_t required_bytes = static_cast<std::size_t>(rows) *
+                                           static_cast<std::size_t>(cols) *
+                                           sizeof(core::limb);
+        if (total_bytes != required_bytes) {
+            throw py::value_error("packed limb buffer byte size mismatch");
+        }
+        TensorMetadata metadata;
+        metadata.dtype = ScalarType::TernaryLimb;
+        metadata.device_type = DeviceType::CPU;
+        metadata.data_ptr = info.ptr;
+        metadata.sizes = {static_cast<int64_t>(rows), static_cast<int64_t>(cols)};
+        metadata.strides = {static_cast<int64_t>(cols), 1};
+        metadata.storage_offset = 0;
+        metadata.owns_memory = false;
+        metadata.requires_sync = false;
+        return metadata;
+    }
+
+    PyTensorHandle metadata_from_limb_buffer(py::object obj, int rows, int cols) {
+        py::buffer buffer(obj);
+        const auto info = buffer.request(false);
+        TensorMetadata metadata = metadata_from_limb_buffer_info(info, rows, cols);
+        PyTensorHandle handle;
+        handle.meta = std::move(metadata);
+        handle.owner = obj;
+        return handle;
+    }
+
     ScalarType scalar_type_from_torch(const py::object &dtype) {
         if (dtype.equal(get_torch_module().attr("float32"))) {
             return ScalarType::Float;
@@ -253,7 +296,8 @@ namespace {
         return ScalarType::Undefined;
     }
 
-    PyTensorHandle metadata_from_torch(const py::object &tensor) {
+    PyTensorHandle metadata_from_torch(const py::object &tensor,
+                                       ScalarType override_dtype = ScalarType::Undefined) {
         PyTensorHandle handle;
         handle.owner = tensor;
         handle.is_torch = true;
@@ -270,14 +314,59 @@ namespace {
         }
         const auto ptr_value = tensor.attr("data_ptr")().cast<std::uintptr_t>();
         metadata.data_ptr = reinterpret_cast<void *>(ptr_value);
-        metadata.dtype = scalar_type_from_torch(tensor.attr("dtype"));
+        const ScalarType base_dtype = scalar_type_from_torch(tensor.attr("dtype"));
+        metadata.dtype = override_dtype != ScalarType::Undefined ? override_dtype : base_dtype;
         metadata.sizes = shape_to_int64(tensor.attr("size")());
         metadata.strides = shape_to_int64(tensor.attr("stride")());
         metadata.storage_offset = tensor.attr("storage_offset")().cast<int64_t>();
         metadata.owns_memory = false;
-        metadata.requires_sync = true;
+        metadata.requires_sync = (metadata.device_type != DeviceType::CPU);
         handle.meta = std::move(metadata);
         return handle;
+    }
+
+    PyTensorHandle metadata_from_packed_torch(py::object tensor, int rows, int cols) {
+        if (!is_torch_tensor(tensor)) {
+            throw py::value_error("packed limbs must come from torch tensors");
+        }
+        const auto dims = tensor.attr("ndim").cast<int>();
+        if (dims != 3) {
+            throw py::value_error("packed torch tensors must be 3-dimensional");
+        }
+        const auto shape = shape_to_int64(tensor.attr("shape")());
+        if (static_cast<int>(shape[0]) != rows || static_cast<int>(shape[1]) != cols ||
+            static_cast<int>(shape[2]) != static_cast<int>(core::limb::BYTES)) {
+            throw py::value_error("packed torch tensor shape must be (rows, cols, bytes_per_limb)");
+        }
+        const auto torch = get_torch_module();
+        if (!tensor.attr("dtype").equal(torch.attr("uint8"))) {
+            throw py::value_error("packed torch tensors must store uint8 bytes");
+        }
+        const auto strides = shape_to_int64(tensor.attr("stride")());
+        const std::size_t expected_stride0 =
+            static_cast<std::size_t>(cols) * static_cast<std::size_t>(core::limb::BYTES);
+        if (static_cast<std::size_t>(strides[0]) != expected_stride0 ||
+            static_cast<std::size_t>(strides[1]) != static_cast<std::size_t>(core::limb::BYTES) ||
+            static_cast<std::size_t>(strides[2]) != 1) {
+            throw py::value_error("packed torch tensor must be C-contiguous in the last dimension");
+        }
+        if (!tensor.attr("is_contiguous")().cast<bool>()) {
+            throw py::value_error("packed torch tensor must be contiguous");
+        }
+        PyTensorHandle handle = metadata_from_torch(tensor, ScalarType::TernaryLimb);
+        handle.meta.sizes = {static_cast<int64_t>(rows), static_cast<int64_t>(cols)};
+        handle.meta.strides = {static_cast<int64_t>(cols), 1};
+        handle.meta.storage_offset = 0;
+        handle.meta.dtype = ScalarType::TernaryLimb;
+        handle.meta.requires_sync = (handle.meta.device_type != DeviceType::CPU);
+        return handle;
+    }
+
+    PyTensorHandle handle_for_packed_object(py::object obj, int rows, int cols) {
+        if (is_torch_tensor(obj)) {
+            return metadata_from_packed_torch(obj, rows, cols);
+        }
+        return metadata_from_limb_buffer(obj, rows, cols);
     }
 
     PyTensorHandle extract_tensor_handle(py::object obj) {
@@ -650,9 +739,9 @@ PYBIND11_MODULE(t81lib, module) {
 
     module.def(
         "gemm_ternary",
-        [](py::buffer A_packed,
-           py::buffer B_packed,
-           py::buffer C_buffer,
+        [](py::object A_obj,
+           py::object B_obj,
+           py::object C_obj,
            int M,
            int N,
            int K,
@@ -665,19 +754,16 @@ PYBIND11_MODULE(t81lib, module) {
                 throw py::value_error("K must be divisible by the limb trit count");
             }
             const int K_limbs = K / core::limb::TRITS;
-            const std::size_t m_size = static_cast<std::size_t>(M);
-            const std::size_t n_size = static_cast<std::size_t>(N);
-            const std::size_t k_size = static_cast<std::size_t>(K_limbs);
-            const std::size_t expected_a = m_size * k_size;
-            const std::size_t expected_b = k_size * n_size;
-            const std::size_t expected_c = m_size * n_size;
-            py::buffer a_view = std::move(A_packed);
-            py::buffer b_view = std::move(B_packed);
-            py::buffer c_view = std::move(C_buffer);
-            const auto a_span = make_limb_span(a_view, expected_a);
-            const auto b_span = make_limb_span(b_view, expected_b);
-            auto c_span = make_float_span(c_view, expected_c);
-            t81::linalg::gemm_ternary(a_span, b_span, c_span, M, N, K, alpha, beta);
+            const auto a_handle = handle_for_packed_object(A_obj, M, K_limbs);
+            const auto b_handle = handle_for_packed_object(B_obj, K_limbs, N);
+            const auto c_handle = extract_tensor_handle(C_obj);
+            if (static_cast<int>(c_handle.meta.sizes.size()) != 2 ||
+                static_cast<int>(c_handle.meta.sizes[0]) != M ||
+                static_cast<int>(c_handle.meta.sizes[1]) != N) {
+                throw py::value_error("C tensor shape must match (M, N)");
+            }
+            t81::linalg::detail::gemm_ternary(
+                a_handle.meta, b_handle.meta, c_handle.meta, alpha, beta, Backend::Auto);
         },
         py::arg("A"),
         py::arg("B"),

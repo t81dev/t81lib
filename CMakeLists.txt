@@ -16,6 +16,7 @@ option(T81LIB_ENABLE_TORCH_BINDINGS
 
 option(USE_CUDA "Enable CUDA backend" OFF)
 option(USE_ROCM "Enable ROCm/HIP backend" OFF)
+option(USE_METAL "Enable Apple Metal backend" OFF)
 
 if(USE_CUDA)
     enable_language(CUDA)

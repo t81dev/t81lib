@@ -17,6 +17,12 @@ t81lib.gemm_ternary(packed, packed, c, 16, 16, 48)
 
 This shows how to drive the low-level binding (`t81lib.pack_dense_matrix`) together with `gemm_ternary` without needing PyTorch.
 
+### Keep packed buffers on the GPU
+
+When CUDA/ROCm support is enabled, `t81lib.gemm_ternary` accepts GPU-backed metadata directly. The dispatcher expects A/B to describe `ScalarType::TernaryLimb` rows with `TRYTES_PER_LIMB` packed trytes (e.g., NumPy `dtype('V16')` or `torch.uint8` views shaped `(M, k_limbs, 16)` after calling `torch.from_numpy(packed).reshape(...)`). The accumulator `C` stays float32 contiguous, and with `Backend::Auto` the binding routes the work to the compiled GPU kernel if the necessary backend is available.
+
+Use `t81.torch.TernaryTensor` to keep limbs on the GPU and let the binding generate the required metadata, or copy a packed NumPy buffer onto CUDA/ROCm if you need to interface with other tooling. Because the binding now shares the same `TensorMetadata` flow as `t81lib.where`/`clamp`/`lerp`, no extra copying or manual span conversions are required when the inputs already live on a compatible device.
+
 ## 2. Drop in `t81.torch.TernaryTensor` during training
 
 ```python
