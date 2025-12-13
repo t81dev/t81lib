@@ -2,6 +2,8 @@
 
 #include <benchmark/benchmark.h>
 
+#include <utility>
+
 #include <t81/t81lib.hpp>
 
 namespace {
@@ -17,8 +19,10 @@ namespace {
         const t81::Float rhs(make_limb(9), -2);
         for (auto _ : state) {
             auto product = lhs * rhs;
-            benchmark::DoNotOptimize(product.mantissa());
-            benchmark::DoNotOptimize(product.exponent());
+            auto mantissa_value = product.mantissa();
+            benchmark::DoNotOptimize(std::move(mantissa_value));
+            auto exponent_value = product.exponent();
+            benchmark::DoNotOptimize(std::move(exponent_value));
         }
     }
     BENCHMARK(BM_FloatMultiply);
@@ -29,8 +33,9 @@ namespace {
         for (auto _ : state) {
             auto sum = lhs + rhs;
             auto ordering = lhs <=> rhs;
-            benchmark::DoNotOptimize(sum.numerator());
-            benchmark::DoNotOptimize(ordering);
+            auto numerator_value = sum.numerator();
+            benchmark::DoNotOptimize(std::move(numerator_value));
+            benchmark::DoNotOptimize(std::move(ordering));
         }
     }
     BENCHMARK(BM_RatioArithmetic);
@@ -42,7 +47,8 @@ namespace {
         for (auto _ : state) {
             auto result = left;
             result += right;
-            benchmark::DoNotOptimize(result.to_limb());
+            auto limb_value = result.to_limb();
+            benchmark::DoNotOptimize(std::move(limb_value));
         }
     }
     BENCHMARK(BM_MontgomeryIntAdd);
@@ -54,7 +60,8 @@ namespace {
         for (auto _ : state) {
             auto result = left;
             result *= right;
-            benchmark::DoNotOptimize(result.to_limb());
+            auto limb_value = result.to_limb();
+            benchmark::DoNotOptimize(std::move(limb_value));
         }
     }
     BENCHMARK(BM_MontgomeryIntMultiply);

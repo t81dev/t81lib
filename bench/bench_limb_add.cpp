@@ -1,6 +1,7 @@
 // bench/bench_limb_add.cpp — Benchmark for limb addition routines.
 
 #include <random>
+#include <utility>
 
 #include <benchmark/benchmark.h>
 
@@ -21,8 +22,8 @@ bench_limb_add(benchmark::State &state) {
     while (state.KeepRunning()) {
         const auto lhs = random_limb(rng);
         const auto rhs = random_limb(rng);
-        const auto result = lhs + rhs;
-        benchmark::DoNotOptimize(result);
+        auto result = lhs + rhs;
+        benchmark::DoNotOptimize(std::move(result));
     }
 }
 
@@ -32,8 +33,9 @@ bench_limb_mul(benchmark::State &state) {
     while (state.KeepRunning()) {
         const auto lhs = random_limb(rng);
         const auto rhs = random_limb(rng);
-        const auto product = t81::core::limb::mul_wide(lhs, rhs);
-        benchmark::DoNotOptimize(product.first);
+        auto product = t81::core::limb::mul_wide(lhs, rhs);
+        auto product_value = product.first;
+        benchmark::DoNotOptimize(std::move(product_value));
     }
 }
 
