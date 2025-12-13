@@ -4,6 +4,8 @@
 
 #include <benchmark/benchmark.h>
 
+#include <utility>
+
 #include <t81/t81lib.hpp>
 #include <t81/util/random.hpp>
 
@@ -35,8 +37,8 @@ bench_bigint_div_mod(benchmark::State &state) {
         if (divisor.is_zero()) {
             divisor = t81::core::bigint::one();
         }
-        const auto result = t81::core::bigint::div_mod(dividend, divisor);
-        benchmark::DoNotOptimize(result);
+        auto result = t81::core::bigint::div_mod(dividend, divisor);
+        benchmark::DoNotOptimize(std::move(result));
     }
 }
 
@@ -50,8 +52,8 @@ bench_montgomery_mul(benchmark::State &state) {
         const auto b = random_positive_bigint(rng, 2);
         const auto ma = context.to_montgomery(a);
         const auto mb = context.to_montgomery(b);
-        const auto result = context.mul(ma, mb);
-        benchmark::DoNotOptimize(result);
+        auto result = context.mul(ma, mb);
+        benchmark::DoNotOptimize(std::move(result));
     }
 }
 
@@ -64,8 +66,8 @@ bench_montgomery_pow(benchmark::State &state) {
     while (state.KeepRunning()) {
         const auto base = random_positive_bigint(rng, 2);
         const auto mb = context.to_montgomery(base);
-        const auto result = context.pow(mb, exponent);
-        benchmark::DoNotOptimize(result);
+        auto result = context.pow(mb, exponent);
+        benchmark::DoNotOptimize(std::move(result));
     }
 }
 
