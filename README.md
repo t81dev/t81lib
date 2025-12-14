@@ -71,7 +71,7 @@ ctest --test-dir build --output-on-failure
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install .[torch]
+pip install ".[torch]"
 ```
 
 `pip install` builds the Python bindings, exposes `t81lib`/`t81`, and pulls the optional `torch` helpers when you request `[torch]`. See [docs/python-install.md](docs/python-install.md) for pipx, CLI helpers, and verification scripts.
