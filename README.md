@@ -69,10 +69,14 @@ ctest --test-dir build --output-on-failure
 ### 2. Install for Python consumers (optional)
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install .[torch]
 ```
 
 `pip install` builds the Python bindings, exposes `t81lib`/`t81`, and pulls the optional `torch` helpers when you request `[torch]`. See [docs/python-install.md](docs/python-install.md) for pipx, CLI helpers, and verification scripts.
+
+On macOS or other PEP 668-enforced environments, activate a virtualenv before running `pip install ".[torch]"` (or use `python3 -m pip install --user ".[torch]" --break-system-packages` if you understand the risks) so pip can install the extra dependencies without hitting the “externally managed environment” error.
 
 ### 3. Consume as a subproject
 
