@@ -23,7 +23,8 @@ pybind11_add_module(t81lib_python MODULE bindings.cpp)
 
 target_sources(t81lib_python PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/t81/core/gguf_quants.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../src/linalg/gemm_dispatch.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/linalg/gemm_dispatch.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/linalg/gemm_cpu.cpp)
 target_compile_features(t81lib_python PRIVATE cxx_std_20)
 
 #target_link_libraries(t81lib_python PRIVATE t81lib)
