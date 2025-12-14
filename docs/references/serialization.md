@@ -29,5 +29,5 @@ nlohmann/json supports binary blobs through the `json::binary_t` alias. Wrap the
 ## Tips
 
 1. Pass the `std::span<const std::uint8_t>` you obtain from FlatBuffers/MsgPack/JSON directly into `bigint::from_bytes()` to avoid extra copies.
-2. Keep the `bigint::to_bytes()` output along with any CLI metadata you need (threshold, dtype) so your AI checkpoints can be reloaded with matching `t81-qat` or `t81-convert` settings.
+2. Keep the `bigint::to_bytes()` output along with any CLI metadata you need (threshold, dtype) so your AI checkpoints can be reloaded with matching `t81-qat` or `t81 convert` (or `t81-convert`) settings.
 3. After deserializing, you can call `std::hash<t81::core::bigint>` and compare it with the stored hash (or the hash computed before serialization) to guard against corruption before reusing the value in unordered containers or caches.

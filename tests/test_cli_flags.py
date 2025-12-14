@@ -26,7 +26,8 @@ def _run_convert(source: Path, target: Path) -> None:
     cmd = [
         sys.executable,
         "-m",
-        "t81.convert",
+        "t81",
+        "convert",
         str(source),
         str(target),
         "--device-map",
@@ -42,7 +43,8 @@ def _run_gguf(source: Path, gguf_path: Path) -> None:
     cmd = [
         sys.executable,
         "-m",
-        "t81.scripts.t81_gguf",
+        "t81",
+        "gguf",
         str(gguf_path),
         "--from-hf",
         str(source),
@@ -57,6 +59,11 @@ def _run_gguf(source: Path, gguf_path: Path) -> None:
     subprocess.run(cmd, check=True)
 
 
+def _run_info(path: Path) -> None:
+    cmd = [sys.executable, "-m", "t81", "info", str(path)]
+    subprocess.run(cmd, check=True)
+
+
 def test_convert_respects_flags(tmp_path: Path) -> None:
     source = tmp_path / "hf"
     target = tmp_path / "converted"
@@ -64,6 +71,7 @@ def test_convert_respects_flags(tmp_path: Path) -> None:
     _build_dummy_hf_model(source)
     _run_convert(source, target)
     assert (target / "t81_metadata.json").exists()
+    _run_info(target)
 
 
 def test_gguf_respects_device_map(tmp_path: Path) -> None:
@@ -73,3 +81,4 @@ def test_gguf_respects_device_map(tmp_path: Path) -> None:
     _build_dummy_hf_model(source)
     _run_gguf(source, gguf_file)
     assert gguf_file.exists() and gguf_file.stat().st_size > 0
+    _run_info(gguf_file)

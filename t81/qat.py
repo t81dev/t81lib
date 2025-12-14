@@ -6,7 +6,7 @@ import torch
 
 
 def _clamp_threshold(threshold: float) -> float:
-    return float(max(0.0, min(threshold, 0.9999)))
+    return float(max(0.0, min(threshold, 1.0)))
 
 
 def _quantize_tensor(x: torch.Tensor, threshold: float, stochastic: bool) -> torch.Tensor:
@@ -22,7 +22,7 @@ def _quantize_tensor(x: torch.Tensor, threshold: float, stochastic: bool) -> tor
         noise = torch.rand_like(probability)
         mask = mask & (noise < probability)
     quantized = quantized.masked_scatter(mask, sign[mask])
-    return quantized
+    return quantized.detach()
 
 
 def dorso_round(x: torch.Tensor) -> torch.Tensor:
@@ -47,7 +47,9 @@ class _TernarySTE(torch.autograd.Function):
 
 
 def ternary(x: torch.Tensor, threshold: float = 0.45, stochastic: bool = False) -> torch.Tensor:
-    """Quantize ``x`` to balanced ternary with optional stochastic rounding."""
+    """
+    Quantize ``x`` to balanced ternary with optional stochastic rounding.
+    """
 
     threshold = _clamp_threshold(threshold)
     quantized = _quantize_tensor(x, threshold, stochastic)

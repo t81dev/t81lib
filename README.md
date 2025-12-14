@@ -46,13 +46,13 @@ It is **not** a drop-in replacement for PyTorch or NumPy, but a focused toolkit 
 
 - **C++ limb/bigint & numerics** — build locally, include `<t81/t81lib.hpp>`, and verify the `tests/unit/` suite. Starts: [Quick start](#quick-start) & [docs/api-overview.md](docs/api-overview.md).
 - **Python quantization & helpers** — `pip install .[torch]` unlocks `t81lib`/`t81`, NumPy wrappers, and `t81.torch`/`t81.nn`. See [docs/python-install.md](docs/python-install.md) & [docs/python-api.md](docs/python-api.md).
-- **CLI & GGUF/QAT workflows** — `t81-convert`, `t81-gguf`, and `t81-qat` automate quantize→export→train flows. Follow [docs/references/cli-usage.md](docs/references/cli-usage.md).
+- **CLI & GGUF/QAT workflows** — `t81 convert`, `t81 gguf`, and `t81-qat` (the legacy `t81-convert`/`t81-gguf` aliases still work) automate quantize→export→train flows. Follow [docs/references/cli-usage.md](docs/references/cli-usage.md).
 
 ## Highlights
 
 - **Balanced-ternary core**: `t81::Int` (an alias for `t81::core::limb`) ships overflow-aware arithmetic, canonical I/O, and deterministic hashing.
 - **Ternary-friendly GEMMs**: `t81::linalg::gemm_ternary` packs balanced ternary matrices into AVX/NEON-accelerated kernels with alpha/beta semantics mirrored in the Python binding.
-- **Python, CLI, and Torch helpers**: Pybind11 bindings expose quantize/dequantize utilities and `t81.torch`/`t81.nn`, while `t81-convert`, `t81-gguf`, and `t81-qat` automate quantize/export/train workflows.
+- **Python, CLI, and Torch helpers**: Pybind11 bindings expose quantize/dequantize utilities and `t81.torch`/`t81.nn`, while `t81 convert`, `t81 gguf`, and `t81-qat` (and their legacy `t81-convert`/`t81-gguf` aliases) automate quantize/export/train workflows.
 - **Normative docs & demos**: Architecture notes, CLI references, and runnable demos live under `docs/`, `examples/`, and `bench/`.
 
 ## Quick start
@@ -80,7 +80,7 @@ On macOS or other PEP 668-enforced environments, activate a virtualenv before ru
 
 ### 2a. CLI-friendly Pipx install
 
-If you prefer shell-level access to `t81-convert`, `t81-gguf`, `t81-qat`, and `t81-dequant`, pipx can install the repo and then inject the torch extras:
+If you prefer shell-level access to the unified `t81` CLI (with `convert`/`gguf` subcommands) plus `t81-qat` and `t81-dequant`, pipx can install the repo and then inject the torch extras:
 
 ```bash
 pipx install --python python3 /Users/t81dev/Desktop/t81lib
@@ -121,7 +121,17 @@ Optional CUDA/ROCm backends can be enabled with `-DUSE_CUDA=ON` / `-DUSE_ROCM=ON
 
 ## CLI helpers
 
-`t81-convert`, `t81-gguf`, and `t81-qat` automate quantize→export→train flows with progress reporting and validation hooks. Browse [docs/references/cli-usage.md](docs/references/cli-usage.md), [docs/diagrams/cli-workflows-mermaid.md](docs/diagrams/cli-workflows-mermaid.md), and [examples/cli-examples.md](examples/cli-examples.md) for recipes.
+`t81 convert`, `t81 gguf`, `t81 info`, and `t81-qat` automate quantize→export→train flows with progress reporting and validation hooks (the legacy `t81-convert`/`t81-gguf` names still work). Browse [docs/references/cli-usage.md](docs/references/cli-usage.md), [docs/diagrams/cli-workflows-mermaid.md](docs/diagrams/cli-workflows-mermaid.md), and [examples/cli-examples.md](examples/cli-examples.md) for recipes.
+
+### Large models & GGUF streaming
+
+When targeting multi-gigabyte models (Llama 3.x or Gemma 3.x checkpoints) you can still run the CLI helpers without triggering macOS’s OOM killer, but you need to pin everything to CPU memory:
+
+- Set `ACCELERATE_DISABLE=1` (and `HF_ACCELERATE_DISABLE=1` when you launch a `transformers` command) so Accelerate never offloads tensors to `meta`/disk and the helpers can call `.to("cpu")`.
+- Prefer `--force-cpu-device-map` or `--device-map none/cpu` so `t81 convert`/`t81 gguf` (and the legacy `t81-convert`/`t81-gguf` wrappers) keep checkpoint shards on host RAM.
+- The Python GGUF reader now streams metadata/tensor infos directly from a file handle, seeks to each tensor block, and only buffers one tensor at a time, so `t81 gguf`/`t81-dequant` (and `t81-gguf`/`t81-dequant` scripts for compatibility) can handle the resulting bundles without reading the entire file into memory.
+
+If you still see `NotImplementedError: Cannot copy out of meta tensor` or a kernel that dies while building Matplotlib’s font cache, repeat the cache setup from [docs/troubleshooting.md](docs/troubleshooting.md#large-gguf-conversions) (`MPLCONFIGDIR`, `FONTCONFIG_PATH`, etc.) before rerunning the CLI.
 
 ### Dequantizing for downstream runtimes
 

@@ -4,23 +4,23 @@ docs/references/cli-usage.md — Usage notes for the console scripts.
 
 # CLI helpers
 
-The `t81lib` package exposes three console scripts once you install the `torch`/`transformers` extras:
+The `t81lib` package exposes multiple CLI helpers once you install the `torch`/`transformers` extras:
 
 ```bash
 pipx install .[torch]  # or pip install t81lib[torch] if you prefer a shared venv
 ```
 
-After that `t81-convert`, `t81-gguf`, and `t81-qat` land in `~/.local/bin` (or pipx’s `bin` directory) so you can run the tooling without dropping into Python.
+After that the unified `t81` CLI (with `convert`/`gguf` subcommands), `t81-qat`, and `t81-dequant` land in `~/.local/bin` (or pipx’s `bin` directory). The old `t81-convert`/`t81-gguf` names still exist as wrappers for backward compatibility.
 
-## `t81-convert`
+## `t81 convert` (legacy `t81-convert`)
 
 Convert any Hugging Face checkpoint into the ternary-aware runtime that powers `t81.torch`/`t81.nn`.
 
 ```bash
-t81-convert meta-llama/Llama-3.2-3B-Instruct path/to/converted --quant TQ1_0 --torch-dtype bfloat16
+t81 convert meta-llama/Llama-3.2-3B-Instruct path/to/converted --quant TQ1_0 --torch-dtype bfloat16
 ```
 
-`t81-convert` outputs a lightweight progress line (bar + percentage) for conversion, checkpointing, and optional GGUF export so you can monitor long-lived runs without missing other stderr logs.
+`t81 convert` outputs a lightweight progress line (bar + percentage) for conversion, checkpointing, and optional GGUF export so you can monitor long-lived runs without missing other stderr logs. The legacy `t81-convert` name still invokes this codepath.
 
 After you emit a GGUF bundle with `--output-gguf`, the new `--validate` flag reads the file via `gguf.read_gguf` and, if llama.cpp’s `gguf_validate`/`gguf_to_gguf` is installed, passes the file through that tool to ensure compatibility before the command exits.
 
@@ -31,30 +31,30 @@ Key flags:
 - `--force-cpu-device-map`: overrides `transformers` so the conversion stays on CPU, which prevents `NotImplementedError: Cannot copy out of meta tensor` when saving and guarantees the `t81_metadata.json` footprint is serializable.
 - `--keep-biases-bf16` / `--no-keep-biases-bf16`: control whether bias tensors stay in BF16 or are promoted to FP32.
 - `--torch-dtype`: optional dtype for the floating-point buffer used during quantization.
-- `--output-gguf`: pipe the converted model straight into `gguf.write_gguf` (see `t81-gguf` below) with a `--gguf-quant` choice of `TQ1_0` or `TQ2_0`.
+- `--output-gguf`: pipe the converted model straight into `gguf.write_gguf` (see `t81 gguf` below) with a `--gguf-quant` choice of `TQ1_0` or `TQ2_0`.
 - `--validate`: after writing the GGUF bundle, run llama.cpp’s GGUF validator (or the Python reader) so you can detect incompatible exports before the command succeeds.
 
 The command rewrites every `nn.Linear` into `t81.nn.Linear`, stores metadata in `t81_metadata.json`, and emits compression stats so you can see how much VRAM you save.
 
-## `t81-gguf`
+## `t81 gguf` (legacy `t81-gguf`)
 
 Write a ternary GGUF bundle that works with `llama.cpp`, Ollama, or LM Studio without rerunning the conversion step.
 
 ```bash
-t81-gguf out.3.t81.gguf --from-hf meta-llama/Llama-3.2-3B-Instruct --quant TQ2_0
+t81 gguf out.3.t81.gguf --from-hf meta-llama/Llama-3.2-3B-Instruct --quant TQ2_0
 ```
 
-Alternately, re-export an existing t81-converted directory:
+Alternatively, re-export an existing t81-converted directory:
 
 ```bash
-t81-gguf out.3.t81.gguf --from-t81 path/to/converted
+t81 gguf out.3.t81.gguf --from-t81 path/to/converted
 ```
 
-`t81-gguf` also prints a brief progress line tied to its conversion and GGUF serialization stages.
+`t81 gguf` also prints a brief progress line tied to its conversion and GGUF serialization stages. The older `t81-gguf` name remains available as a wrapper.
 
 Pass `--validate` when you want the fresh GGUF bundle checked by both the Python reader and llama.cpp’s validator so incompatibilities are caught before you ship the file.
 
-Use the same `--threshold`, `--device-map`, `--torch-dtype`, and `--force-cpu-device-map` knobs as `t81-convert` because `t81-gguf` delegates to that CLI internally.
+Use the same `--threshold`, `--device-map`, `--torch-dtype`, and `--force-cpu-device-map` knobs as `t81 convert` because `t81 gguf` delegates to that CLI internally.
 
 ## `t81-qat`
 
@@ -67,19 +67,31 @@ t81-qat gpt2 --dataset-name wikitext --output-dir ternary-gpt2 \
 
 `--ternary-threshold`, `--ternary-stochastic-rounding`, and `--ternary-warmup-steps` mirror the batch quantization helpers in `t81.trainer`. The CLI expects `datasets` + `transformers` to be installed alongside `torch`; if they are missing the command explains how to satisfy the dependencies (`pip install .[torch]` or `pip install t81lib[torch]`).
 
+## `t81 info`
+
+Inspect a converted directory or GGUF bundle without loading a model.
+
+```bash
+t81 info path/to/converted
+t81 info model.t81.gguf
+```
+
+The command prints the saved threshold/keep-bias metadata for converted checkpoints and echoes the GGUF metadata (architecture, quant type/threshold, tensor count, version) so you can verify a bundle before distribution.
+
 ## Troubleshooting
 
 - On macOS/Metal devices with limited GPU memory (e.g., 8 GB M2s) keep conversions on the CPU with `--force-cpu-device-map` or pass `--device-map none`. This avoids accelerated offloading paths that can exceed the working set and trigger Metal kills.
-- If you see `NotImplementedError: Cannot copy out of meta tensor` while saving or exporting, rerun `t81-convert`/`t81-gguf` with `--force-cpu-device-map` to pin the tensors to host memory before writing them.
-- When re-using an existing converted directory, `t81-gguf` preserves `t81_metadata.json`, so converting a new HF checkpoint isn’t required if you only need a GGUF bundle.
+- If you see `NotImplementedError: Cannot copy out of meta tensor` while saving or exporting, rerun `t81 convert`/`t81 gguf` (or the legacy `t81-convert`/`t81-gguf` scripts) with `--force-cpu-device-map` to pin the tensors to host memory before writing them.
+- When re-using an existing converted directory, `t81 gguf` (and `t81-gguf`) preserves `t81_metadata.json`, so converting a new HF checkpoint isn’t required if you only need a GGUF bundle.
+- Handling multi-gigabyte files: `t81 gguf`, `t81-dequant`, and `t81 convert` (plus the legacy wrappers) now stream metadata/tensors off disk, but you still need to keep every tensor on CPU. Export with `--force-cpu-device-map`, set `ACCELERATE_DISABLE=1`/`HF_ACCELERATE_DISABLE=1`, and optionally configure `MPLCONFIGDIR` + `FONTCONFIG_PATH` cache dirs before running those helpers; see [docs/troubleshooting.md#large-gguf-conversions](../troubleshooting.md#large-gguf-conversions) for the full checklist.
 
 For advanced control (custom thresholds, bias strategies, or dtype hooks) the same APIs are available programmatically via `t81.convert.convert`, `t81.convert.save_pretrained_t81`, and `t81.gguf.write_gguf`.
 
 ## Python ↔ CLI crosswalk
 
 - `t81-qat` mirrors `t81.trainer.TernaryTrainer` + `t81.nn.Linear`. The new `examples/ternary_qat_inference_comparison.py` script shows a mini QAT loop, logs the warmup threshold schedule, and exercises the cached ternary GEMM path so you can experiment interactively before hitting the CLI; the CLI now prints a three-stage progress line (`dataset prepared`, `training complete`, `checkpoint saved`) to highlight where dataset prep or saving waits occur.
-- `t81-convert` wraps `t81.convert.convert`/`t81.convert.save_pretrained_t81`. Use the same threshold, dtype, bias, and device-map knobs if you need fine-grained control while scripting.
-- `t81-gguf` delegates to `t81.gguf.write_gguf`; reuse the same quantization/device map knobs when you need GGUF bundles for llama.cpp, Ollama, or LM Studio.
+- `t81 convert` (a drop-in replacement for `t81-convert`) wraps `t81.convert.convert`/`t81.convert.save_pretrained_t81`. Use the same threshold, dtype, bias, and device-map knobs if you need fine-grained control while scripting.
+- `t81 gguf` (and its `t81-gguf` alias) delegates to `t81.gguf.write_gguf`; reuse the same quantization/device map knobs when you need GGUF bundles for llama.cpp, Ollama, or LM Studio.
 
 ## Serialization hooks
 
@@ -95,11 +107,11 @@ Before deploying ternary checkpoints, collect a few reference metrics and record
 
 Link these benchmarks back to the CLI workflows (e.g., mention the dataset/model used for `t81-qat` runs and the limb size for GEMM measurements) so AI teams can cite the numbers when proposing ternary deployments.
 
-Consider extending `docs/diagrams/cli-workflows-mermaid.md` (or adding a complementary diagram) that overlays these targets/metrics on the `t81-convert`, `t81-gguf`, and `t81-qat` workflows so researchers can visualize where to insert serialization and GEMM benchmarks in their pipelines.
+Consider extending `docs/diagrams/cli-workflows-mermaid.md` (or adding a complementary diagram) that overlays these targets/metrics on the `t81 convert`, `t81 gguf`, and `t81-qat` workflows (the legacy `t81-convert`/`t81-gguf` wrappers remain) so researchers can visualize where to insert serialization and GEMM benchmarks in their pipelines.
 
 These crosswalk notes make it easy to prototype in Python (with the t81.torch/t81.nn stack) and later translate the workflow to the CLI scripts once you validate accuracy/latency trade-offs.
 
 ## Regression coverage
 
-- `tests/test_cli_flags.py` now runs `t81-convert` and `t81-gguf` against a tiny saved Hugging Face classifier, exercising `--device-map none`, `--torch-dtype float16`, and `--force-cpu-device-map` so changes to the conversion/gguf code paths trigger a test failure before the CLI hits CI.
+- `tests/test_cli_flags.py` now runs `t81 convert` and `t81 gguf` (instead of the legacy wrappers) against a tiny saved Hugging Face classifier, exercising `--device-map none`, `--torch-dtype float16`, and `--force-cpu-device-map` so changes to the conversion/gguf code paths trigger a test failure before the CLI hits CI.
 - When you adjust device maps or dtype logic, rerun the new test to make sure the metadata (`t81_metadata.json`) still exists, and the GGUF bundle writes without triggering `NotImplementedError: Cannot copy out of meta tensor`.

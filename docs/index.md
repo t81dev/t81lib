@@ -24,17 +24,17 @@ to understand the balanced ternary engine without digging through specs immediat
 - **Python cookbook** — [`docs/python-cookbook.md`](python-cookbook.md) gathers recipes that mix `t81lib.pack_dense_matrix`, `t81.torch.TernaryTensor`, and the CLI helpers.
 - **Python install paths** — [`docs/python-install.md`](python-install.md) explains pip/pipx builds, validation tips, and CLI helper installs.
 - **PyTorch how-to** — [`docs/torch.md`](torch.md) walks through `t81.torch`, `t81.nn`, conversion helpers, and how the CLI scripts mirror the Python flows.
-- **CLI reference** — [`docs/references/cli-usage.md`](references/cli-usage.md) lists the `t81-convert`, `t81-gguf`, and `t81-qat` helpers
+- **CLI reference** — [`docs/references/cli-usage.md`](references/cli-usage.md) lists the unified `t81 convert`/`t81 gguf` helpers (with legacy `t81-convert`/`t81-gguf` aliases) plus `t81-qat`
   plus the common flags for exporting GGUF bundles and running QAT.
 - **Hardware & energy reference** — [`docs/references/hardware-emulation.md`](references/hardware-emulation.md) connects `t81.hardware.TernaryEmulator`
   with the Python quantization helpers plus the new [`scripts/quantize_measure.py`](../scripts/quantize_measure.py) automation that chains
-  `t81-convert` → measurement.
+  `t81 convert` → measurement.
 - **Python demos** — the [`examples/`](../examples/) scripts/notebooks track `t81.torch` + `t81.nn` workflows; add
   [`examples/ternary_qat_inference_comparison.py`](../examples/ternary_qat_inference_comparison.py) to kick off a mini `t81.trainer` QAT loop, print the ternary
   threshold schedule, and compare `torch.matmul` vs. `t81lib.gemm_ternary` latency so you can prototype
   entirely inside Python before launching the CLI helpers.
 - **CLI automation & energy benchmarking** — [`scripts/quantize_measure.py`](../scripts/quantize_measure.py) and [`scripts/quantize_energy_benchmark.py`](../scripts/quantize_energy_benchmark.py)
-  chain `t81-convert`/`t81-gguf` runs with latency/energy measurement so you can report quantization impact directly
+  chain `t81 convert`/`t81 gguf` runs with latency/energy measurement so you can report quantization impact directly
   from command-line workflows.
 - **Use cases & demos** — [`docs/use-cases.md`](use-cases.md) and [`examples/README.md`](../examples/README.md) capture the canonical scripts, notebooks, and research stories.
 - **Hardware simulation** — [`docs/hardware.md`](hardware.md) details `t81.hardware.TernaryEmulator`, fuzzy helpers, and the visualizer notebook.

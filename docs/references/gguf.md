@@ -11,5 +11,5 @@
 
 ```bash
 # Convert + export directly to GGUF
-t81-convert meta-llama/Llama-3.2-3B-Instruct llama3.2-3b-t81.gguf \
+t81 convert meta-llama/Llama-3.2-3B-Instruct llama3.2-3b-t81.gguf \
   --quant TQ1_0 --threshold 0.45

@@ -103,9 +103,11 @@ setup(
     cmdclass={"build_ext": CMakeBuild},
     entry_points={
         "console_scripts": [
-            "t81-convert = t81.convert:main",
+            "t81 = t81.cli:main",
+            "t81-convert = t81.cli:main_convert",
+            "t81-gguf = t81.cli:main_gguf",
             "t81-qat = t81.scripts.t81_qat:main",
-            "t81-gguf = t81.scripts.t81_gguf:main",
+            "t81-dequant = t81.scripts.t81_dequant:main",
         ],
     },
     zip_safe=False,
