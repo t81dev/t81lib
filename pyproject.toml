@@ -36,7 +36,8 @@ torch = [
 dev = ["pytest>=9.0", "pybind11>=2.12", "cibuildwheel>=2.15"]
 
 [project.scripts]
-t81-convert = "t81.convert:main"
+t81 = "t81.cli:main"
+t81-convert = "t81.cli:main_convert"
 t81-qat = "t81.scripts.t81_qat:main"
-t81-gguf = "t81.scripts.t81_gguf:main"
+t81-gguf = "t81.cli:main_gguf"
 t81-dequant = "t81.scripts.t81_dequant:main"

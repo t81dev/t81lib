@@ -8,7 +8,7 @@ docs/references/hardware-emulation.md — How hardware emulation ties to python 
 
 ## Correlating quantization metrics with energy budgets
 
-1. **Quantize via the CLI** — run `t81-convert` (or the new `scripts/quantize_measure.py` helper) to turn a Hugging Face checkpoint into ternary `t81.nn.Linear` layers. This script reuses the CLI for conversion and then loads the converted checkpoint via `AutoModel.from_pretrained_t81`, timing the first ternary layer so you can see the float vs. ternary latency before you reach for hardware counters.
+1. **Quantize via the CLI** — run `t81 convert` (or the new `scripts/quantize_measure.py` helper) to turn a Hugging Face checkpoint into ternary `t81.nn.Linear` layers. This script reuses the CLI for conversion and then loads the converted checkpoint via `AutoModel.from_pretrained_t81`, timing the first ternary layer so you can see the float vs. ternary latency before you reach for hardware counters.
 2. **Pack + unpack weights** — once you have weights or a `TernaryTensor`, call `t81lib.pack_dense_matrix` and `t81lib.unpack_packed_limbs` to recover the raw trits. Feed those trits into `TernaryEmulator.set_wire` (for single wires) or `ripple_adder` layers to tally how often each trit flips when an AVX/NEON-friendly GEMM runs on the host.
 3. **Inspect the trace** — `emulator.energy_consumed`, `emulator.transition_counter`, and `emulator.power_trace` are simple sequences you can plot or log alongside the training/validation reports from `examples/ternary_qat_inference_comparison.py` so quantization loss and energy-per-step live in the same notebook.
 
@@ -37,5 +37,5 @@ This snippet shows how to link the same packed matrix that feeds `t81lib.gemm_te
 
 - `examples/ternary_hardware_sim_demo.ipynb` for a notebook-based emulator walkthrough covering balanced-adders, fuzzy thresholds, and gate-level power curves.
 - `examples/ternary_qat_inference_comparison.py` for a QAT loop that logs validation metrics, compression ratios, and GEMM timings so you can overlay the emulator-derived energy on top of the same Python story.
-- `scripts/quantize_measure.py` to chain `t81-convert`, `AutoModel.from_pretrained_t81`, `t81lib.pack_dense_matrix`, and inference latencies when you want to automate quantize→measure in a production pipeline.
-- `scripts/quantize_energy_benchmark.py` for a higher-level pipeline that runs `t81-convert`, measures float/ternary latencies, and traces `TernaryEmulator` energy so you get a single CSV/JSON row with compression, latency, and power numbers.
+- `scripts/quantize_measure.py` to chain `t81 convert`, `AutoModel.from_pretrained_t81`, `t81lib.pack_dense_matrix`, and inference latencies when you want to automate quantize→measure in a production pipeline.
+- `scripts/quantize_energy_benchmark.py` for a higher-level pipeline that runs `t81 convert`, measures float/ternary latencies, and traces `TernaryEmulator` energy so you get a single CSV/JSON row with compression, latency, and power numbers.

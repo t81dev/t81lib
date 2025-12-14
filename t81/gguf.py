@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import struct
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, BinaryIO, Iterable, Mapping, Sequence
 
 import numpy as np
 import torch
@@ -112,7 +112,7 @@ def _collect_metadata(model: PreTrainedModel, quant: str, threshold: float) -> t
         architecture = architecture or getattr(config, "model_type", None)
     architecture = architecture or type(model).__name__
     name = getattr(model, "name_or_path", architecture) or architecture
-    threshold = float(max(0.0, min(0.9999, threshold)))
+    quant_prefix = quant.lower()
     entries = [
         ("general.architecture", architecture),
         ("general.name", name),
@@ -120,9 +120,11 @@ def _collect_metadata(model: PreTrainedModel, quant: str, threshold: float) -> t
         ("general.alignment", HEADER_ALIGNMENT),
         ("general.quantized_by", "t81lib"),
         ("general.quantization_version", 3 if quant == "TQ2_0" else 2),
-        ("quantization.type", quant.lower()),
+        ("quantization.type", quant_prefix),
         ("quantization.block_size", GGUF_QUANT_BLOCK_ROWS),
         ("quantization.threshold", threshold),
+        (f"{quant_prefix}.threshold", threshold),
+        (f"{quant_prefix}.version", 1),
     ]
     buffer = bytearray()
     for key, value in entries:
@@ -161,6 +163,76 @@ def _serialize_tensor_info(
         encoded.extend(b"\x00" * padding)
     return bytes(encoded)
 
+
+def _read_bytes(handle: BinaryIO, count: int) -> bytes:
+    data = handle.read(count)
+    if len(data) != count:
+        raise ValueError("metadata truncated")
+    return data
+
+
+def _read_metadata_value(handle: BinaryIO, value_type: int) -> Any:
+    if value_type == GGUF_TYPE_UINT32:
+        return struct.unpack("<I", _read_bytes(handle, 4))[0]
+    if value_type == GGUF_TYPE_INT32:
+        return struct.unpack("<i", _read_bytes(handle, 4))[0]
+    if value_type == GGUF_TYPE_FLOAT32:
+        return struct.unpack("<f", _read_bytes(handle, 4))[0]
+    if value_type == GGUF_TYPE_BOOL:
+        return bool(struct.unpack("<b", _read_bytes(handle, 1))[0])
+    if value_type == GGUF_TYPE_STRING:
+        length = struct.unpack("<Q", _read_bytes(handle, 8))[0]
+        return _read_bytes(handle, length).decode("utf-8")
+    if value_type == GGUF_TYPE_ARRAY:
+        element_type = struct.unpack("<i", _read_bytes(handle, 4))[0]
+        count = struct.unpack("<Q", _read_bytes(handle, 8))[0]
+        return [_read_metadata_value(handle, element_type) for _ in range(count)]
+    if value_type == GGUF_TYPE_UINT64:
+        return struct.unpack("<Q", _read_bytes(handle, 8))[0]
+    if value_type == GGUF_TYPE_INT64:
+        return struct.unpack("<q", _read_bytes(handle, 8))[0]
+    if value_type == GGUF_TYPE_FLOAT64:
+        return struct.unpack("<d", _read_bytes(handle, 8))[0]
+    raise ValueError(f"unsupported metadata value type {value_type}")
+
+
+def _parse_metadata_from_file(handle: BinaryIO, count: int) -> tuple[Mapping[str, Any], int]:
+    metadata: dict[str, Any] = {}
+    start = handle.tell()
+    for _ in range(count):
+        key_len = struct.unpack("<Q", _read_bytes(handle, 8))[0]
+        key = _read_bytes(handle, key_len).decode("utf-8")
+        value_type = struct.unpack("<i", _read_bytes(handle, 4))[0]
+        metadata[key] = _read_metadata_value(handle, value_type)
+    return metadata, handle.tell() - start
+
+
+def _parse_tensor_infos_from_file(
+    handle: BinaryIO,
+    count: int,
+    alignment: int,
+) -> list[_TensorInfo]:
+    infos: list[_TensorInfo] = []
+    for _ in range(count):
+        start = handle.tell()
+        name_len = struct.unpack("<Q", _read_bytes(handle, 8))[0]
+        name_bytes = _read_bytes(handle, name_len)
+        try:
+            name = name_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            name = name_bytes.decode("latin-1")
+        n_dims = struct.unpack("<I", _read_bytes(handle, 4))[0]
+        shape: list[int] = []
+        for _ in range(n_dims):
+            shape.append(struct.unpack("<Q", _read_bytes(handle, 8))[0])
+        ggml_type = struct.unpack("<i", _read_bytes(handle, 4))[0]
+        data_offset = struct.unpack("<Q", _read_bytes(handle, 8))[0]
+        length = handle.tell() - start
+        padding = _align(length, alignment) - length
+        if padding:
+            handle.seek(padding, 1)
+        infos.append(_TensorInfo(name, tuple(shape), ggml_type, data_offset))
+    return infos
 
 def _serialize_metadata_from_mapping(metadata: Mapping[str, Any]) -> tuple[bytes, int]:
     buffer = bytearray()
@@ -280,17 +352,46 @@ def _quantize_tensor(tensor: torch.Tensor, quant: str, threshold: float) -> byte
     return bytes(serialized)
 
 
-def _collect_linears(model: PreTrainedModel) -> list[tuple[str, torch.Tensor]]:
+def _collect_quantized_weight_names(model: PreTrainedModel) -> set[str]:
     seen: set[str] = set()
-    result: list[tuple[str, torch.Tensor]] = []
     for module_name, module in model.named_modules():
         if isinstance(module, TernaryLinear):
             tensor_name = f"{module_name}.weight" if module_name else "weight"
-            if tensor_name in seen:
-                continue
             seen.add(tensor_name)
-            result.append((tensor_name, module.weight.detach()))
+    return seen
+
+
+def _collect_all_parameters(model: PreTrainedModel) -> list[tuple[str, torch.Tensor]]:
+    result: list[tuple[str, torch.Tensor]] = []
+    seen: set[str] = set()
+    for name, parameter in model.named_parameters():
+        if name in seen:
+            continue
+        seen.add(name)
+        result.append((name, parameter.detach()))
     return result
+
+
+def _infer_ggml_type(tensor: torch.Tensor, quantized: bool, quant: str) -> int:
+    if quantized:
+        return GGML_TYPE_TQ1_0 if quant == "TQ1_0" else GGML_TYPE_TQ2_0
+    if tensor.dtype in (torch.float16, torch.bfloat16):
+        return GGML_TYPE_F16
+    return GGML_TYPE_F32
+
+
+def _float_tensor_bytes(tensor: torch.Tensor, ggml_type: int) -> bytes:
+    array = tensor.detach().cpu()
+    if ggml_type == GGML_TYPE_F16:
+        array = array.to(dtype=torch.float16)
+        numpy_dtype = np.float16
+    else:
+        array = array.to(dtype=torch.float32)
+        numpy_dtype = np.float32
+    numpy_array = array.numpy()
+    if numpy_array.dtype != numpy_dtype:
+        numpy_array = numpy_array.astype(numpy_dtype, copy=False)
+    return numpy_array.tobytes(order="C")
 
 
 def write_gguf(
@@ -306,19 +407,25 @@ def write_gguf(
     quant = quant.upper()
     if quant not in {"TQ1_0", "TQ2_0"}:
         raise ValueError("quant must be one of 'TQ1_0' or 'TQ2_0'")
-    threshold = float(np.clip(threshold, 0.0, 0.9999))
-    entries = _collect_linears(model)
-    if not entries:
+    threshold = float(np.clip(threshold, 0.0, 1.0))
+    quantized_names = _collect_quantized_weight_names(model)
+    if not quantized_names:
         raise ValueError("model does not contain any t81.nn.Linear layers")
 
+    parameters = _collect_all_parameters(model)
     tensor_payloads: list[_TensorPayload] = []
-    for name, tensor in entries:
-        data = _quantize_tensor(tensor, quant, threshold)
+    for name, tensor in parameters:
+        quantizable = name in quantized_names and tensor.ndim == 2
+        ggml_type = _infer_ggml_type(tensor, quantizable, quant)
+        if quantizable:
+            data = _quantize_tensor(tensor, quant, threshold)
+        else:
+            data = _float_tensor_bytes(tensor, ggml_type)
         tensor_payloads.append(
             _TensorPayload(
                 name=name,
                 shape=tuple(tensor.shape),
-                ggml_type=GGML_TYPE_TQ1_0 if quant == "TQ1_0" else GGML_TYPE_TQ2_0,
+                ggml_type=ggml_type,
                 data=data,
             )
         )
@@ -326,78 +433,6 @@ def write_gguf(
     alignment = HEADER_ALIGNMENT
     metadata_bytes, metadata_count = _collect_metadata(model, quant, threshold)
     _write_payloads(tensor_payloads, metadata_bytes, metadata_count, alignment, Path(path))
-
-
-def _parse_metadata(
-    buffer: bytes,
-    offset: int,
-    count: int,
-) -> tuple[Mapping[str, Any], int]:
-    metadata: dict[str, Any] = {}
-    cursor = offset
-    for _ in range(count):
-        if cursor + 8 > len(buffer):
-            raise ValueError("metadata truncated")
-        key_len = struct.unpack_from("<Q", buffer, cursor)[0]
-        cursor += 8
-        key = buffer[cursor : cursor + key_len].decode("utf-8")
-        cursor += key_len
-        if cursor + 4 > len(buffer):
-            raise ValueError("metadata truncated")
-        value_type = struct.unpack_from("<i", buffer, cursor)[0]
-        cursor += 4
-        if value_type == GGUF_TYPE_UINT32:
-            metadata[key] = struct.unpack_from("<I", buffer, cursor)[0]
-            cursor += 4
-        elif value_type == GGUF_TYPE_FLOAT32:
-            metadata[key] = struct.unpack_from("<f", buffer, cursor)[0]
-            cursor += 4
-        elif value_type == GGUF_TYPE_BOOL:
-            metadata[key] = bool(struct.unpack_from("<b", buffer, cursor)[0])
-            cursor += 1
-        elif value_type == GGUF_TYPE_STRING:
-            if cursor + 8 > len(buffer):
-                raise ValueError("metadata truncated")
-            value_len = struct.unpack_from("<Q", buffer, cursor)[0]
-            cursor += 8
-            metadata[key] = buffer[cursor : cursor + value_len].decode("utf-8")
-            cursor += value_len
-        else:
-            raise ValueError(f"unsupported metadata value type {value_type}")
-    return metadata, cursor
-
-
-def _parse_tensor_infos(
-    buffer: bytes,
-    offset: int,
-    count: int,
-    alignment: int,
-) -> list[_TensorInfo]:
-    infos: list[_TensorInfo] = []
-    cursor = offset
-    for _ in range(count):
-        start = cursor
-        if cursor + 8 > len(buffer):
-            raise ValueError("tensor info truncated")
-        name_len = struct.unpack_from("<Q", buffer, cursor)[0]
-        cursor += 8
-        name = buffer[cursor : cursor + name_len].decode("utf-8")
-        cursor += name_len
-        n_dims = struct.unpack_from("<I", buffer, cursor)[0]
-        cursor += 4
-        shape: list[int] = []
-        for _ in range(n_dims):
-            dim = struct.unpack_from("<Q", buffer, cursor)[0]
-            cursor += 8
-            shape.append(dim)
-        ggml_type = struct.unpack_from("<i", buffer, cursor)[0]
-        cursor += 4
-        data_offset = struct.unpack_from("<Q", buffer, cursor)[0]
-        cursor += 8
-        length = cursor - start
-        cursor = start + _align(length, alignment)
-        infos.append(_TensorInfo(name, tuple(shape), ggml_type, data_offset))
-    return infos
 
 
 def _decode_quant_tensor(
@@ -411,8 +446,8 @@ def _decode_quant_tensor(
     cols = shape[1] if len(shape) > 1 else 1
     if not dequantize:
         return chunk
-    if ggml_type == GGML_TYPE_F32:
-        dtype = np.float32
+    if ggml_type in {GGML_TYPE_F32, GGML_TYPE_F16}:
+        dtype = np.float32 if ggml_type == GGML_TYPE_F32 else np.float16
         data = np.frombuffer(memoryview(chunk), dtype=dtype)
         if shape:
             expected = int(np.prod(shape))
@@ -432,41 +467,43 @@ def read_gguf(
     dequantize: bool = True,
     return_metadata: bool = False,
 ) -> Mapping[str, torch.Tensor | bytes] | tuple[Mapping[str, torch.Tensor | bytes], Mapping[str, Any]]:
-    """
-    Read a GGUF file. Quantized tensors are dequantized when requested.
-    """
-    buffer = Path(path).read_bytes()
-    if len(buffer) < HEADER_SIZE:
-        raise ValueError("file too short to be a valid GGUF blob")
-    magic, version, num_tensors, metadata_kv_count = HEADER_STRUCT.unpack_from(buffer, 0)
-    if magic != HEADER_MAGIC or version != HEADER_VERSION:
-        raise ValueError("GGUF header mismatch")
-
-    metadata, metadata_end = _parse_metadata(buffer, HEADER_SIZE, metadata_kv_count)
-    metadata_length = metadata_end - HEADER_SIZE
-    alignment = int(metadata.get("general.alignment", HEADER_ALIGNMENT))
-    if alignment <= 0:
-        raise ValueError("invalid GGUF alignment")
-    tensor_infos_offset = HEADER_SIZE + _align(metadata_length, alignment)
-    block_rows = int(metadata.get("quantization.block_size", GGUF_QUANT_BLOCK_ROWS))
-    tensor_infos = _parse_tensor_infos(buffer, tensor_infos_offset, num_tensors, alignment)
-    sorted_infos = sorted(tensor_infos, key=lambda info: info.offset)
-    payload: dict[str, torch.Tensor | bytes] = {}
-    prev_end = 0
-    for index, info in enumerate(sorted_infos):
-        if info.offset < prev_end:
-            raise ValueError("tensor data overlaps or is out of order")
-        next_offset = (
-            sorted_infos[index + 1].offset if index + 1 < len(sorted_infos) else len(buffer)
-        )
-        if next_offset > len(buffer):
-            raise ValueError("tensor data extends beyond file length")
-        prev_end = next_offset
-        chunk = buffer[info.offset:next_offset]
-        if info.ggml_type not in {GGML_TYPE_TQ1_0, GGML_TYPE_TQ2_0, GGML_TYPE_F32}:
-            raise ValueError(f"unsupported tensor type {info.ggml_type}")
-        decoded = _decode_quant_tensor(chunk, info.shape, info.ggml_type, block_rows, dequantize)
-        payload[info.name] = decoded
+    path_obj = Path(path)
+    file_size = path_obj.stat().st_size
+    with path_obj.open("rb") as handle:
+        header = handle.read(HEADER_SIZE)
+        if len(header) < HEADER_SIZE:
+            raise ValueError("file too short to be a valid GGUF blob")
+        magic, version, num_tensors, metadata_kv_count = HEADER_STRUCT.unpack_from(header, 0)
+        if magic != HEADER_MAGIC or version != HEADER_VERSION:
+            raise ValueError("GGUF header mismatch")
+        metadata, metadata_length = _parse_metadata_from_file(handle, metadata_kv_count)
+        alignment = int(metadata.get("general.alignment", HEADER_ALIGNMENT))
+        if alignment <= 0:
+            raise ValueError("invalid GGUF alignment")
+        metadata_end = handle.tell()
+        aligned_end = HEADER_SIZE + _align(metadata_length, alignment)
+        if aligned_end > metadata_end:
+            handle.seek(aligned_end - metadata_end, 1)
+        tensor_infos = _parse_tensor_infos_from_file(handle, num_tensors, alignment)
+        sorted_infos = sorted(tensor_infos, key=lambda info: info.offset)
+        block_rows = int(metadata.get("quantization.block_size", GGUF_QUANT_BLOCK_ROWS))
+        payload: dict[str, torch.Tensor | bytes] = {}
+        prev_end = 0
+        for index, info in enumerate(sorted_infos):
+            if info.offset < prev_end:
+                raise ValueError("tensor data overlaps or is out of order")
+            next_offset = (
+                sorted_infos[index + 1].offset if index + 1 < len(sorted_infos) else file_size
+            )
+            if next_offset > file_size:
+                raise ValueError("tensor data extends beyond file length")
+            prev_end = next_offset
+            handle.seek(info.offset)
+            chunk = _read_bytes(handle, next_offset - info.offset)
+            if info.ggml_type not in {GGML_TYPE_TQ1_0, GGML_TYPE_TQ2_0, GGML_TYPE_F32, GGML_TYPE_F16}:
+                raise ValueError(f"unsupported tensor type {info.ggml_type}")
+            decoded = _decode_quant_tensor(chunk, info.shape, info.ggml_type, block_rows, dequantize)
+            payload[info.name] = decoded
     if return_metadata:
         return payload, metadata
     return payload
