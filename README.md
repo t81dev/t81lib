@@ -78,6 +78,17 @@ pip install ".[torch]"
 
 On macOS or other PEP 668-enforced environments, activate a virtualenv before running `pip install ".[torch]"` (or use `python3 -m pip install --user ".[torch]" --break-system-packages` if you understand the risks) so pip can install the extra dependencies without hitting the “externally managed environment” error.
 
+### 2a. CLI-friendly Pipx install
+
+If you prefer shell-level access to `t81-convert`, `t81-gguf`, `t81-qat`, and `t81-dequant`, pipx can install the repo and then inject the torch extras:
+
+```bash
+pipx install --python python3 /Users/t81dev/Desktop/t81lib
+pipx inject t81lib torch transformers accelerate datasets safetensors
+```
+
+Pipx doesn’t understand `.[torch]` when pointing at a local directory, so we first install the package from source and then inject the optional dependencies you need (torch, transformers, accelerate, datasets, safetensors). Once that completes, the CLI helpers will run from `~/.local/bin` with the same requirements as `pip install ".[torch]"`. Continue running `pipx uninstall t81lib` and reinject if you upgrade the repo checkout.
+
 ### 3. Consume as a subproject
 
 ```cmake
