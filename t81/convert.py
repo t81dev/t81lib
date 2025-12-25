@@ -401,17 +401,26 @@ def main() -> int:
         help="GGUF quantization format to emit.",
     )
     parser.add_argument(
+        "--gguf-profile",
+        help="GGUF export profile (e.g. compression-first). Overrides --gguf-quant/--threshold.",
+    )
+    parser.add_argument(
         "--validate",
         action="store_true",
         help="After writing a GGUF bundle, run llama.cpp's validator (or the Python reader) against it.",
     )
     args = parser.parse_args()
+    profile = None
+    if args.output_gguf and args.gguf_profile:
+        profile = gguf.resolve_gguf_profile(args.gguf_profile)
+    threshold = profile.threshold if profile is not None else args.threshold
+    gguf_quant = profile.quant if profile is not None else args.gguf_quant
     total_steps = 2 + (1 if args.output_gguf else 0)
     progress = CLIProgress("t81-convert", total_steps=total_steps)
 
     model = convert(
         args.model_id_or_path,
-        threshold=args.threshold,
+        threshold=threshold,
         keep_biases_bf16=args.keep_biases_bf16,
         device_map=_normalize_device_map_arg(args.device_map),
         torch_dtype=args.torch_dtype,
@@ -426,8 +435,9 @@ def main() -> int:
         gguf.write_gguf(
             model,
             args.output_gguf,
-            quant=args.gguf_quant,
-            threshold=args.threshold,
+            quant=gguf_quant,
+            threshold=threshold,
+            profile=args.gguf_profile,
         )
         progress.step("wrote GGUF bundle")
         if args.validate:

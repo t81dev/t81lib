@@ -63,6 +63,10 @@ def main() -> int:
         help="Ternary GGUF format to emit.",
     )
     parser.add_argument(
+        "--profile",
+        help="GGUF export profile (e.g. compression-first). Overrides --quant/--threshold.",
+    )
+    parser.add_argument(
         "--threshold",
         type=float,
         default=0.45,
@@ -107,11 +111,16 @@ def main() -> int:
     if bool(args.from_hf) == bool(args.from_t81):
         parser.error("provide exactly one of --from-hf or --from-t81")
 
+    profile = None
+    if args.profile:
+        profile = gguf.resolve_gguf_profile(args.profile)
+    threshold = profile.threshold if profile is not None else args.threshold
+    gguf_quant = profile.quant if profile is not None else args.quant
     source = args.from_hf or args.from_t81 or ""
     progress = CLIProgress("t81-gguf", total_steps=2)
     model = convert.convert(
         source,
-        threshold=args.threshold,
+        threshold=threshold,
         keep_biases_bf16=args.keep_biases_bf16,
         device_map=convert._normalize_device_map_arg(args.device_map),
         torch_dtype=args.torch_dtype,
@@ -122,8 +131,9 @@ def main() -> int:
     gguf.write_gguf(
         model,
         Path(args.output),
-        quant=args.quant,
-        threshold=args.threshold,
+        quant=gguf_quant,
+        threshold=threshold,
+        profile=args.profile,
     )
     progress.step("wrote GGUF bundle")
     if args.validate:

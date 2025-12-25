@@ -103,6 +103,10 @@ def _add_convert_parser(subparsers: argparse._SubParsersAction) -> None:  # type
         help="GGUF quantization format to emit (when --output-gguf is provided).",
     )
     parser.add_argument(
+        "--gguf-profile",
+        help="GGUF export profile (e.g. compression-first). Overrides --gguf-quant/--threshold.",
+    )
+    parser.add_argument(
         "--validate",
         action="store_true",
         help="Validate the GGUF bundle (if written) before exiting.",
@@ -137,6 +141,10 @@ def _add_gguf_parser(subparsers: argparse._SubParsersAction) -> None:  # type: i
         choices=["TQ1_0", "TQ2_0"],
         default="TQ1_0",
         help="Ternary GGUF format to emit.",
+    )
+    parser.add_argument(
+        "--profile",
+        help="GGUF export profile (e.g. compression-first). Overrides --quant/--threshold.",
     )
     parser.add_argument("--threshold", type=float, default=0.45, help="Threshold for ternary conversion.")
     parser.add_argument("--device-map", default="auto", help="Device map forwarded to transformers.")
@@ -204,11 +212,16 @@ def _create_parser() -> argparse.ArgumentParser:
 def _handle_convert(args: argparse.Namespace) -> int:
     convert = _import_convert_module()
     gguf_module = _import_gguf_module()
+    profile = None
+    if args.output_gguf and args.gguf_profile:
+        profile = gguf_module.resolve_gguf_profile(args.gguf_profile)
+    threshold = profile.threshold if profile is not None else args.threshold
+    gguf_quant = profile.quant if profile is not None else args.gguf_quant
     total_steps = 2 + (1 if args.output_gguf else 0)
     progress = CLIProgress("t81 convert", total_steps=total_steps, quiet=args.quiet)
     model = convert.convert(
         args.model_id_or_path,
-        threshold=args.threshold,
+        threshold=threshold,
         keep_biases_bf16=args.keep_biases_bf16,
         device_map=convert._normalize_device_map_arg(args.device_map),
         torch_dtype=args.torch_dtype,
@@ -221,8 +234,9 @@ def _handle_convert(args: argparse.Namespace) -> int:
         gguf_module.write_gguf(
             model,
             Path(args.output_gguf),
-            quant=args.gguf_quant,
-            threshold=args.threshold,
+            quant=gguf_quant,
+            threshold=threshold,
+            profile=args.gguf_profile,
         )
         progress.step("wrote GGUF bundle")
         if args.validate:
@@ -235,11 +249,16 @@ def _handle_gguf(args: argparse.Namespace) -> int:
     gguf_module = _import_gguf_module()
     if bool(args.from_hf) == bool(args.from_t81):
         raise SystemExit("provide exactly one of --from-hf or --from-t81")
+    profile = None
+    if args.profile:
+        profile = gguf_module.resolve_gguf_profile(args.profile)
+    threshold = profile.threshold if profile is not None else args.threshold
+    gguf_quant = profile.quant if profile is not None else args.quant
     source = args.from_hf or args.from_t81  # type: ignore[assignment]
     progress = CLIProgress("t81 gguf", total_steps=2, quiet=args.quiet)
     model = convert.convert(
         source,
-        threshold=args.threshold,
+        threshold=threshold,
         keep_biases_bf16=args.keep_biases_bf16,
         device_map=convert._normalize_device_map_arg(args.device_map),
         torch_dtype=args.torch_dtype,
@@ -249,8 +268,9 @@ def _handle_gguf(args: argparse.Namespace) -> int:
     gguf_module.write_gguf(
         model,
         Path(args.output),
-        quant=args.quant,
-        threshold=args.threshold,
+        quant=gguf_quant,
+        threshold=threshold,
+        profile=args.profile,
     )
     progress.step("wrote GGUF bundle")
     if args.validate:

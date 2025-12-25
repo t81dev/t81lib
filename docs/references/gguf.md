@@ -13,3 +13,8 @@
 # Convert + export directly to GGUF
 t81 convert meta-llama/Llama-3.2-3B-Instruct llama3.2-3b-t81.gguf \
   --quant TQ1_0 --threshold 0.45
+```
+
+### Export profiles
+
+For a no-knobs compression-first export, use the `compression-first` profile via the CLI (`--gguf-profile` or `--profile`). It stamps `t81.profile=compression-first` in metadata and pins the GGUF quant scheme to TQ1_0 for maximum compression.

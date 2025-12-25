@@ -32,6 +32,7 @@ Key flags:
 - `--keep-biases-bf16` / `--no-keep-biases-bf16`: control whether bias tensors stay in BF16 or are promoted to FP32.
 - `--torch-dtype`: optional dtype for the floating-point buffer used during quantization.
 - `--output-gguf`: pipe the converted model straight into `gguf.write_gguf` (see `t81 gguf` below) with a `--gguf-quant` choice of `TQ1_0` or `TQ2_0`.
+- `--gguf-profile`: apply a named GGUF export profile (e.g. `compression-first`), overriding `--gguf-quant` and the conversion threshold.
 - `--validate`: after writing the GGUF bundle, run llama.cpp’s GGUF validator (or the Python reader) so you can detect incompatible exports before the command succeeds.
 
 The command rewrites every `nn.Linear` into `t81.nn.Linear`, stores metadata in `t81_metadata.json`, and emits compression stats so you can see how much VRAM you save.
@@ -55,6 +56,61 @@ t81 gguf out.3.t81.gguf --from-t81 path/to/converted
 Pass `--validate` when you want the fresh GGUF bundle checked by both the Python reader and llama.cpp’s validator so incompatibilities are caught before you ship the file.
 
 Use the same `--threshold`, `--device-map`, `--torch-dtype`, and `--force-cpu-device-map` knobs as `t81 convert` because `t81 gguf` delegates to that CLI internally.
+
+Use `--profile compression-first` to force the compression-first profile (TQ1_0 + default threshold) and stamp profile metadata into the bundle.
+
+### Compression-first wedge (FP16 to ternary GGUF)
+
+If you want a single compression-first export profile that loads in llama.cpp without extra flags, use the `compression-first` profile. It stamps `t81.profile=compression-first` in the GGUF metadata and pins the quantization scheme to TQ1_0 with the default threshold.
+
+1) Export a baseline FP16 GGUF with llama.cpp (or reuse an existing FP16 GGUF bundle):
+
+```bash
+python llama.cpp/convert.py meta-llama/Llama-3.2-3B-Instruct --outtype f16 --outfile llama3.2-3b-f16.gguf
+```
+
+2) Export the ternary GGUF via the compression-first profile:
+
+```bash
+t81 gguf llama3.2-3b-tq1.gguf --from-hf meta-llama/Llama-3.2-3B-Instruct --profile compression-first
+```
+
+3) Benchmark both bundles for size, peak RAM, and batch=1 latency:
+
+```bash
+python scripts/gguf_benchmark.py --gguf llama3.2-3b-f16.gguf --llama-cli /path/to/llama-cli --n-predict 128
+python scripts/gguf_benchmark.py --gguf llama3.2-3b-tq1.gguf --llama-cli /path/to/llama-cli --n-predict 128
+```
+
+Capture the reported MiB on disk, peak RSS, and `eval` ms/token so the before/after comparison is repeatable.
+
+Example before/after (TinyLlama-1.1B Q4_0 to TQ1_0, batch=1, CPU-only):
+
+```bash
+python scripts/gguf_benchmark.py --gguf tinyllama-1.1b-chat-v1.0.Q4_0.gguf \
+  --llama-cli /opt/homebrew/bin/llama-cli --n-predict 128 \
+  --prompt "In ternary we trust. The goal is compression-first inference on today’s binary machines. We compare GGUF exports for size, RAM, and latency at batch=1. Use a fixed prompt to measure prompt eval and token eval timings." \
+  --extra --device none --n-gpu-layers 0
+
+python scripts/gguf_benchmark.py --gguf tinyllama-1.1b-tq1.gguf \
+  --llama-cli /opt/homebrew/bin/llama-cli --n-predict 128 \
+  --prompt "In ternary we trust. The goal is compression-first inference on today’s binary machines. We compare GGUF exports for size, RAM, and latency at batch=1. Use a fixed prompt to measure prompt eval and token eval timings." \
+  --extra --device none --n-gpu-layers 0
+```
+
+Observed numbers (Apple M2, llama.cpp brew build):
+
+```
+Baseline Q4_0: size 608.16 MiB, peak RSS 1190.02 MiB, eval 55.94 ms/token (17.88 tok/s)
+TQ1_0:         size 696.89 MiB, peak RSS  760.58 MiB, eval 55.51 ms/token (18.01 tok/s)
+```
+
+Tensor/metadata sanity check (same model, same tensor names/shapes):
+
+```
+Baseline types: Q4_0 (155), F32 (45), Q6_K (1), file_type=2, kv_count=23
+TQ1_0 types:    TQ1_0 (154), F32 (47), file_type=36, kv_count=31
+```
 
 ## `t81-qat`
 

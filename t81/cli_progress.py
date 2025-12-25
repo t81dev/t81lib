@@ -8,14 +8,23 @@ import sys
 class CLIProgress:
     """Prints lightweight progress updates for console helpers."""
 
-    def __init__(self, name: str, total_steps: int | None = None) -> None:
+    def __init__(
+        self,
+        name: str,
+        total_steps: int | None = None,
+        *,
+        quiet: bool = False,
+    ) -> None:
         self.name = name
         self.total_steps = total_steps or 0
         self.completed = 0
+        self.quiet = quiet
 
     def step(self, message: str) -> None:
         """Advance the progress and emit the updated status line."""
 
+        if self.quiet:
+            return
         self.completed += 1
         percent = ""
         bar = ""
