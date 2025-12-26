@@ -304,6 +304,27 @@ def _print_gguf_info(path: Path) -> int:
             print("invalid GGUF header", file=sys.stderr)
             return 1
         metadata, _ = _parse_metadata_from_file(handle, metadata_count)
+    kv_count = len(metadata)
+    kv_mismatch = kv_count != metadata_count
+    tokens = metadata.get("tokenizer.ggml.tokens")
+    token_types = metadata.get("tokenizer.ggml.token_type")
+    scores = metadata.get("tokenizer.ggml.scores")
+    tokenizer_payload_size = len(tokens) if isinstance(tokens, list) else None
+    token_type_count = len(token_types) if isinstance(token_types, list) else None
+    score_count = len(scores) if isinstance(scores, list) else None
+    token_type_sane = True
+    if isinstance(token_types, list):
+        token_type_sane = all(isinstance(value, int) and 0 <= value <= 6 for value in token_types)
+    token_type_matches = (
+        tokenizer_payload_size is None or token_type_count is None or tokenizer_payload_size == token_type_count
+    )
+    score_matches = (
+        tokenizer_payload_size is None or score_count is None or tokenizer_payload_size == score_count
+    )
+    tokenizer_ok = (
+        tokenizer_payload_size is None
+        or (tokenizer_payload_size > 0 and token_type_matches and score_matches and token_type_sane)
+    )
     print(f"GGUF bundle: {path}")
     print(f"  version: {version}")
     print(f"  tensors: {num_tensors}")
@@ -316,6 +337,40 @@ def _print_gguf_info(path: Path) -> int:
     if quant_type:
         print(f"  quant type: {quant_type}")
     print(f"  block size: {metadata.get('quantization.block_size')}")
+    profile = metadata.get("t81.profile")
+    if profile:
+        print(f"  profile: {profile}")
+        layout = metadata.get("t81.profile.layout")
+        if layout:
+            print(f"  profile layout: {layout}")
+        scale_format = metadata.get("t81.profile.scale_format")
+        scale_cadence = metadata.get("t81.profile.scale_cadence_blocks")
+        scale_shared_exp = metadata.get("t81.profile.scale_shared_exponent")
+        if scale_format or scale_cadence:
+            print(f"  profile scale format: {scale_format}")
+            print(f"  profile scale cadence: {scale_cadence}")
+        if scale_shared_exp is not None:
+            print(f"  profile scale shared exponent: {scale_shared_exp}")
+        block_bytes_est = metadata.get("t81.profile.block_bytes_tq1_1_est")
+        if block_bytes_est is not None:
+            print(f"  profile block bytes (est): {block_bytes_est}")
+    print(f"  metadata kv count: {metadata_count}")
+    print(f"  metadata entries: {kv_count}")
+    if tokenizer_payload_size is not None:
+        print(f"  tokenizer tokens: {tokenizer_payload_size}")
+        print(f"  tokenizer token_type entries: {token_type_count}")
+        print(f"  tokenizer scores: {score_count}")
+        print(f"  tokenizer token_type sane: {token_type_sane}")
+    profile_layout = metadata.get("t81.profile.layout")
+    profile_mismatch = profile_layout == "tq1_1-draft" and metadata.get("quantization.type") != "tq1_1"
+    if kv_mismatch or not tokenizer_ok:
+        if kv_mismatch:
+            print("  warning: metadata kv count does not match entries", file=sys.stderr)
+        if not tokenizer_ok:
+            print("  warning: tokenizer metadata failed sanity checks", file=sys.stderr)
+        return 1
+    if profile_mismatch:
+        print("  warning: profile layout is draft; data encoded as tq1_0", file=sys.stderr)
     return 0
 
 

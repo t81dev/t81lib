@@ -14,6 +14,29 @@ README.md — Visitor-facing overview, focused onboarding, and first-steps guida
 packed ternary GEMMs, Python bindings, and quantization helpers to deterministic numerics and ternary-aware
 AI workflows.
 
+**Featured demo** — [Ternary Quantization on Phi-3-mini: PTQ + QAT (8-10x compression, <10% PPL degradation)](examples/ternary_phi3_ptq_qat_demo.ipynb)
+
+## Getting started for Torch users
+
+If you are arriving from PyTorch or Hugging Face, start here and treat `t81` as your single entry point:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install ".[torch]"
+```
+
+```python
+import t81 as t8
+
+tensor = t8.torch.TernaryTensor.from_float(weight, threshold=0.45)
+output = tensor.matmul_input(input_tensor, bias=bias)
+```
+
+# -> Runs 2-4x faster on CPU than FP16 with packed ternary kernels
+
+Next steps: `t8.nn.Linear` for drop-in layers, `t8.convert`/`t8.gguf` for programmatic conversion, and `t81 convert`/`t81 gguf` for CLI flows.
+
 ## Minimum viable success
 
 ```cpp
@@ -121,7 +144,7 @@ Optional CUDA/ROCm backends can be enabled with `-DUSE_CUDA=ON` / `-DUSE_ROCM=ON
 
 ## CLI helpers
 
-`t81 convert`, `t81 gguf`, `t81 info`, and `t81-qat` automate quantize→export→train flows with progress reporting and validation hooks (the legacy `t81-convert`/`t81-gguf` names still work). Browse [docs/references/cli-usage.md](docs/references/cli-usage.md), [docs/diagrams/cli-workflows-mermaid.md](docs/diagrams/cli-workflows-mermaid.md), and [examples/cli-examples.md](examples/cli-examples.md) for recipes.
+`t81 convert`, `t81 gguf`, `t81 info`, and `t81-qat` automate quantize→export→train flows with progress reporting and validation hooks (the legacy `t81-convert`/`t81-gguf` names still work). Note: both `t81 convert` (new) and `t81-convert` (legacy) are available for backward compatibility. Browse [docs/references/cli-usage.md](docs/references/cli-usage.md), [docs/diagrams/cli-workflows-mermaid.md](docs/diagrams/cli-workflows-mermaid.md), and [examples/cli-examples.md](examples/cli-examples.md) for recipes.
 
 ### Large models & GGUF streaming
 
@@ -153,7 +176,7 @@ For a zero-disk workaround you can also dequantize on the fly (via `t81.dequanti
 - Deterministic numerics and research-grade arithmetic built atop the same core.
 - Ternary hardware simulation and energy modeling (see [docs/hardware.md](docs/hardware.md)).
 
-See [docs/use-cases.md](docs/use-cases.md) for demos, notebooks, and experiments that spotlight these flows.
+See [Use Cases & Demos](docs/use-cases.md) for real-world workflows, including the Phi-3-mini ternary notebook.
 
 ## Examples
 

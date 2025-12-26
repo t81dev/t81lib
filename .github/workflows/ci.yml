@@ -31,7 +31,7 @@ jobs:
   build-and-test:
     name: Matrix build & tests
     needs: format-and-lint
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.compiler.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -39,39 +39,59 @@ jobs:
           - name: gcc
             c: gcc
             cxx: g++
+            os: ubuntu-latest
           - name: clang
             c: clang
             cxx: clang++
+            os: ubuntu-latest
+          - name: appleclang
+            c: clang
+            cxx: clang++
+            os: macos-14
         configuration:
           - name: minimal
             python_bindings: OFF
           - name: python
             python_bindings: ON
-        avx:
-          - name: avx
-            flags: "-mavx512f"
+            python_version: "3.11"
+        simd:
           - name: scalar
             flags: "-mno-avx"
+          - name: avx2
+            flags: "-mavx2"
+        build_type:
+          - Release
+          - Debug
+        exclude:
+          - compiler:
+              name: appleclang
+            simd:
+              name: avx2
     env:
-      BUILD_DIR: build-${{ matrix.compiler.name }}-${{ matrix.configuration.name }}-${{ matrix.avx.name }}
-      ARTIFACT_LABEL: ci-${{ matrix.compiler.name }}-${{ matrix.configuration.name }}-${{ matrix.avx.name }}
+      BUILD_DIR: build-${{ matrix.compiler.os }}-${{ matrix.compiler.name }}-${{ matrix.configuration.name }}-${{ matrix.simd.name }}-${{ matrix.build_type }}
+      ARTIFACT_LABEL: ci-${{ matrix.compiler.os }}-${{ matrix.compiler.name }}-${{ matrix.configuration.name }}-${{ matrix.simd.name }}-${{ matrix.build_type }}
     steps:
       - uses: actions/checkout@v4
+      - name: Setup Python
+        if: matrix.configuration.name == 'python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.configuration.python_version }}
       - name: Configure
         run: |
           cmake -S . -B "$BUILD_DIR" \
             -DT81LIB_BUILD_TESTS=ON \
             -DT81LIB_BUILD_PYTHON_BINDINGS=${{ matrix.configuration.python_bindings }} \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DCMAKE_C_COMPILER=${{ matrix.compiler.c }} \
             -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }} \
-            -DCMAKE_C_FLAGS="${{ matrix.avx.flags }}" \
-            -DCMAKE_CXX_FLAGS="${{ matrix.avx.flags }}"
+            ${{ runner.os == 'Linux' && format('-DCMAKE_C_FLAGS={0} -DCMAKE_CXX_FLAGS={0}', matrix.simd.flags) || '' }}
       - name: Build
         run: cmake --build "$BUILD_DIR" --parallel
       - name: Test
         run: ctest --test-dir "$BUILD_DIR" --output-on-failure
       - name: Python binding + GGUF regression tests
-        if: matrix.configuration.name == 'python'
+        if: matrix.configuration.name == 'python' && runner.os == 'Linux'
         run: |
           set -euo pipefail
           mkdir -p artifacts
@@ -89,6 +109,47 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ARTIFACT_LABEL }}
+          path: artifacts
+
+  coverage:
+    name: Coverage report
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    env:
+      BUILD_DIR: build-coverage
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install coverage tooling
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install gcovr
+      - name: Configure
+        run: |
+          cmake -S . -B "$BUILD_DIR" \
+            -DT81LIB_BUILD_TESTS=ON \
+            -DT81LIB_BUILD_PYTHON_BINDINGS=OFF \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="--coverage -O0 -g" \
+            -DCMAKE_CXX_FLAGS="--coverage -O0 -g"
+      - name: Build
+        run: cmake --build "$BUILD_DIR" --parallel
+      - name: Test
+        run: ctest --test-dir "$BUILD_DIR" --output-on-failure
+      - name: Generate coverage report
+        run: |
+          mkdir -p artifacts
+          gcovr --root . \
+            --exclude "$BUILD_DIR/.*" \
+            --xml --output artifacts/coverage.xml \
+            --html --html-details --output artifacts/coverage.html
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
           path: artifacts
 
   gpu-cuda:

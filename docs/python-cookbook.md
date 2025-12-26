@@ -2,6 +2,17 @@
 
 These recipes show practical ways to combine the `t81lib` bindings, the `t81.torch` helpers, and the CLI utilities so you can prototype, test, and ship balanced ternary quantization pipelines from Python.
 
+## Python entry points
+
+| Entry point | Use it when you want to... | Start here |
+| --- | --- | --- |
+| `t81lib` | access the low-level pybind11 bindings (BigInt, Limb, packing, GGUF helpers) | `import t81lib` |
+| `t81` | use the high-level re-exported API without worrying about missing bindings | `import t81` |
+| `t81.torch` | run ternary tensor ops or integrate with Torch tensors | `from t81 import torch as t81torch` |
+| `t81.nn` | swap in ternary-aware layers (e.g., `Linear`) | `from t81 import nn as t81nn` |
+| `t81.convert` / `t81.gguf` | call the conversion/GGUF helpers programmatically | `from t81 import convert, gguf` |
+| `t81.hardware` | explore ternary hardware emulation helpers | `from t81 import hardware` |
+
 ## 1. Quantize a dense weight matrix and run `gemm_ternary`
 
 ```python

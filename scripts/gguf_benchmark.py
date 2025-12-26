@@ -99,6 +99,10 @@ def main() -> int:
     parser.add_argument("--threads", type=int, help="Thread count (llama.cpp -t).")
     parser.add_argument("--json", action="store_true", help="Emit JSON output.")
     parser.add_argument(
+        "--json-output",
+        help="Optional path to write a JSON summary report.",
+    )
+    parser.add_argument(
         "--extra",
         nargs=argparse.REMAINDER,
         help="Extra args forwarded to llama-cli after --extra.",
@@ -149,6 +153,11 @@ def main() -> int:
         "prompt": args.prompt,
     }
     report.update(_extract_timings(output))
+
+    if args.json_output:
+        output_path = Path(args.json_output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
 
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))

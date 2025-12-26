@@ -62,3 +62,4 @@ This file helps AI agents discover and understand how to work with this reposito
 - Enhanced `tests/python/test_gguf.py` with quant-parameterized round-trip checks, metadata assertions, and a regression case for invalid quant identifiers to spotlight the GGUF helpers before future agents touch them.
 - Hardened the SIMD detection helpers in `include/t81/core/detail/simd.hpp` with CPUID/xgetbv fallbacks, documented the `add_trytes_*` overflow semantics, and made NEON runtime checks opt-out via `T81_DISABLE_NEON`.
 - Added the `compression-first` GGUF export profile (metadata + CLI flags), plus `scripts/gguf_benchmark.py` and CLI docs that walk FP16 to ternary GGUF before/after measurements.
+- Added `examples/ternary_phi3_ptq_qat_demo.ipynb` to showcase Phi-3-mini PTQ/QAT size, latency, and perplexity comparisons in one compact notebook.

@@ -9,6 +9,7 @@ resulting files can be consumed by unmodified llama.cpp builds.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 import struct
 from typing import Any, BinaryIO, Iterable, Mapping, Sequence
@@ -28,10 +29,12 @@ HEADER_SIZE = HEADER_STRUCT.size
 
 GGML_TYPE_TQ1_0 = 34
 GGML_TYPE_TQ2_0 = 35
+GGML_TYPE_TQ1_1 = 38
 GGML_TYPE_F32 = 0
 GGML_TYPE_F16 = 1
 
 GGUF_PROFILE_COMPRESSION_FIRST = "compression-first"
+GGUF_PROFILE_TQ1_1_DRAFT = "tq1_1-draft"
 
 GGUF_TYPE_UINT8 = 0
 GGUF_TYPE_INT8 = 1
@@ -50,6 +53,8 @@ GGUF_TYPE_FLOAT64 = 12
 GGUF_QUANT_BLOCK_ROWS = 256  # ggml TQ block size
 TQ1_TRITS_PER_BLOCK = 8
 TQ2_TRITS_PER_BYTE = 4
+TQ1_1_SCALE_BIAS = 7
+TQ1_1_SCALE_BITS = 3
 
 
 @dataclass(frozen=True)
@@ -70,6 +75,21 @@ GGUF_EXPORT_PROFILES: dict[str, GGUFExportProfile] = {
             "t81.profile.intent": "compression",
             "t81.profile.quant": "tq1_0",
             "t81.profile.bpw": 1.625,
+        },
+    ),
+    GGUF_PROFILE_TQ1_1_DRAFT: GGUFExportProfile(
+        name=GGUF_PROFILE_TQ1_1_DRAFT,
+        quant="TQ1_0",
+        threshold=0.45,
+        metadata={
+            "t81.profile": GGUF_PROFILE_TQ1_1_DRAFT,
+            "t81.profile.intent": "header-hygiene",
+            "t81.profile.layout": "tq1_1-draft",
+            "t81.profile.scale_format": "fp8-e4m3",
+            "t81.profile.scale_cadence_blocks": 1,
+            "t81.profile.scale_shared_exponent": False,
+            "t81.profile.block_bytes_tq1_0": 54,
+            "t81.profile.block_bytes_tq1_1_est": 53,
         },
     ),
 }
@@ -161,14 +181,22 @@ def _collect_metadata(
     architecture = architecture or type(model).__name__
     name = getattr(model, "name_or_path", architecture) or architecture
     quant_prefix = quant.lower()
-    file_type = 36 if quant == "TQ1_0" else 37
+    if quant == "TQ1_0":
+        file_type = 36
+    elif quant == "TQ2_0":
+        file_type = 37
+    else:
+        file_type = 38
+    quant_version = 3 if quant == "TQ2_0" else 2
+    if quant == "TQ1_1":
+        quant_version = 4
     entries = [
         ("general.architecture", architecture),
         ("general.name", name),
         ("general.file_type", file_type),
         ("general.alignment", HEADER_ALIGNMENT),
         ("general.quantized_by", "t81lib"),
-        ("general.quantization_version", 3 if quant == "TQ2_0" else 2),
+        ("general.quantization_version", quant_version),
         ("quantization.type", quant_prefix),
         ("quantization.block_size", GGUF_QUANT_BLOCK_ROWS),
         ("quantization.threshold", threshold),
@@ -479,6 +507,60 @@ def _quantize_blocks_tq1(blocks: np.ndarray, threshold: float | None) -> np.ndar
     return np.concatenate([qs, d_bytes], axis=-1)
 
 
+def _float_to_fp8_e4m3(values: np.ndarray) -> np.ndarray:
+    values = values.astype(np.float32, copy=False)
+    out = np.zeros(values.shape, dtype=np.uint8)
+    mask = values > 0
+    if not np.any(mask):
+        return out
+    v = values[mask]
+    exp = np.floor(np.log2(v)).astype(np.int32)
+    exp = np.clip(exp, -6, 7)
+    mant = np.round((v / np.exp2(exp) - 1.0) * (1 << TQ1_1_SCALE_BITS)).astype(np.int32)
+    carry = mant >= (1 << TQ1_1_SCALE_BITS)
+    if np.any(carry):
+        mant = np.where(carry, 0, mant)
+        exp = np.where(carry, np.minimum(exp + 1, 7), exp)
+    mant = np.clip(mant, 0, (1 << TQ1_1_SCALE_BITS) - 1)
+    exp = np.clip(exp + TQ1_1_SCALE_BIAS, 0, 0x0F)
+    out_vals = (exp << TQ1_1_SCALE_BITS) | mant
+    out[mask] = out_vals.astype(np.uint8)
+    return out
+
+
+def _fp8_e4m3_to_float(values: np.ndarray) -> np.ndarray:
+    values = values.astype(np.uint8, copy=False)
+    exp = (values >> TQ1_1_SCALE_BITS) & 0x0F
+    mant = values & ((1 << TQ1_1_SCALE_BITS) - 1)
+    is_zero = (exp == 0) & (mant == 0)
+    exp = exp.astype(np.int32) - TQ1_1_SCALE_BIAS
+    scale = (1.0 + mant.astype(np.float32) / (1 << TQ1_1_SCALE_BITS)) * np.exp2(exp)
+    scale = np.where(is_zero, 0.0, scale)
+    return scale.astype(np.float32)
+
+
+def _quantize_blocks_tq1_1(blocks: np.ndarray, threshold: float | None) -> np.ndarray:
+    n_blocks = blocks.shape[0]
+    d = np.abs(blocks).max(axis=-1, keepdims=True)
+    with np.errstate(divide="ignore"):
+        inv_d = np.where(d == 0, 0, 1.0 / d)
+    trits = _quantize_trits(blocks * inv_d, threshold)
+    qs = (trits + 1).astype(np.uint8)
+
+    qs0, qs1, qh = qs[..., :(32 * 5)], qs[..., (32 * 5) : (48 * 5)], qs[..., (48 * 5) :]
+    weights5 = np.array([81, 27, 9, 3, 1], dtype=np.uint8).reshape((1, 1, 5, 1))
+    qs0 = (qs0.reshape((n_blocks, -1, 5, 32)) * weights5).sum(axis=-2).reshape((n_blocks, -1))
+    qs1 = (qs1.reshape((n_blocks, -1, 5, 16)) * weights5).sum(axis=-2).reshape((n_blocks, -1))
+    weights4 = np.array([81, 27, 9, 3], dtype=np.uint8).reshape((1, 1, 4, 1))
+    qh = (qh.reshape((n_blocks, -1, 4, 4)) * weights4).sum(axis=-2).reshape((n_blocks, -1))
+
+    qs = np.concatenate([qs0, qs1, qh], axis=-1)
+    qs = (qs.astype(np.uint16) * 256 + (243 - 1)) // 243
+    qs = qs.astype(np.uint8)
+    d_fp8 = _float_to_fp8_e4m3(d.reshape((n_blocks,))).reshape((n_blocks, 1))
+    return np.concatenate([qs, d_fp8], axis=-1)
+
+
 def _quantize_blocks_tq2(blocks: np.ndarray, threshold: float | None) -> np.ndarray:
     n_blocks = blocks.shape[0]
     d = np.abs(blocks).max(axis=-1, keepdims=True)
@@ -515,6 +597,23 @@ def _dequantize_blocks_tq1(blocks: np.ndarray) -> np.ndarray:
     return d * qs.astype(np.float32)
 
 
+def _dequantize_blocks_tq1_1(blocks: np.ndarray) -> np.ndarray:
+    n_blocks = blocks.shape[0]
+    qk = GGUF_QUANT_BLOCK_ROWS
+    qs, rest = np.hsplit(blocks, [(qk - 4 * qk // 64) // 5])
+    qh, d = np.hsplit(rest, [qk // 64])
+    d = _fp8_e4m3_to_float(d.reshape((n_blocks,))).reshape((n_blocks, 1))
+
+    qs0, qs1 = qs[..., :32], qs[..., 32:]
+    weights5 = np.array([1, 3, 9, 27, 81], dtype=np.uint8).reshape((1, 1, 5, 1))
+    qs0 = (qs0.reshape((n_blocks, -1, 1, 32)) * weights5).reshape((n_blocks, -1))
+    qs1 = (qs1.reshape((n_blocks, -1, 1, 16)) * weights5).reshape((n_blocks, -1))
+    weights4 = np.array([1, 3, 9, 27], dtype=np.uint8).reshape((1, 1, 4, 1))
+    qh = (qh.reshape((n_blocks, -1, 1, 4)) * weights4).reshape((n_blocks, -1))
+    qs = np.concatenate([qs0, qs1, qh], axis=-1)
+    qs = ((qs.astype(np.uint16) * 3) >> 8).astype(np.int8) - np.int8(1)
+    return d * qs.astype(np.float32)
+
 def _dequantize_blocks_tq2(blocks: np.ndarray) -> np.ndarray:
     n_blocks = blocks.shape[0]
     qk = GGUF_QUANT_BLOCK_ROWS
@@ -538,7 +637,12 @@ def _quantize_tensor(tensor: torch.Tensor, quant: str, threshold: float) -> byte
     block_size = GGUF_QUANT_BLOCK_ROWS
     threshold_value = float(np.clip(threshold, 0.0, 1.0))
     use_threshold = threshold_value if threshold_value > 0.0 else None
-    quantize_blocks = _quantize_blocks_tq1 if quant == "TQ1_0" else _quantize_blocks_tq2
+    if quant == "TQ1_0":
+        quantize_blocks = _quantize_blocks_tq1
+    elif quant == "TQ1_1":
+        quantize_blocks = _quantize_blocks_tq1_1
+    else:
+        quantize_blocks = _quantize_blocks_tq2
     blocks_per_row = (cols + block_size - 1) // block_size
     padded_cols = blocks_per_row * block_size
     for row in array:
@@ -616,7 +720,11 @@ def resolve_gguf_profile(profile: str | None) -> GGUFExportProfile | None:
 
 def _infer_ggml_type(tensor: torch.Tensor, quantized: bool, quant: str) -> int:
     if quantized:
-        return GGML_TYPE_TQ1_0 if quant == "TQ1_0" else GGML_TYPE_TQ2_0
+        if quant == "TQ1_0":
+            return GGML_TYPE_TQ1_0
+        if quant == "TQ1_1":
+            return GGML_TYPE_TQ1_1
+        return GGML_TYPE_TQ2_0
     if tensor.dtype in (torch.float16, torch.bfloat16):
         return GGML_TYPE_F16
     return GGML_TYPE_F32
@@ -655,8 +763,15 @@ def write_gguf(
     else:
         profile_metadata = {}
     quant = quant.upper()
-    if quant not in {"TQ1_0", "TQ2_0"}:
-        raise ValueError("quant must be one of 'TQ1_0' or 'TQ2_0'")
+    if profile_data is not None and profile_data.name == GGUF_PROFILE_TQ1_1_DRAFT:
+        if os.getenv("T81_ENABLE_TQ1_1") == "1":
+            quant = "TQ1_1"
+        else:
+            raise ValueError("tq1_1-draft requires T81_ENABLE_TQ1_1=1")
+    if quant not in {"TQ1_0", "TQ1_1", "TQ2_0"}:
+        raise ValueError("quant must be one of 'TQ1_0', 'TQ1_1', or 'TQ2_0'")
+    if quant == "TQ1_1" and os.getenv("T81_ENABLE_TQ1_1") != "1":
+        raise ValueError("TQ1_1 is experimental; set T81_ENABLE_TQ1_1=1 to enable")
     threshold = float(np.clip(threshold, 0.0, 1.0))
     quantized_names = _collect_quantized_weight_names(model)
     if not quantized_names:
@@ -707,8 +822,8 @@ def repack_gguf(
 ) -> None:
     """Repack an existing GGUF file with ternary quantization."""
     quant = quant.upper()
-    if quant not in {"TQ1_0", "TQ2_0"}:
-        raise ValueError("quant must be one of 'TQ1_0' or 'TQ2_0'")
+    if quant not in {"TQ1_0", "TQ1_1", "TQ2_0"}:
+        raise ValueError("quant must be one of 'TQ1_0', 'TQ1_1', or 'TQ2_0'")
     profile_data = resolve_gguf_profile(profile)
     if profile_data is not None:
         quant = profile_data.quant
@@ -716,6 +831,13 @@ def repack_gguf(
         profile_metadata = profile_data.metadata
     else:
         profile_metadata = {}
+    if profile_data is not None and profile_data.name == GGUF_PROFILE_TQ1_1_DRAFT:
+        if os.getenv("T81_ENABLE_TQ1_1") == "1":
+            quant = "TQ1_1"
+        else:
+            raise ValueError("tq1_1-draft requires T81_ENABLE_TQ1_1=1")
+    if quant == "TQ1_1" and os.getenv("T81_ENABLE_TQ1_1") != "1":
+        raise ValueError("TQ1_1 is experimental; set T81_ENABLE_TQ1_1=1 to enable")
     threshold = float(np.clip(threshold, 0.0, 1.0))
     quant_prefix = quant.lower()
 
@@ -746,8 +868,12 @@ def repack_gguf(
         tensor_infos_end = handle.tell()
         tensor_data_start = _align(tensor_infos_end, alignment)
 
+        offsets_are_relative = any(info.offset < tensor_data_start for info in tensor_infos)
+
         def _resolve_offset(info: _TensorInfo) -> int:
-            return info.offset if info.offset >= tensor_data_start else tensor_data_start + info.offset
+            if offsets_are_relative:
+                return tensor_data_start + info.offset
+            return info.offset
 
         def _tensor_nbytes(info: _TensorInfo) -> int:
             if not info.shape:
@@ -760,6 +886,10 @@ def repack_gguf(
                 rows, cols = info.shape[0], info.shape[1] if len(info.shape) > 1 else 1
                 blocks_per_row = (cols + GGUF_QUANT_BLOCK_ROWS - 1) // GGUF_QUANT_BLOCK_ROWS
                 return rows * blocks_per_row * 54
+            if info.ggml_type == GGML_TYPE_TQ1_1:
+                rows, cols = info.shape[0], info.shape[1] if len(info.shape) > 1 else 1
+                blocks_per_row = (cols + GGUF_QUANT_BLOCK_ROWS - 1) // GGUF_QUANT_BLOCK_ROWS
+                return rows * blocks_per_row * 53
             if info.ggml_type == GGML_TYPE_TQ2_0:
                 rows, cols = info.shape[0], info.shape[1] if len(info.shape) > 1 else 1
                 blocks_per_row = (cols + GGUF_QUANT_BLOCK_ROWS - 1) // GGUF_QUANT_BLOCK_ROWS
@@ -782,7 +912,12 @@ def repack_gguf(
                 array = np.frombuffer(memoryview(data), dtype=dtype).reshape(info.shape).astype(np.float32)
                 tensor = torch.from_numpy(array)
                 data = _quantize_tensor(tensor, quant, threshold)
-                ggml_type = GGML_TYPE_TQ1_0 if quant == "TQ1_0" else GGML_TYPE_TQ2_0
+                if quant == "TQ1_0":
+                    ggml_type = GGML_TYPE_TQ1_0
+                elif quant == "TQ1_1":
+                    ggml_type = GGML_TYPE_TQ1_1
+                else:
+                    ggml_type = GGML_TYPE_TQ2_0
             else:
                 ggml_type = info.ggml_type
             payloads_by_name[info.name] = _TensorPayload(
@@ -793,7 +928,13 @@ def repack_gguf(
             )
 
     metadata["general.quantized_by"] = "t81lib"
-    metadata["general.quantization_version"] = 3 if quant == "TQ2_0" else 2
+    if quant == "TQ2_0":
+        quant_version = 3
+    elif quant == "TQ1_1":
+        quant_version = 4
+    else:
+        quant_version = 2
+    metadata["general.quantization_version"] = quant_version
     metadata["quantization.type"] = quant_prefix
     metadata["quantization.block_size"] = GGUF_QUANT_BLOCK_ROWS
     metadata["quantization.threshold"] = threshold
@@ -833,7 +974,12 @@ def _decode_quant_tensor(
         raise ValueError("invalid quant block size")
     if cols == 0 or rows == 0:
         return torch.zeros(shape, dtype=torch.float32)
-    block_bytes = 54 if ggml_type == GGML_TYPE_TQ1_0 else 66
+    if ggml_type == GGML_TYPE_TQ1_0:
+        block_bytes = 54
+    elif ggml_type == GGML_TYPE_TQ1_1:
+        block_bytes = 53
+    else:
+        block_bytes = 66
     blocks_per_row = (cols + block_size - 1) // block_size
     row_bytes = blocks_per_row * block_bytes
     expected_bytes = rows * row_bytes
@@ -841,7 +987,12 @@ def _decode_quant_tensor(
         raise ValueError("quantized tensor data truncated")
     data = np.frombuffer(memoryview(chunk), dtype=np.uint8, count=expected_bytes)
     data = data.reshape((rows, blocks_per_row, block_bytes))
-    dequantize_blocks = _dequantize_blocks_tq1 if ggml_type == GGML_TYPE_TQ1_0 else _dequantize_blocks_tq2
+    if ggml_type == GGML_TYPE_TQ1_0:
+        dequantize_blocks = _dequantize_blocks_tq1
+    elif ggml_type == GGML_TYPE_TQ1_1:
+        dequantize_blocks = _dequantize_blocks_tq1_1
+    else:
+        dequantize_blocks = _dequantize_blocks_tq2
     decoded_rows = []
     for row_blocks in data:
         dequant = dequantize_blocks(row_blocks)
@@ -884,8 +1035,12 @@ def read_gguf(
         tensor_infos_end = handle.tell()
         tensor_data_start = _align(tensor_infos_end, alignment)
 
+        offsets_are_relative = any(info.offset < tensor_data_start for info in tensor_infos)
+
         def _resolve_offset(info: _TensorInfo) -> int:
-            return info.offset if info.offset >= tensor_data_start else tensor_data_start + info.offset
+            if offsets_are_relative:
+                return tensor_data_start + info.offset
+            return info.offset
 
         sorted_infos = sorted(tensor_infos, key=_resolve_offset)
         block_rows = int(metadata.get("quantization.block_size", GGUF_QUANT_BLOCK_ROWS))
@@ -903,7 +1058,15 @@ def read_gguf(
             prev_end = next_offset
             handle.seek(resolved_offset)
             chunk = _read_bytes(handle, next_offset - resolved_offset)
-            if info.ggml_type not in {GGML_TYPE_TQ1_0, GGML_TYPE_TQ2_0, GGML_TYPE_F32, GGML_TYPE_F16}:
+            if info.ggml_type == GGML_TYPE_TQ1_1 and os.getenv("T81_ENABLE_TQ1_1") != "1":
+                raise ValueError("TQ1_1 tensors require T81_ENABLE_TQ1_1=1")
+            if info.ggml_type not in {
+                GGML_TYPE_TQ1_0,
+                GGML_TYPE_TQ1_1,
+                GGML_TYPE_TQ2_0,
+                GGML_TYPE_F32,
+                GGML_TYPE_F16,
+            }:
                 raise ValueError(f"unsupported tensor type {info.ggml_type}")
             decoded = _decode_quant_tensor(chunk, info.shape, info.ggml_type, block_rows, dequantize)
             payload[info.name] = decoded

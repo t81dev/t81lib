@@ -57,7 +57,7 @@ Pass `--validate` when you want the fresh GGUF bundle checked by both the Python
 
 Use the same `--threshold`, `--device-map`, `--torch-dtype`, and `--force-cpu-device-map` knobs as `t81 convert` because `t81 gguf` delegates to that CLI internally.
 
-Use `--profile compression-first` to force the compression-first profile (TQ1_0 + default threshold) and stamp profile metadata into the bundle.
+Use `--profile compression-first` to force the compression-first profile (TQ1_0 + default threshold) and stamp profile metadata into the bundle. Use `--profile tq1_1-draft` with `T81_ENABLE_TQ1_1=1` to write the experimental TQ1_1 payloads.
 
 ### Compression-first wedge (FP16 to ternary GGUF)
 
@@ -111,6 +111,101 @@ Tensor/metadata sanity check (same model, same tensor names/shapes):
 Baseline types: Q4_0 (155), F32 (45), Q6_K (1), file_type=2, kv_count=23
 TQ1_0 types:    TQ1_0 (154), F32 (47), file_type=36, kv_count=31
 ```
+
+### TQ1_1 draft header layout (size-only sketch)
+
+Candidate layout for a tighter on-disk TQ1_0 variant without changing math:
+
+- Current TQ1_0 block: 48-byte qs + 4-byte qh + 2-byte FP16 scale = 54 bytes.
+- Draft TQ1_1: keep qs/qh, store FP8 (e4m3) scale per block.
+  - Scale payload per block: 1 byte.
+  - Estimated block size: 48 + 4 + 1 = 53 bytes.
+  - Estimated savings: 54 -> 53 bytes (~1.9% per block).
+
+This is a header-size sketch only; `--profile tq1_1-draft` requires `T81_ENABLE_TQ1_1=1` and writes experimental payloads that llama.cpp will not load today.
+
+## Compression-first report template
+
+Use this template to keep FP16 ↔ TQ1_0 comparisons consistent:
+
+```
+Model:
+Baseline GGUF:
+Ternary GGUF:
+Profile:
+llama.cpp commit:
+llama-cli path:
+Load flags:
+Prompt:
+n_predict / ctx / batch:
+
+Baseline metrics:
+  size_mib:
+  peak_rss_mib:
+  eval_ms_per_token:
+  eval_tokens_per_sec:
+  prompt_ms_per_token:
+  prompt_tokens_per_sec:
+
+Ternary metrics:
+  size_mib:
+  peak_rss_mib:
+  eval_ms_per_token:
+  eval_tokens_per_sec:
+  prompt_ms_per_token:
+  prompt_tokens_per_sec:
+
+Accuracy sanity:
+  dataset:
+  metric:
+  baseline_score:
+  ternary_score:
+  delta:
+
+Size audit:
+  script:
+  total_delta_bytes:
+```
+
+You can automate report capture with JSON summaries:
+
+```bash
+python scripts/gguf_benchmark.py --gguf llama3.2-3b-f16.gguf \
+  --llama-cli /path/to/llama-cli --n-predict 128 \
+  --json-output reports/llama3.2-3b-f16.json
+
+python scripts/gguf_benchmark.py --gguf llama3.2-3b-tq1.gguf \
+  --llama-cli /path/to/llama-cli --n-predict 128 \
+  --json-output reports/llama3.2-3b-tq1.json
+
+python scripts/gguf_compare.py \
+  --baseline reports/llama3.2-3b-f16.json \
+  --candidate reports/llama3.2-3b-tq1.json \
+  --baseline-label fp16 --candidate-label tq1
+
+python scripts/gguf_size_audit.py --gguf llama3.2-3b-tq1.gguf \
+  > reports/llama3.2-3b-tq1-size.csv
+```
+
+For auditability, run a quick accuracy sanity check for the `compression-first` profile and record the delta:
+
+```bash
+t81 gguf llama3.2-3b-tq1.gguf --from-hf meta-llama/Llama-3.2-3B-Instruct \
+  --profile compression-first
+
+# Example: plug in your existing eval harness to score both bundles and record
+# the dataset + metric used (e.g., wikitext-2 perplexity or a tiny MMLU subset).
+```
+
+## GGUF compatibility matrix
+
+Record known-good loader environments so "loads natively" stays objective.
+
+| Runtime | Version / commit | Load flags | Notes |
+| --- | --- | --- | --- |
+| llama.cpp | `TODO` | `TODO` | Update with the exact commit hash you validated. |
+| Ollama | `TODO` | `TODO` | Include the app version or build number. |
+| LM Studio | `TODO` | `TODO` | Note the model format setting if applicable. |
 
 ## `t81-qat`
 

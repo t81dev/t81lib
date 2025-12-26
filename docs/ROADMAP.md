@@ -56,15 +56,25 @@ The codebase is thoughtfully commented, consistently formatted by `clang-format`
 
 ## 3. Next Steps Recommendations
 
+### Progress update (2024)
+
+Recent work has delivered parts of this roadmap:
+
+* **Recommendation 1** — quickstart matrix + common workflows added to `DEVELOPMENT.md`.
+* **Recommendation 2** — CI matrix expanded for OS/build types and SIMD guards; Python tests standardized on Linux.
+* **Recommendation 3** — Python entry-points table added to `docs/python-api.md` and `docs/python-cookbook.md`, with links from `docs/index.md`.
+
+Remaining items are listed below with the next steps still required.
+
 ### Recommendation 1: Streamline the Developer Onboarding Experience
 
 * **Why**: New contributors struggle with CMake options, Python extras, and building bindings.
 * **Benefits**: Faster first-time builds, fewer setup questions, more contributions.
 * **Effort**: Medium.
 * **Implementation**:
-  1. Add `DEVELOPMENT.md` with step-by-step instructions (clone, configure with `T81LIB_BUILD_PYTHON_BINDINGS`, `pipx` options, CLI usage).
-  2. Provide helper scripts or Makefile targets (`run-tests.sh`, `build-python.sh`) that wrap the most common commands.
-  3. Deliver a `.devcontainer` (VS Code + Docker) to let contributors spin up a configured environment without manual dependency juggling.
+  1. Expand `DEVELOPMENT.md` with a quickstart matrix (CMake-only vs. bindings vs. torch extras) and explicit `T81LIB_BUILD_PYTHON_BINDINGS` examples. **Done.**
+  2. Add a short "common workflows" section that references `run-tests.sh` and `build-python.sh`, plus expected outputs/flags. **Done.**
+  3. Decide whether a `.devcontainer` is still needed or document the current preferred local setup to avoid duplicate paths. **Done.**
 
 ### Recommendation 2: Expand CI and Code Quality Automation
 
@@ -72,9 +82,9 @@ The codebase is thoughtfully commented, consistently formatted by `clang-format`
 * **Benefits**: Higher confidence in main, earlier detection of regressions, better cross-platform coverage.
 * **Effort**: Medium.
 * **Implementation**:
-  1. Extend `.github/workflows/ci.yml` with a build matrix (GCC/Clang, binding vs. minimal configuration, AVX vs. scalar) and run both C++ and Python test suites.
-  2. Add format/lint steps (`clang-format` check, `ruff`/`black` for Python) to gate style.
-  3. Publish coverage/artifacts (e.g., via Codecov or GHA artifacts) so maintainers can monitor test completeness.
+  1. Extend `.github/workflows/ci.yml` with a richer build matrix (GCC/Clang, bindings vs. minimal configuration, AVX vs. scalar) and run both C++ and Python test suites. **Done (matrix + SIMD guard updates).**
+  2. Add format/lint steps (`clang-format` check, `ruff`/`black` for Python) to gate style. **Done.**
+  3. Publish coverage/artifacts (e.g., via Codecov or GHA artifacts) so maintainers can monitor test completeness. **Done (coverage artifact upload).**
 
 ### Recommendation 3: Unify and Document the Python API Surface
 
@@ -82,9 +92,9 @@ The codebase is thoughtfully commented, consistently formatted by `clang-format`
 * **Benefits**: Easier discoverability, faster adoption, clearer path from C++ bindings to Torch wrappers.
 * **Effort**: Low-Medium.
 * **Implementation**:
-  1. Integrate Sphinx or MkDocs into `docs/` to auto-generate Python API reference from docstrings and tie it to the existing docs site.
-  2. Add a “Python Cookbook” doc with recipes showing how to combine `t81lib.pack_dense_matrix`, `t81.torch.TernaryTensor`, and CLI helpers.
-  3. Consider re-exporting the binding objects via the higher-level `t81` module so users can `import t81` and access the full quantization stack.
+  1. Expand MkDocs coverage by generating the Python API reference via mkdocstrings and ensuring key modules are linked from `docs/index.md`. **Done (entry-point links + extra directives).**
+  2. Keep the “Python Cookbook” up to date with end-to-end recipes (bindings + `t81.torch` + CLI), and add a short "choose your entry point" table. **Done (entry points table).**
+  3. Validate that the `t81` re-exports stay in sync with `t81lib` bindings and add a quick API surface checklist. **Done (checklist added).**
 
 ### Recommendation 4: Introduce a Standardized Quantization-Aware Training Benchmark
 
@@ -93,8 +103,8 @@ The codebase is thoughtfully commented, consistently formatted by `clang-format`
 * **Effort**: High.
 * **Implementation**:
   1. Define a benchmark (e.g., small BERT or ViT on GLUE/CIFAR subsets) with FP32, PTQ, and QAT runs.
-  2. Create a `scripts/` benchmark script that trains the model, applies `t81` quantization, and logs accuracy, model size, and latency.
-  3. Document the benchmark/results in a new `BENCHMARKS.md` (link from `README.md`) so the community can reproduce and compare.
+  2. Extend the existing `scripts/` benchmark tooling to log accuracy, model size, and latency in a standardized JSON schema.
+  3. Update `BENCHMARKS.md` with reproducible baseline results and link the dataset/model artifacts used for comparisons.
 
 ### Recommendation 5: Harden the GPU Tensor Metadata Path
 

@@ -7,6 +7,32 @@ docs/index.md — Primary landing page for the documentation set.
 This landing page highlights the most helpful resources for people discovering `t81lib` or wanting
 to understand the balanced ternary engine without digging through specs immediately.
 
+## Featured example
+
+Try the compact, end-to-end PTQ + QAT notebook that measures size, latency, and perplexity on Phi-3-mini:
+[`examples/ternary_phi3_ptq_qat_demo.ipynb`](../examples/ternary_phi3_ptq_qat_demo.ipynb).
+
+**Featured demo** — [Try Phi-3-mini PTQ + QAT](../examples/ternary_phi3_ptq_qat_demo.ipynb)
+
+## Getting started for Torch users
+
+If you are arriving from PyTorch or Hugging Face, use `t81` as the single entry point and alias it once:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install ".[torch]"
+```
+
+```python
+import t81 as t8
+
+tensor = t8.torch.TernaryTensor.from_float(weight, threshold=0.45)
+output = tensor.matmul_input(input_tensor, bias=bias)
+```
+
+From here: `t8.nn.Linear` for drop-in layers, `t8.convert`/`t8.gguf` for scripted conversion, and `t81 convert`/`t81 gguf` for CLI workflows.
+
 ## Core resources
 
 - **Landing & Quick Start** — [`README.md`](../README.md) contains the hero content, badges, and a comprehensive quick
@@ -22,6 +48,7 @@ to understand the balanced ternary engine without digging through specs immediat
   [`examples/ternary_sparse_preview.py`](../examples/ternary_sparse_preview.py) for runnable workflows.
 - **Python API reference** — [`docs/python-api.md`](python-api.md) lays out how MkDocs plus `mkdocstrings` auto-generate the binding reference.
 - **Python cookbook** — [`docs/python-cookbook.md`](python-cookbook.md) gathers recipes that mix `t81lib.pack_dense_matrix`, `t81.torch.TernaryTensor`, and the CLI helpers.
+- **Python entry points** — [`docs/python-api.md`](python-api.md) and [`docs/python-cookbook.md`](python-cookbook.md) now include a quick table showing which module to import for each workflow.
 - **Python install paths** — [`docs/python-install.md`](python-install.md) explains pip/pipx builds, validation tips, and CLI helper installs.
 - **PyTorch how-to** — [`docs/torch.md`](torch.md) walks through `t81.torch`, `t81.nn`, conversion helpers, and how the CLI scripts mirror the Python flows.
 - **CLI reference** — [`docs/references/cli-usage.md`](references/cli-usage.md) lists the unified `t81 convert`/`t81 gguf` helpers (with legacy `t81-convert`/`t81-gguf` aliases) plus `t81-qat`

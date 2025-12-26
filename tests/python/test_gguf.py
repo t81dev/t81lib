@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import ast
+import os
+import struct
 from pathlib import Path
 
 import pytest
@@ -36,6 +38,31 @@ def _write_and_read_roundtrip(tmp_path: Path, quant: str, threshold: float, fill
 def _quant_tolerance(quant: str) -> float:
     """Return the empirically calibrated tolerance for the visible quant forms."""
     return _QUANT_TOLERANCES[quant]
+
+
+def _tensor_type_counts(gguf_path: Path) -> dict[int, int]:
+    with gguf_path.open("rb") as handle:
+        header = handle.read(gguf.HEADER_SIZE)
+        magic, version, num_tensors, metadata_kv_count = gguf.HEADER_STRUCT.unpack_from(header, 0)
+        if magic != gguf.HEADER_MAGIC or version != gguf.HEADER_VERSION:
+            raise ValueError("GGUF header mismatch")
+        metadata, metadata_length = gguf._parse_metadata_from_file(handle, metadata_kv_count)
+        alignment = int(metadata.get("general.alignment", gguf.HEADER_ALIGNMENT))
+        metadata_end = handle.tell()
+        peek = handle.read(8)
+        if len(peek) != 8:
+            raise ValueError("metadata truncated before tensor infos")
+        name_len = struct.unpack("<Q", peek)[0]
+        handle.seek(-8, 1)
+        if name_len == 0 or name_len > 4096:
+            aligned_end = gguf.HEADER_SIZE + gguf._align(metadata_length, alignment)
+            if aligned_end > metadata_end:
+                handle.seek(aligned_end - metadata_end, 1)
+        tensor_infos = gguf._parse_tensor_infos_from_file(handle, num_tensors)
+    counts: dict[int, int] = {}
+    for info in tensor_infos:
+        counts[info.ggml_type] = counts.get(info.ggml_type, 0) + 1
+    return counts
 
 
 @pytest.mark.slow
@@ -99,6 +126,22 @@ def test_write_gguf_invalid_quant(tmp_path: Path) -> None:
         gguf.write_gguf(model, bad_path, quant="INVALID")
 
 
+@pytest.mark.slow
+def test_roundtrip_gguf_tq1_1(tmp_path: Path, monkeypatch) -> None:
+    """Ensure the experimental TQ1_1 path round-trips when enabled."""
+    if os.getenv("T81_ENABLE_TQ1_1") != "1":
+        pytest.skip("Skipping TQ1_1 round-trip (set T81_ENABLE_TQ1_1=1 to enable)")
+    monkeypatch.setenv("T81_ENABLE_TQ1_1", "1")
+    model = _DummyModel()
+    _populate_linear(model, -1.0, 0.8)
+    gguf_path = tmp_path / "dummy-tq1-1.gguf"
+    gguf.write_gguf(model, gguf_path, quant="TQ1_1", threshold=0.45)
+    payload, metadata = gguf.read_gguf(gguf_path, dequantize=True, return_metadata=True)
+    decoded = payload.get("linear.weight")
+    assert isinstance(decoded, torch.Tensor)
+    assert decoded.shape == model.linear.weight.shape
+    assert torch.isfinite(decoded).all()
+    assert metadata["quantization.type"] == "tq1_1"
 
 @pytest.mark.slow
 def test_t81_dequant_cli_info(tmp_path: Path, capsys) -> None:
@@ -132,6 +175,92 @@ def test_t81_dequant_cli_info(tmp_path: Path, capsys) -> None:
     expected_samples = values.flatten()[:2].tolist()
     for actual, expected in zip(sample_values, expected_samples):
         assert abs(actual - expected) <= 0.15
+
+
+@pytest.mark.slow
+def test_gguf_metadata_snapshot(tmp_path: Path) -> None:
+    """Snapshot tokenizer metadata and tensor type counts for GGUF exports."""
+    try:
+        from tokenizers import Tokenizer, models, pre_tokenizers
+        from transformers import PreTrainedTokenizerFast, PretrainedConfig, PreTrainedModel
+    except ImportError:
+        pytest.skip("Skipping tokenizer metadata snapshot (requires tokenizers)")
+
+    vocab = {
+        "[UNK]": 0,
+        "<s>": 1,
+        "</s>": 2,
+        "<0x41>": 3,
+        "hello": 4,
+        "<pad>": 5,
+    }
+    tokenizer_obj = Tokenizer(models.WordLevel(vocab=vocab, unk_token="[UNK]"))
+    tokenizer_obj.pre_tokenizer = pre_tokenizers.Whitespace()
+    fast_tokenizer = PreTrainedTokenizerFast(
+        tokenizer_object=tokenizer_obj,
+        unk_token="[UNK]",
+        bos_token="<s>",
+        eos_token="</s>",
+        pad_token="<pad>",
+    )
+    tokenizer_dir = tmp_path / "tokenizer"
+    fast_tokenizer.save_pretrained(tokenizer_dir)
+
+    class _LlamaDummyConfig(PretrainedConfig):
+        model_type = "llama"
+
+    class _LlamaDummyModel(PreTrainedModel):
+        config_class = _LlamaDummyConfig
+
+        def __init__(self, config: PretrainedConfig, name_or_path: Path):
+            super().__init__(config)
+            self.linear = _DummyModel().linear
+            self.name_or_path = str(name_or_path)
+
+        def forward(self, tensor: torch.Tensor) -> torch.Tensor:  # pragma: no cover - not executed
+            return self.linear(tensor)
+
+    config = _LlamaDummyConfig(
+        vocab_size=fast_tokenizer.vocab_size,
+        hidden_size=8,
+        num_hidden_layers=2,
+        num_attention_heads=2,
+        num_key_value_heads=2,
+        intermediate_size=16,
+        max_position_embeddings=128,
+        rms_norm_eps=1e-5,
+        rope_theta=10000.0,
+    )
+    model = _LlamaDummyModel(config, tokenizer_dir)
+    _populate_linear(model, -0.5, 0.5)
+    gguf_path = tmp_path / "tokenizer-meta.gguf"
+    gguf.write_gguf(model, gguf_path, quant="TQ1_0", threshold=0.45)
+    _payload, metadata = gguf.read_gguf(gguf_path, dequantize=True, return_metadata=True)
+
+    snapshot = {
+        "tokenizer.ggml.model": metadata.get("tokenizer.ggml.model"),
+        "tokenizer.ggml.tokens": metadata.get("tokenizer.ggml.tokens"),
+        "tokenizer.ggml.token_type": metadata.get("tokenizer.ggml.token_type"),
+        "tokenizer.ggml.bos_token_id": metadata.get("tokenizer.ggml.bos_token_id"),
+        "tokenizer.ggml.eos_token_id": metadata.get("tokenizer.ggml.eos_token_id"),
+        "tokenizer.ggml.unknown_token_id": metadata.get("tokenizer.ggml.unknown_token_id"),
+        "tokenizer.ggml.padding_token_id": metadata.get("tokenizer.ggml.padding_token_id"),
+        "tokenizer.ggml.token_type_count": len(metadata.get("tokenizer.ggml.token_type", [])),
+        "tensor_type_counts": _tensor_type_counts(gguf_path),
+    }
+
+    expected = {
+        "tokenizer.ggml.model": "llama",
+        "tokenizer.ggml.tokens": ["[UNK]", "<s>", "</s>", "<0x41>", "hello", "<pad>"],
+        "tokenizer.ggml.token_type": [2, 3, 3, 6, 1, 3],
+        "tokenizer.ggml.bos_token_id": 1,
+        "tokenizer.ggml.eos_token_id": 2,
+        "tokenizer.ggml.unknown_token_id": 0,
+        "tokenizer.ggml.padding_token_id": 5,
+        "tokenizer.ggml.token_type_count": 6,
+        "tensor_type_counts": {gguf.GGML_TYPE_TQ1_0: 1, gguf.GGML_TYPE_F32: 1},
+    }
+    assert snapshot == expected
 
 
 @pytest.mark.slow

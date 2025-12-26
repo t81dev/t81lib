@@ -8,6 +8,7 @@ This file is the canonical list of runnable scripts and notebooks maintained und
 - `examples/scaling_laws_ternary.py` — Compare ternary vs float scaling laws across RMSNorm, RoPE, and throughput axes.
 - `examples/ternary_sparse_preview.py` — Explore hybrid sparsity, GEMM packing, and quantized transformer inference with notebook-friendly visuals.
 - `examples/ternary_quantization_demo.ipynb` — Tutorial notebook showing packed GEMMs, quantized trits, and dequantization.
+- `examples/ternary_phi3_ptq_qat_demo.ipynb` — End-to-end Phi-3-mini PTQ/QAT notebook with size, latency, and perplexity tracking.
 - `examples/ternary_transformer_demo.ipynb` — Micro GPT stack with cached ternary projections and packed GEMM profiling.
 - `examples/ternary_mnist_demo.ipynb` — Quantize an MNIST classifier, pack weight buffers, and route inference through `t81lib.gemm_ternary`.
 - `examples/ternary_qat_inference_comparison.py` — Run a miniature QAT loop, log ternary threshold schedules, and compare latency between `torch.matmul` and cached `TernaryTensor`.
