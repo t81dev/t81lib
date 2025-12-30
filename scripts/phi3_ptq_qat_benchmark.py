@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from pathlib import Path
 
 import torch
 from datasets import load_dataset
@@ -17,16 +19,32 @@ import t81 as t8
 
 
 @dataclass
+class StageMetrics:
+    size_gib: float
+    ppl: float | None
+    tok_s: float
+
+
+@dataclass
 class BenchResults:
-    baseline_size_gib: float
-    ptq_size_gib: float
+    model_id: str
+    dataset: str
+    device: str
+    dtype: str
+    threshold: float
+    max_eval_tokens: int
+    eval_texts: int
+    max_new_tokens: int
+    skip_latency: bool
+    skip_ptq_ppl: bool
+    run_qat: bool
+    qat_steps: int
+    train_split: str
+    learning_rate: float
     compression_ratio: float
-    baseline_ppl: float
-    ptq_ppl: float
-    baseline_tok_s: float
-    ptq_tok_s: float
-    qat_ppl: float | None = None
-    qat_tok_s: float | None = None
+    baseline: StageMetrics
+    ptq: StageMetrics
+    qat: StageMetrics | None = None
 
 
 class QATProgressCallback(TrainerCallback):
@@ -129,7 +147,10 @@ def run(args: argparse.Namespace) -> BenchResults:
     ptq_tok_s = 0.0
     if not args.skip_latency:
         ptq_tok_s = measure_generate_latency(model, tokenizer, prompt, args.max_new_tokens)
-    ptq_ppl = perplexity(model, tokenizer, wikitext, args.max_eval_tokens, args.eval_texts)
+    if args.skip_ptq_ppl:
+        ptq_ppl = None
+    else:
+        ptq_ppl = perplexity(model, tokenizer, wikitext, args.max_eval_tokens, args.eval_texts)
     phases.update(1)
 
     qat_ppl = None
@@ -180,15 +201,40 @@ def run(args: argparse.Namespace) -> BenchResults:
 
     compression_ratio = baseline_bytes / max(ternary_bytes, 1)
     return BenchResults(
-        baseline_size_gib=bytes_to_gib(baseline_bytes),
-        ptq_size_gib=bytes_to_gib(ternary_bytes),
+        model_id=args.model_id,
+        dataset="wikitext-2-raw-v1",
+        device=args.device,
+        dtype=args.dtype,
+        threshold=args.threshold,
+        max_eval_tokens=args.max_eval_tokens,
+        eval_texts=args.eval_texts,
+        max_new_tokens=args.max_new_tokens,
+        skip_latency=args.skip_latency,
+        skip_ptq_ppl=args.skip_ptq_ppl,
+        run_qat=args.run_qat,
+        qat_steps=args.qat_steps,
+        train_split=args.train_split,
+        learning_rate=args.learning_rate,
         compression_ratio=compression_ratio,
-        baseline_ppl=baseline_ppl,
-        ptq_ppl=ptq_ppl,
-        baseline_tok_s=baseline_tok_s,
-        ptq_tok_s=ptq_tok_s,
-        qat_ppl=qat_ppl,
-        qat_tok_s=qat_tok_s,
+        baseline=StageMetrics(
+            size_gib=bytes_to_gib(baseline_bytes),
+            ppl=baseline_ppl,
+            tok_s=baseline_tok_s,
+        ),
+        ptq=StageMetrics(
+            size_gib=bytes_to_gib(ternary_bytes),
+            ppl=ptq_ppl,
+            tok_s=ptq_tok_s,
+        ),
+        qat=(
+            None
+            if qat_ppl is None
+            else StageMetrics(
+                size_gib=bytes_to_gib(ternary_bytes),
+                ppl=qat_ppl,
+                tok_s=qat_tok_s or 0.0,
+            )
+        ),
     )
 
 
@@ -202,27 +248,41 @@ def main() -> int:
     parser.add_argument("--eval-texts", type=int, default=32)
     parser.add_argument("--max-new-tokens", type=int, default=64)
     parser.add_argument("--skip-latency", action="store_true")
+    parser.add_argument(
+        "--skip-ptq-ppl",
+        action="store_true",
+        help="Skip PTQ perplexity (useful when CPU runs are too slow).",
+    )
     parser.add_argument("--run-qat", action="store_true")
     parser.add_argument("--qat-steps", type=int, default=50)
     parser.add_argument("--train-split", default="train[:1%]")
     parser.add_argument("--learning-rate", type=float, default=5e-5)
     parser.add_argument("--output-dir", default="phi3-qat")
+    parser.add_argument("--json-output", type=Path)
     args = parser.parse_args()
 
     results = run(args)
 
     print("\nSummary")
-    print(f"Baseline size GiB: {results.baseline_size_gib:.2f}")
-    print(f"PTQ size GiB: {results.ptq_size_gib:.2f}")
+    print(f"Baseline size GiB: {results.baseline.size_gib:.2f}")
+    print(f"PTQ size GiB: {results.ptq.size_gib:.2f}")
     print(f"Compression ratio: {results.compression_ratio:.1f}x")
-    print(f"Baseline PPL: {results.baseline_ppl:.2f}")
-    print(f"PTQ PPL: {results.ptq_ppl:.2f}")
-    print(f"Baseline tok/s: {results.baseline_tok_s:.2f}")
-    print(f"PTQ tok/s: {results.ptq_tok_s:.2f}")
-    if results.qat_ppl is not None:
-        print(f"QAT PPL: {results.qat_ppl:.2f}")
-    if results.qat_tok_s is not None:
-        print(f"QAT tok/s: {results.qat_tok_s:.2f}")
+    print(f"Baseline PPL: {results.baseline.ppl:.2f}")
+    if results.ptq.ppl is None:
+        print("PTQ PPL: pending")
+    else:
+        print(f"PTQ PPL: {results.ptq.ppl:.2f}")
+    print(f"Baseline tok/s: {results.baseline.tok_s:.2f}")
+    print(f"PTQ tok/s: {results.ptq.tok_s:.2f}")
+    if results.qat is not None:
+        print(f"QAT PPL: {results.qat.ppl:.2f}")
+        print(f"QAT tok/s: {results.qat.tok_s:.2f}")
+
+    if args.json_output is not None:
+        args.json_output.parent.mkdir(parents=True, exist_ok=True)
+        payload = asdict(results)
+        with args.json_output.open("w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
     return 0
 
 

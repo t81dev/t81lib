@@ -64,12 +64,14 @@ Recent work has delivered parts of this roadmap:
 * **Recommendation 2** — CI matrix expanded for OS/build types and SIMD guards; Python tests standardized on Linux.
 * **Recommendation 3** — Python entry-points table added to `docs/python-api.md` and `docs/python-cookbook.md`, with links from `docs/index.md`. **In progress (benchmark visibility added in `README.md`, `BENCHMARKS.md`, and the Phi-3 notebook).**
 * **GGUF compatibility** — Phi-3 export validated (`phi3-tq1-fixed12.gguf`); QKV split experiment reverted for llama.cpp parity.
+* **QAT benchmark groundwork** — ViT CIFAR-10 PTQ/QAT script added with size-only baseline captured; Phi-3 baseline PPL captured (PTQ PPL/QAT pending).
 
 ### Status timeline (recent highlights)
 
 * Python entry-point discoverability refreshed (docs landing page + cookbook + API entry table).
 * Phi-3 GGUF export validated with llama.cpp baseline metrics captured for reference.
 * CLI documentation updated to call out Phi-3 GGUF compatibility expectations.
+* ViT size-only baseline logged; Phi-3 baseline PPL captured with PTQ PPL/QAT queued.
 
 ### High-impact next priorities (effort vs. impact)
 
@@ -115,6 +117,7 @@ Remaining items are listed below with the next steps still required.
 * **Why**: QAT features are powerful but lack standard public benchmarks to illustrate benefits.
 * **Benefits**: Demonstrates effectiveness, guides performance tuning, attracts AI users.
 * **Effort**: High.
+* **Status**: In progress (ViT size-only baseline logged, Phi-3 baseline PPL captured, JSON artifacts added; PTQ PPL/QAT pending).
 * **Implementation**:
   1. Define a benchmark (e.g., small BERT or ViT on GLUE/CIFAR subsets) with FP32, PTQ, and QAT runs.
   2. Extend the existing `scripts/` benchmark tooling to log accuracy, model size, and latency in a standardized JSON schema.

@@ -35,13 +35,41 @@ python scripts/phi3_ptq_qat_benchmark.py \
   --max-new-tokens 4 \
   --run-qat \
   --qat-steps 5 \
-  --train-split 'train[:20]'
+  --train-split 'train[:20]' \
+  --json-output benchmarks/gpt2_ptq_qat.json
 ```
 
 Expected output:
 - Console summary with size, compression ratio, perplexity, and tok/s for baseline/PTQ/QAT.
+- `benchmarks/gpt2_ptq_qat.json` with stage metrics and run configuration.
 
-### 3) ViT CIFAR-10 PTQ/QAT baseline (quick)
+### 3) Phi-3 PTQ/QAT baseline (PPL-focused)
+
+```bash
+python scripts/phi3_ptq_qat_benchmark.py \
+  --model-id microsoft/Phi-3-mini-4k-instruct \
+  --device cpu \
+  --dtype float32 \
+  --max-eval-tokens 1024 \
+  --eval-texts 32 \
+  --max-new-tokens 64 \
+  --skip-latency \
+  --json-output benchmarks/phi3_ptq_qat.json
+```
+
+Expected output:
+- Console summary with baseline/PTQ perplexity and size.
+- `benchmarks/phi3_ptq_qat.json` with stage metrics and run configuration.
+
+Observed output (size-only PTQ PPL skipped):
+- baseline size: 14.23 GiB
+- PTQ size: 1.16 GiB
+- compression ratio: 12.3x
+- baseline PPL: 6.76
+- PTQ PPL: pending (CPU run skipped)
+- QAT: pending
+
+### 4) ViT CIFAR-10 PTQ/QAT baseline (quick)
 
 ```bash
 python scripts/vit_ptq_qat_benchmark.py \
@@ -61,7 +89,12 @@ Expected output:
 - Console summary with size, accuracy/loss, and images/s for baseline/PTQ/QAT.
 - `benchmarks/vit_cifar10_baseline.json` with stage metrics and model metadata.
 
-### 4) GGUF export + load check
+Observed output (size-only smoke run, eval/throughput skipped):
+- model: facebook/deit-tiny-patch16-224
+- baseline size: 0.0206 GiB
+- PTQ size: 0.00173 GiB
+
+### 5) GGUF export + load check
 
 ```bash
 t81 convert microsoft/Phi-3-mini-4k-instruct phi3-t81 --threshold 0.45 --force-cpu-device-map
@@ -88,7 +121,7 @@ Observed output:
 - prompt: 54.35 ms/token (18.4 tok/s)
 - eval: 56.22 ms/token (17.79 tok/s)
 
-### 5) GEMM throughput (CPU)
+### 6) GEMM throughput (CPU)
 
 ```bash
 python - <<'PY'
@@ -107,6 +140,14 @@ PY
 
 Expected output:
 - Console prints `gemm_ternary OK (1024, 1024)`.
+
+## JSON artifact schema
+
+`scripts/phi3_ptq_qat_benchmark.py` and `scripts/vit_ptq_qat_benchmark.py` can emit JSON summaries with:
+
+- `model_id`, `dataset`, `device`, `dtype`, `threshold`
+- `baseline`, `ptq`, `qat` objects with stage metrics (`size_gib` plus either `ppl`/`tok_s` for Phi-3 or `accuracy`/`loss`/`images_per_s` for ViT)
+- run configuration (`max_eval_tokens`, `eval_texts`, `max_new_tokens`, `qat_steps`, `train_split`, etc.)
 
 ## Script overview
 
