@@ -205,6 +205,8 @@ def _collect_metadata(
     ]
     if architecture == "llama":
         entries.extend(_collect_llama_metadata(model, name))
+    if architecture == "phi3":
+        entries.extend(_collect_phi3_metadata(model, name))
     if extra_metadata:
         seen = {key for key, _ in entries}
         for key, value in extra_metadata.items():
@@ -251,14 +253,49 @@ def _collect_llama_metadata(model: PreTrainedModel, name_or_path: str) -> list[t
     return entries
 
 
+def _collect_phi3_metadata(model: PreTrainedModel, name_or_path: str) -> list[tuple[str, Any]]:
+    config = getattr(model, "config", None)
+    if config is None:
+        return []
+    max_ctx = getattr(config, "max_position_embeddings", None) or getattr(
+        config, "max_sequence_length", 4096
+    )
+    hidden_size = getattr(config, "hidden_size", 0)
+    n_layers = getattr(config, "num_hidden_layers", 0)
+    n_heads = getattr(config, "num_attention_heads", 0)
+    n_kv_heads = getattr(config, "num_key_value_heads", n_heads)
+    head_dim = hidden_size // n_heads if n_heads else 0
+    ff_size = getattr(config, "intermediate_size", 0)
+    rms_eps = getattr(config, "rms_norm_eps", 1e-5)
+    rope_theta = getattr(config, "rope_theta", 10000.0)
+
+    tokenizer_metadata = _collect_tokenizer_metadata(name_or_path, config)
+    entries = [
+        ("phi3.context_length", int(max_ctx)),
+        ("phi3.embedding_length", int(hidden_size)),
+        ("phi3.block_count", int(n_layers)),
+        ("phi3.feed_forward_length", int(ff_size)),
+        ("phi3.rope.dimension_count", int(head_dim)),
+        ("phi3.rope.freq_base", float(rope_theta)),
+        ("phi3.attention.head_count", int(n_heads)),
+        ("phi3.attention.head_count_kv", int(n_kv_heads)),
+        ("phi3.attention.layer_norm_rms_epsilon", float(rms_eps)),
+        ("phi3.vocab_size", int(getattr(config, "vocab_size", 0))),
+    ]
+    entries.extend(tokenizer_metadata)
+    return entries
+
+
 def _collect_tokenizer_metadata(name_or_path: str, config: Any) -> list[tuple[str, Any]]:
     try:
         from transformers import AutoTokenizer
     except ImportError:
         return []
     tokenizer = AutoTokenizer.from_pretrained(name_or_path, use_fast=True)
-    vocab_size = getattr(tokenizer, "vocab_size", None) or getattr(config, "vocab_size", 0)
-    tokens = [tokenizer.convert_ids_to_tokens(i) for i in range(vocab_size)]
+    tokenizer_vocab = getattr(tokenizer, "vocab_size", None) or 0
+    config_vocab = getattr(config, "vocab_size", 0) or 0
+    vocab_size = max(tokenizer_vocab, config_vocab)
+    tokens = [tokenizer.convert_ids_to_tokens(i) or "" for i in range(vocab_size)]
     scores = [0.0] * vocab_size
     token_types = [1] * vocab_size
     for idx, token in enumerate(tokens):
@@ -665,8 +702,31 @@ def _collect_quantized_weight_names(model: PreTrainedModel) -> set[str]:
 def _collect_all_parameters(model: PreTrainedModel) -> list[tuple[str, torch.Tensor]]:
     result: list[tuple[str, torch.Tensor]] = []
     seen: set[str] = set()
+    config = getattr(model, "config", None)
+    vocab_size = getattr(config, "vocab_size", None)
+    num_labels = getattr(config, "num_labels", None)
     for name, parameter in model.named_parameters():
         if name in seen:
+            continue
+        if (
+            name.startswith("score.")
+            and num_labels is not None
+            and parameter.ndim >= 1
+            and parameter.shape[0] == num_labels
+        ):
+            continue
+        if (
+            name.startswith("score.")
+            and parameter.ndim == 2
+            and parameter.shape[0] < parameter.shape[1]
+        ):
+            continue
+        if (
+            vocab_size is not None
+            and name.startswith("score.")
+            and parameter.ndim >= 1
+            and parameter.shape[0] != vocab_size
+        ):
             continue
         seen.add(name)
         result.append((name, parameter.detach()))
@@ -693,9 +753,11 @@ def _map_llama_tensor_name(name: str) -> str:
         "self_attn.k_proj.weight": "attn_k.weight",
         "self_attn.v_proj.weight": "attn_v.weight",
         "self_attn.o_proj.weight": "attn_output.weight",
+        "self_attn.qkv_proj.weight": "attn_qkv.weight",
         "mlp.gate_proj.weight": "ffn_gate.weight",
         "mlp.up_proj.weight": "ffn_up.weight",
         "mlp.down_proj.weight": "ffn_down.weight",
+        "mlp.gate_up_proj.weight": "ffn_up.weight",
         "input_layernorm.weight": "attn_norm.weight",
         "post_attention_layernorm.weight": "ffn_norm.weight",
     }
@@ -780,12 +842,19 @@ def write_gguf(
     parameters = _collect_all_parameters(model)
     config = getattr(model, "config", None)
     model_type = getattr(config, "model_type", None) if config is not None else None
-    use_llama_names = model_type == "llama"
+    use_llama_names = model_type in {"llama", "phi3"}
     tensor_payloads: list[_TensorPayload] = []
     for name, tensor in parameters:
+        if name.startswith("score.") and tensor.ndim == 2 and tensor.shape[0] <= 8:
+            continue
         write_tensor = tensor.t() if use_llama_names and tensor.ndim == 2 else tensor
         quantizable = name in quantized_names and tensor.ndim == 2
         if use_llama_names and name in {"model.embed_tokens.weight", "lm_head.weight"}:
+            quantizable = False
+        if quantizable and (
+            write_tensor.shape[0] % GGUF_QUANT_BLOCK_ROWS != 0
+            or write_tensor.shape[1] % GGUF_QUANT_BLOCK_ROWS != 0
+        ):
             quantizable = False
         ggml_type = _infer_ggml_type(write_tensor, quantizable, quant)
         if quantizable:

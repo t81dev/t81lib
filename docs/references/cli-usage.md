@@ -57,6 +57,8 @@ Pass `--validate` when you want the fresh GGUF bundle checked by both the Python
 
 Use the same `--threshold`, `--device-map`, `--torch-dtype`, and `--force-cpu-device-map` knobs as `t81 convert` because `t81 gguf` delegates to that CLI internally.
 
+Phi-3 GGUF compatibility: the exporter now splits fused `qkv_proj`/`gate_up_proj` weights and skips ternary quantization for non-block-aligned matrices so `llama.cpp` can load Phi-3 bundles without patching. If you have an older GGUF, re-export with the latest `t81 gguf`.
+
 Use `--profile compression-first` to force the compression-first profile (TQ1_0 + default threshold) and stamp profile metadata into the bundle. Use `--profile tq1_1-draft` with `T81_ENABLE_TQ1_1=1` to write the experimental TQ1_1 payloads.
 
 ### Compression-first wedge (FP16 to ternary GGUF)

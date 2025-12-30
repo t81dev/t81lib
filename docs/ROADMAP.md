@@ -62,7 +62,20 @@ Recent work has delivered parts of this roadmap:
 
 * **Recommendation 1** — quickstart matrix + common workflows added to `DEVELOPMENT.md`.
 * **Recommendation 2** — CI matrix expanded for OS/build types and SIMD guards; Python tests standardized on Linux.
-* **Recommendation 3** — Python entry-points table added to `docs/python-api.md` and `docs/python-cookbook.md`, with links from `docs/index.md`.
+* **Recommendation 3** — Python entry-points table added to `docs/python-api.md` and `docs/python-cookbook.md`, with links from `docs/index.md`. **In progress (benchmark visibility added in `README.md`, `BENCHMARKS.md`, and the Phi-3 notebook).**
+* **GGUF compatibility** — Phi-3 export validated (`phi3-tq1-fixed12.gguf`); QKV split experiment reverted for llama.cpp parity.
+
+### Status timeline (recent highlights)
+
+* Python entry-point discoverability refreshed (docs landing page + cookbook + API entry table).
+* Phi-3 GGUF export validated with llama.cpp baseline metrics captured for reference.
+* CLI documentation updated to call out Phi-3 GGUF compatibility expectations.
+
+### High-impact next priorities (effort vs. impact)
+
+1. **Recommendation 4 — Standardized QAT benchmark (high effort, high impact)**: define a reproducible suite (e.g., Phi-3 Mini fine-tune on OpenAssistant/oasst1 or a small ViT on CIFAR-10) that compares FP16 → PTQ → QAT. Capture perplexity/accuracy, model size, and tok/s on CPU (llama.cpp) plus GPU (when bindings are ready), and publish baselines in `BENCHMARKS.md` with JSON artifacts.
+2. **Recommendation 5 — GPU tensor metadata + dispatcher hardening (medium effort, high impact)**: stabilize the `TensorMetadata` ABI for safe `device_ptr` handling, add broadcasting/contiguous fallbacks, and certify CUDA/ROCm kernels in CI with latency/accuracy parity against CPU.
+3. **Polish & community**: add issue templates + “good first issue” labels, ship pre-built wheels (including CUDA-enabled variants), and publish the Phi-3 TQ1_0 GGUF for community testing.
 
 Remaining items are listed below with the next steps still required.
 
@@ -91,6 +104,7 @@ Remaining items are listed below with the next steps still required.
 * **Why**: Python users currently discover helpers across `t81lib`, `t81`, and CLI docs.
 * **Benefits**: Easier discoverability, faster adoption, clearer path from C++ bindings to Torch wrappers.
 * **Effort**: Low-Medium.
+* **Status**: In progress (benchmark visibility added in `README.md`, `BENCHMARKS.md`, and the Phi-3 notebook).
 * **Implementation**:
   1. Expand MkDocs coverage by generating the Python API reference via mkdocstrings and ensuring key modules are linked from `docs/index.md`. **Done (entry-point links + extra directives).**
   2. Keep the “Python Cookbook” up to date with end-to-end recipes (bindings + `t81.torch` + CLI), and add a short "choose your entry point" table. **Done (entry points table).**

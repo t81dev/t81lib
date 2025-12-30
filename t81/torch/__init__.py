@@ -254,7 +254,7 @@ class TernaryTensor(torch.Tensor):
     def _compute_gemm(self, rhs: torch.Tensor) -> torch.Tensor:
         rhs_matrix = rhs.contiguous()
         packed_rhs = self._pack_rhs_for_gemm(rhs_matrix)
-        output = np.zeros((self._rows * rhs_matrix.shape[1],), dtype=np.float32)
+        output = np.zeros((self._rows, rhs_matrix.shape[1]), dtype=np.float32)
         t81lib.gemm_ternary(
             self._packed,
             packed_rhs,
@@ -263,7 +263,7 @@ class TernaryTensor(torch.Tensor):
             rhs_matrix.shape[1],
             self._k_limbs * 48,
         )
-        return torch.from_numpy(output.reshape(self._rows, rhs_matrix.shape[1]))
+        return torch.from_numpy(output)
 
 
 class _TernaryGemmFunction(torch.autograd.Function):

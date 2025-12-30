@@ -177,6 +177,9 @@ def _report_stats(stats: _ConversionStats, replaced: int) -> None:
 
 
 def _select_model_class(model_id_or_path: str, **kwargs: Any) -> PreTrainedModel:
+    model_id = model_id_or_path.lower()
+    if "phi-3" in model_id or "phi_3" in model_id or "phi3" in model_id:
+        return AutoModelForCausalLM.from_pretrained(model_id_or_path, **kwargs)
     last_error: Exception | None = None
     for cls in _AUTO_MODEL_CLASSES:
         try:

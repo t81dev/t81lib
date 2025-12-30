@@ -51,6 +51,13 @@ class Linear(nn.Linear):
         return self._packed_linear(x)
 
     def _packed_linear(self, x: torch.Tensor) -> torch.Tensor:
+        if x.ndim == 3:
+            batch, seq, features = x.shape
+            flat = x.reshape(batch * seq, features)
+            packed = self._packed_linear(flat)
+            return packed.reshape(batch, seq, -1)
+        if x.ndim != 2:
+            raise ValueError("t81.nn.Linear expects 2D or 3D inputs")
         try:
             return self.ternary_weight.matmul_input(x, bias=self.bias)
         except TypeError as exc:  # pragma: no cover - legacy helper might omit bias
@@ -116,4 +123,3 @@ class Linear(nn.Linear):
 
     def configure_qat(self, *, stochastic_rounding: bool) -> None:
         self._stochastic_rounding = stochastic_rounding
-

@@ -225,6 +225,7 @@ See [docs/api-overview.md](docs/api-overview.md) for the full surface described 
 ## Benchmarks
 
 See [BENCHMARKS.md](BENCHMARKS.md) for the Fashion-MNIST FP32/PTQ/QAT comparison.
+Phi-3 GGUF baseline (TQ1_0, CPU-only, llama.cpp): size 1481.96 MiB, peak RSS 2260.02 MiB, prompt 54.35 ms/token (18.4 tok/s), eval 56.22 ms/token (17.79 tok/s).
 
 ```bash
 cmake -S . -B build -DT81LIB_BUILD_BENCH=ON -DT81LIB_USE_GOOGLE_BENCH=ON
