@@ -65,6 +65,7 @@ Recent work has delivered parts of this roadmap:
 * **Recommendation 3** — Python entry-points table added to `docs/python-api.md` and `docs/python-cookbook.md`, with links from `docs/index.md`. **In progress (benchmark visibility added in `README.md`, `BENCHMARKS.md`, and the Phi-3 notebook).**
 * **GGUF compatibility** — Phi-3 export validated (`phi3-tq1-fixed12.gguf`); QKV split experiment reverted for llama.cpp parity.
 * **QAT benchmark groundwork** — ViT CIFAR-10 PTQ/QAT script added with size-only baseline captured; Phi-3 baseline PPL captured (PTQ PPL/QAT pending).
+* **GPU fallback safety** — `t81.torch` now warns + falls back to CPU for PTQ when tensors originate on GPU; smoke test added and troubleshooting docs updated.
 
 ### Status timeline (recent highlights)
 
@@ -72,6 +73,7 @@ Recent work has delivered parts of this roadmap:
 * Phi-3 GGUF export validated with llama.cpp baseline metrics captured for reference.
 * CLI documentation updated to call out Phi-3 GGUF compatibility expectations.
 * ViT size-only baseline logged; Phi-3 baseline PPL captured with PTQ PPL/QAT queued.
+* GPU fallback behavior documented; `.gitignore` hardened against GGUF/cache artifacts.
 
 ### High-impact next priorities (effort vs. impact)
 

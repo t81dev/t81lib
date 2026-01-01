@@ -21,3 +21,7 @@ __pycache__/
 # Benchmark outputs & downloads
 data/
 benchmarks/
+*.gguf
+.cache/
+.matplotlib/
+.fontconfig/

@@ -1,7 +1,11 @@
-#Quantization Benchmark Suite
+# Quantization Benchmark Suite
 
 This repository now provides a reproducible benchmark that compares FP32,
-    post - training ternary quantization(PTQ), and quantization - aware training(QAT) through a small Fashion-MNIST classifier. The script is located at `scripts/ternary_quantization_benchmark.py` and is designed to log accuracy, latency, and storage so you can understand the benefits of moving from float32 weights to ternary-trained representations.
+post-training ternary quantization (PTQ), and quantization-aware training (QAT)
+through a small Fashion-MNIST classifier. The script is located at
+`scripts/ternary_quantization_benchmark.py` and is designed to log accuracy,
+latency, and storage so you can understand the benefits of moving from float32
+weights to ternary-trained representations.
 
 ## Benchmark matrix
 
@@ -60,6 +64,67 @@ python scripts/vit_ptq_qat_benchmark.py \
 Expected output:
 - Console summary with size, accuracy/loss, and images/s for baseline/PTQ/QAT.
 - `benchmarks/vit_cifar10_baseline.json` with stage metrics and model metadata.
+
+### Fast-mode recipes (quick baselines)
+
+Use these when you want a low-latency run to confirm the pipeline without
+waiting for full PTQ/QAT loops.
+
+ViT size + accuracy baseline (skip throughput, minimal eval):
+
+```bash
+python scripts/vit_ptq_qat_benchmark.py \
+  --model-id google/vit-base-patch16-224 \
+  --device cpu \
+  --threshold 0.45 \
+  --batch-size 16 \
+  --max-train-samples 256 \
+  --max-eval-samples 128 \
+  --eval-batches 1 \
+  --max-eval-batches 1 \
+  --skip-throughput \
+  --json-output benchmarks/vit_cifar10_quick.json
+```
+
+Observed output (CPU, size-only run with `--max-eval-batches 0` + `--skip-throughput`):
+- baseline size: 0.32 GiB
+- PTQ size: 0.03 GiB
+- accuracy/loss/images_per_s: 0.0 (skipped)
+
+Phi-3 baseline PPL only (skip latency + PTQ PPL/QAT):
+
+```bash
+python scripts/phi3_ptq_qat_benchmark.py \
+  --model-id microsoft/Phi-3-mini-4k-instruct \
+  --device cpu \
+  --dtype float32 \
+  --max-eval-tokens 512 \
+  --eval-texts 16 \
+  --max-new-tokens 16 \
+  --skip-latency \
+  --skip-ptq-ppl \
+  --json-output benchmarks/phi3_baseline_ppl.json
+```
+
+Status: PTQ PPL + short QAT pending (CPU-only PTQ conversion exceeded 2h locally). Resume on GPU:
+
+```bash
+python scripts/phi3_ptq_qat_benchmark.py \
+  --model-id microsoft/Phi-3-mini-4k-instruct \
+  --device auto \
+  --dtype bfloat16 \
+  --threshold 0.45 \
+  --max-eval-tokens 128 \
+  --eval-texts 2 \
+  --max-new-tokens 0 \
+  --skip-latency \
+  --run-qat \
+  --qat-steps 5 \
+  --train-split 'train[:10]' \
+  --json-output benchmarks/phi3_ptq_qat_fast.json
+```
+
+Note: PTQ still runs on CPU (t81.torch fallback), so keep enough host RAM available.
 
 ### 4) GGUF export + load check
 
@@ -147,6 +212,50 @@ Each row contains:
 * `bytes` – estimated storage for the weight tensors (ternary storage for PTQ/QAT, raw float bytes for FP32).
 
 Use this CSV to plot accuracy vs. storage or compare latency across the three modes.
+
+## JSON artifact schema (ViT + Phi-3)
+
+The ViT and Phi-3 scripts emit JSON when you pass `--json-output`. These files
+are intended to be committed alongside baseline numbers.
+
+ViT JSON keys (from `scripts/vit_ptq_qat_benchmark.py`):
+
+```json
+{
+  "model_id": "google/vit-base-patch16-224",
+  "dataset": "cifar10",
+  "device": "cpu",
+  "threshold": 0.45,
+  "baseline": {"size_gib": 0.00, "accuracy": 0.0, "loss": 0.0, "images_per_s": 0.0},
+  "ptq": {"size_gib": 0.00, "accuracy": 0.0, "loss": 0.0, "images_per_s": 0.0},
+  "qat": null
+}
+```
+
+Phi-3 JSON keys (from `scripts/phi3_ptq_qat_benchmark.py`):
+
+```json
+{
+  "model_id": "microsoft/Phi-3-mini-4k-instruct",
+  "dataset": "wikitext-2-raw-v1",
+  "device": "cpu",
+  "dtype": "float32",
+  "threshold": 0.45,
+  "max_eval_tokens": 1024,
+  "eval_texts": 32,
+  "max_new_tokens": 64,
+  "skip_latency": true,
+  "skip_ptq_ppl": false,
+  "run_qat": false,
+  "qat_steps": 5,
+  "train_split": "train[:1%]",
+  "learning_rate": 5e-5,
+  "compression_ratio": 0.0,
+  "baseline": {"size_gib": 0.00, "ppl": 0.0, "tok_s": 0.0},
+  "ptq": {"size_gib": 0.00, "ppl": null, "tok_s": 0.0},
+  "qat": null
+}
+```
 
 ## Diagrams
 

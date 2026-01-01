@@ -8,6 +8,7 @@ point, re-quantizes right before ``nn.Linear``/``torch.matmul`` runs, and calls
 from __future__ import annotations
 
 from typing import Any, Callable, Dict, Mapping, Optional, Sequence
+import warnings
 
 import numpy as np
 import torch
@@ -50,8 +51,17 @@ def _quantize_tensor(tensor: torch.Tensor, threshold: float = 0.5) -> torch.Tens
 
 
 def _to_cpu_float(tensor: torch.Tensor) -> torch.Tensor:
+    if tensor.is_meta:
+        raise NotImplementedError(
+            "t81.trit does not support meta tensors; load weights on CPU or disable offload."
+        )
     if tensor.device.type != "cpu":
-        raise NotImplementedError("t81.trit currently only supports CPU tensors")
+        warnings.warn(
+            f"t81.trit runs on CPU; moving tensor from {tensor.device} to CPU.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return tensor.detach().to(device="cpu", dtype=torch.float32)
     return tensor.detach().to(dtype=torch.float32, copy=False)
 
 
@@ -272,7 +282,11 @@ class _TernaryGemmFunction(torch.autograd.Function):
         rhs_cpu = _to_cpu_float(rhs)
         ctx.save_for_backward(rhs_cpu)
         ctx.ternary = ternary_weight
-        return ternary_weight._compute_gemm(rhs_cpu)
+        ctx.rhs_device = rhs.device
+        output = ternary_weight._compute_gemm(rhs_cpu)
+        if rhs.device.type != "cpu":
+            output = output.to(rhs.device)
+        return output
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor) -> tuple[None, torch.Tensor]:
@@ -281,8 +295,12 @@ class _TernaryGemmFunction(torch.autograd.Function):
             _limbs_to_trits(ctx.ternary._packed, ctx.ternary._rows, ctx.ternary._k_limbs)
             .astype(np.float32)
         )[:, : ctx.ternary._k_actual]
+        grad_output_cpu = grad_output.to(device="cpu")
         # Gradient for rhs follows the usual matmul gradient formula.
-        grad_rhs = weight_float.transpose(-2, -1).matmul(grad_output)
+        grad_rhs = weight_float.transpose(-2, -1).matmul(grad_output_cpu)
+        rhs_device = getattr(ctx, "rhs_device", torch.device("cpu"))
+        if rhs_device.type != "cpu":
+            grad_rhs = grad_rhs.to(rhs_device)
         return None, grad_rhs
 
 
