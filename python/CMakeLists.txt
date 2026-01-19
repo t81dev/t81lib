@@ -64,7 +64,8 @@ endif()
 
 if(USE_METAL)
     target_sources(t81lib_python PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/../src/linalg/gemm_metal.mm)
+        ${CMAKE_CURRENT_SOURCE_DIR}/../src/linalg/gemm_metal.mm
+        ${CMAKE_CURRENT_SOURCE_DIR}/../src/linalg/pack_metal.mm)
 
     set(METAL_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/../src/linalg/gemm_kernel.metal)
     set(METAL_AIR ${CMAKE_CURRENT_BINARY_DIR}/gemm_kernel.air)
@@ -79,6 +80,20 @@ if(USE_METAL)
     add_custom_target(gemm_metal_shader DEPENDS ${METAL_LIB})
     add_dependencies(t81lib_python gemm_metal_shader)
     target_compile_definitions(t81lib_python PRIVATE GEMM_METAL_LIBRARY_PATH=\"${METAL_LIB}\")
+
+    set(PACK_METAL_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/../src/linalg/pack_kernel.metal)
+    set(PACK_METAL_AIR ${CMAKE_CURRENT_BINARY_DIR}/pack_kernel.air)
+    set(PACK_METAL_LIB ${CMAKE_CURRENT_BINARY_DIR}/pack_kernel.metallib)
+
+    add_custom_command(OUTPUT ${PACK_METAL_LIB}
+        COMMAND xcrun metal -c -o ${PACK_METAL_AIR} ${PACK_METAL_SOURCE}
+        COMMAND xcrun metallib -o ${PACK_METAL_LIB} ${PACK_METAL_AIR}
+        DEPENDS ${PACK_METAL_SOURCE}
+        COMMENT "Compiling Metal pack shader")
+
+    add_custom_target(pack_metal_shader DEPENDS ${PACK_METAL_LIB})
+    add_dependencies(t81lib_python pack_metal_shader)
+    target_compile_definitions(t81lib_python PRIVATE PACK_METAL_LIBRARY_PATH=\"${PACK_METAL_LIB}\")
 endif()
 
 set_target_properties(t81lib_python PROPERTIES

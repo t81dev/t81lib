@@ -24,6 +24,7 @@
 #include <t81/io/format.hpp>
 #include <t81/linalg/gemm.hpp>
 #include <t81/linalg/gemm_gpu.hpp>
+#include <t81/linalg/pack_gpu.hpp>
 #include <t81/tensor_metadata.hpp>
 #include <t81/sparse/simple.hpp>
 #include <t81/t81lib.hpp>
@@ -426,6 +427,17 @@ namespace {
         const std::size_t total = static_cast<std::size_t>(std::max<py::ssize_t>(info.size, 0));
         const auto src = static_cast<const float *>(info.ptr);
         const auto dst = static_cast<std::int8_t *>(output.request().ptr);
+#if T81LIB_USE_METAL
+        if (t81::linalg::detail::metal_available()) {
+            try {
+                std::span<const float> src_span{src, total};
+                std::span<std::int8_t> dst_span{dst, total};
+                t81::linalg::detail::metal_quantize_to_trits(src_span, dst_span, threshold);
+                return output;
+            } catch (const std::exception &) {
+            }
+        }
+#endif
         for (std::size_t index = 0; index < total; ++index) {
             dst[index] = quantize_trit(src[index], threshold);
         }
@@ -463,8 +475,25 @@ namespace {
         py::array_t<std::uint8_t> packed(
             {static_cast<std::size_t>(rows), static_cast<std::size_t>(limbs_per_row), limb_bytes});
         const auto *src = static_cast<const float *>(info.ptr);
-        auto *dst = static_cast<std::uint8_t *>(packed.request().ptr);
+        auto packed_info = packed.request(true);
+        auto *dst = static_cast<std::uint8_t *>(packed_info.ptr);
         const std::size_t row_stride = static_cast<std::size_t>(limbs_per_row) * limb_bytes;
+#if T81LIB_USE_METAL
+        if (t81::linalg::detail::metal_available()) {
+            try {
+                const std::size_t total_src =
+                    static_cast<std::size_t>(rows) * static_cast<std::size_t>(cols);
+                const std::size_t total_dst =
+                    static_cast<std::size_t>(std::max<py::ssize_t>(packed_info.size, 0));
+                std::span<const float> src_span{src, total_src};
+                std::span<std::uint8_t> dst_span{dst, total_dst};
+                t81::linalg::detail::metal_pack_dense_matrix(src_span, dst_span,
+                                                             rows, cols, threshold);
+                return packed;
+            } catch (const std::exception &) {
+            }
+        }
+#endif
         for (int row = 0; row < rows; ++row) {
             const auto *row_ptr =
                 src + static_cast<std::size_t>(row) * static_cast<std::size_t>(cols);

@@ -63,3 +63,5 @@ This file helps AI agents discover and understand how to work with this reposito
 - Hardened the SIMD detection helpers in `include/t81/core/detail/simd.hpp` with CPUID/xgetbv fallbacks, documented the `add_trytes_*` overflow semantics, and made NEON runtime checks opt-out via `T81_DISABLE_NEON`.
 - Added the `compression-first` GGUF export profile (metadata + CLI flags), plus `scripts/gguf_benchmark.py` and CLI docs that walk FP16 to ternary GGUF before/after measurements.
 - Added `examples/ternary_phi3_ptq_qat_demo.ipynb` to showcase Phi-3-mini PTQ/QAT size, latency, and perplexity comparisons in one compact notebook.
+- Added Metal pack/quantize kernels (`src/linalg/pack_kernel.metal`, `src/linalg/pack_metal.mm`) plus `include/t81/linalg/pack_gpu.hpp` and Python binding dispatch so PTQ packing can run on Apple Metal when enabled.
+- Documented GGUF helper APIs (`read_gguf`, `repack_gguf`, `dequantize_gguf`) plus the experimental TQ1_1 note in the GGUF and Python docs.

@@ -13,6 +13,15 @@ This page is the landing spot for the auto-generated Python reference. It is pro
 | `t81.convert` / `t81.gguf` | call the conversion/GGUF helpers programmatically | `from t81 import convert, gguf` |
 | `t81.hardware` | explore ternary hardware emulation helpers | `from t81 import hardware` |
 
+## GGUF helpers (quick reference)
+
+The `t81.gguf` module exposes streaming and compatibility utilities beyond the CLI wrappers:
+
+- `t81.gguf.write_gguf` to emit GGUF bundles from converted models.
+- `t81.gguf.read_gguf` to stream tensor payloads and metadata without loading the full file.
+- `t81.gguf.repack_gguf` to re-quantize existing float16/float32 GGUF bundles into TQ1_0/TQ2_0.
+- `t81.gguf.dequantize_gguf` (plus `t81.dequantize_gguf_to_float`) to rewrite ternary bundles into float GGUF files for broader runtime compatibility.
+
 ## Generating the docs
 
 1. Install the tooling (ideally in a virtual environment):

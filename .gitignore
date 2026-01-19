@@ -1,4 +1,5 @@
 build/
+build-*/
 dist/
 *.o
 *.obj
@@ -13,6 +14,13 @@ build-full/
 pipx_home/
 pipx_logs/
 t81lib.egg-info/
+
+# CMake artifacts
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
 
 # Python runtime artifacts
 __pycache__/

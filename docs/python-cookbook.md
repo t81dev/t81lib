@@ -63,3 +63,22 @@ t81-gguf --input model.t81 --validate
 ```
 
 This recipe shows how Python experiments (scripts, notebooks) complement the CLI docs in `docs/references/cli-usage.md`.
+
+## 4. Inspect, repack, or dequantize GGUF bundles in Python
+
+```python
+import numpy as np
+from t81 import gguf
+
+# Stream metadata and tensors without loading the full file into RAM.
+payload, metadata = gguf.read_gguf("model-tq1.gguf", return_metadata=True)
+print(metadata.get("general.architecture"))
+
+# Repack a float GGUF into ternary (float tensors only).
+gguf.repack_gguf("model-f16.gguf", "model-tq1.gguf", quant="TQ1_0", threshold=0.45)
+
+# Convert a ternary GGUF back to float for runtimes without TQ support.
+gguf.dequantize_gguf("model-tq1.gguf", "model-f16.gguf", dtype=np.float16)
+```
+
+Use `dequantize_gguf_to_float` when you always want float32 output, and set `T81_ENABLE_TQ1_1=1` before using the experimental `tq1_1-draft` profile.
