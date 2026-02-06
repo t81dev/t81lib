@@ -5,7 +5,7 @@
 ### Extreme compression for on-device inference
 
 Ternary PTQ/QAT on Phi-3-mini-4k-instruct: measure size (FP16 -> ternary), latency, and perplexity in a single workflow.
-Start here: [`examples/ternary_phi3_ptq_qat_demo.ipynb`](examples/ternary_phi3_ptq_qat_demo.ipynb).
+Start here: [`examples/ternary_phi3_ptq_qat_demo.ipynb`](../examples/ternary_phi3_ptq_qat_demo.ipynb).
 
 1. Convert existing large language models to ternary weights while keeping `torch.nn.Module` semantics (`examples/demo_llama_conversion.py`).
 2. Study ternary scaling laws for RMSNorm, RoPE, and ternary softmax to compare precision versus throughput (`examples/scaling_laws_ternary.py`).
@@ -25,4 +25,4 @@ These scripts and notebooks mirror the CLI workflows while keeping you inside Py
 
 ## Additional references
 
-Mentioned demos also appear in `docs/index.md` and `docs/references/cli-usage.md` so you can toggle between CLI helpers and Python stories without guessing. The [quantization workflow diagram](docs/diagrams/quantization-workflow.mermaid.md) ties the PyTorch conversion path to the CLI export/inference steps above.
+Mentioned demos also appear in `docs/index.md` and `docs/references/cli-usage.md` so you can toggle between CLI helpers and Python stories without guessing. The [quantization workflow diagram](diagrams/quantization-workflow.mermaid.md) ties the PyTorch conversion path to the CLI export/inference steps above.

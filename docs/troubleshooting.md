@@ -64,5 +64,5 @@ This guide complements [README.md](../README.md) and the other reference pages b
 
 ## Where to go next
 
-- Review the [docs/index.md](docs/index.md) portal for deep dives on Python, Torch, CLI, and hardware flows.
+- Review the [index.md](index.md) portal for deep dives on Python, Torch, CLI, and hardware flows.
 - If you hit a reproducible failure, open an issue referencing the log from `build/test-output` and the exact `cmake` command you used.

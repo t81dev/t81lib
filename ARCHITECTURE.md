@@ -67,7 +67,7 @@ in `docs/design/limb-design.md`, `docs/design/bigint-design.md`, and `docs/desig
 ## Visual guides
 
 - `docs/diagrams/core-architecture.mermaid.md` — layered helpers from `limb` → `bigint` → the umbrella helpers and GEMM stack.
-- [`docs/diagrams/docs-sitemap.mermaid.md`](diagrams/docs-sitemap.mermaid.md) — site map summarizing the docs portal and related resources.
+- [`docs/diagrams/docs-sitemap.mermaid.md`](docs/diagrams/docs-sitemap.mermaid.md) — site map summarizing the docs portal and related resources.
 
 This guide is intentionally light and developer-facing—if you need a runnable overview, `docs/index.md`
 acts as the higher-level docs portal introduced in the README.

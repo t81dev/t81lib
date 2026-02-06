@@ -210,7 +210,7 @@ See [docs/api-overview.md](docs/api-overview.md) for the full surface described 
 
 ### Specs & design
 
-- [docs/t81lib-spec-v1.0.0.md](docs/t81lib-spec-v1.0.0.md) — Normative contract.
+- [docs/t81lib-spec-v0.1.0.md](docs/t81lib-spec-v0.1.0.md) — Normative contract.
 - [docs/design/](docs/design/) — Deep dives on `limb`, `bigint`, and `montgomery`.
 - [docs/api-overview.md](docs/api-overview.md) — Umbrella helper catalog.
 - [ARCHITECTURE.md](ARCHITECTURE.md) & [docs/index.md](docs/index.md) — Architecture stories and portal.

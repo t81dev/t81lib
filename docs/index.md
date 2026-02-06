@@ -38,7 +38,7 @@ From here: `t8.nn.Linear` for drop-in layers, `t8.convert`/`t8.gguf` for scripte
 - **Landing & Quick Start** — [`README.md`](../README.md) contains the hero content, badges, and a comprehensive quick
   start section for builds, subprojects, pip/pipx consumers, CLI helpers, and the new “Start here” router.
 - **Architecture guide** — [`ARCHITECTURE.md`](../ARCHITECTURE.md) walks through the component layers and data flow.
-- **Normative spec** — [`docs/t81lib-spec-v1.0.0.md`](t81lib-spec-v1.0.0.md) defines the API guarantees for `limb`, `bigint`, and helpers.
+- **Normative spec** — [`docs/t81lib-spec-v0.1.0.md`](t81lib-spec-v0.1.0.md) defines the API guarantees for `limb`, `bigint`, and helpers.
 - **Design notes** — [`docs/design/limb-design.md`](design/limb-design.md), [`docs/design/bigint-design.md`](design/bigint-design.md), [`docs/design/montgomery-design.md`](design/montgomery-design.md) explain internal
   choices, algorithms, and invariants.
 - **Examples** — [`examples/`](../examples/) hosts runnable demos that mirror the README snippets.
