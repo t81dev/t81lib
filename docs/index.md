@@ -68,6 +68,7 @@ From here: `t8.nn.Linear` for drop-in layers, `t8.convert`/`t8.gguf` for scripte
 - **GPU backends** — [`docs/gpu.md`](gpu.md) explains the CUDA/ROCm build flags and tensor metadata routing.
 - **API overview** — [`docs/api-overview.md`](api-overview.md) summarizes the numeric containers and helpers exposed via `<t81/t81lib.hpp>`.
 - **Tests & benchmarks** — [`tests/`](../tests/) documents the unit/property coverage while [`bench/`](../bench/) shows throughput patterns.
+- **Phase 1 hardening checklist** — [`docs/quantization-hardening.md`](quantization-hardening.md) defines the arithmetic/quantization stabilization gates and reproducible validation flow.
 - **Docs sitemap** — the [`docs/diagrams/docs-sitemap.mermaid.md`](diagrams/docs-sitemap.mermaid.md) mind map visualizes the content hierarchy referenced on this page.
 
 ## Stay aligned

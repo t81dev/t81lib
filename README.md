@@ -207,6 +207,7 @@ See [docs/api-overview.md](docs/api-overview.md) for the full surface described 
 - [docs/python-api.md](docs/python-api.md) & [docs/python-cookbook.md](docs/python-cookbook.md) — Python recipes.
 - [docs/torch.md](docs/torch.md) — PyTorch integration, `t81.torch`, and `t81.nn`.
 - [docs/references/cli-usage.md](docs/references/cli-usage.md) — CLI workflows for convert/gguf/qat.
+- [docs/quantization-hardening.md](docs/quantization-hardening.md) — Phase 1 hardening checklist and reproducible validation lanes.
 
 ### Specs & design
 
